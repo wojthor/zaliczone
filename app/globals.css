@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Paleta: krem #F7E9AD · limonka #D7FE51 · biel · lodowy #EBEFFE · stal #B1B9D1 */
+  --color-depths: #000c4a;
+  --color-luster: #ebeffe;
+  --color-butter: #f7e9ad;
+  --color-snow: #ffffff;
+  --color-steel: #b1b9d1;
+  --color-lime: #d7fe51;
+  --color-muted: #5a6278;
+  --color-taupe: color-mix(in srgb, #ebeffe 72%, #b1b9d1 28%);
+  --color-aster: #8f97b0;
+  --color-royal: #000c4a;
+  --color-habanero: #8f97b0;
+  --color-jodhpur: color-mix(in srgb, #ebeffe 82%, #ffffff 18%);
+  --color-sage: #c8cedd;
+  --color-panel-frame: #889acc;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@utility rounded-app {
+  border-radius: 1.125rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Ukryty pasek przewijania (treść nadal przewijalna) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Cienki pasek w kolumnach terminarza (Firefox + WebKit) */
+.scrollbar-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-steel) transparent;
+}
+.scrollbar-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-panel::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-steel) 85%, transparent);
+  border-radius: 999px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-luster);
+  color: var(--color-depths);
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
