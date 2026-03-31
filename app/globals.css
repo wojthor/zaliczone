@@ -22,6 +22,42 @@
   border-radius: 1.125rem;
 }
 
+/* Animacja „przeskoku” pozycji z oczekujących do opłaconych (panel rozliczeń admina) */
+@keyframes hopToPaid {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(0.85rem) scale(0.99);
+    opacity: 0.97;
+  }
+  100% {
+    transform: translateX(2rem) scale(0.97);
+    opacity: 0.88;
+  }
+}
+
+.hop-to-paid {
+  animation: hopToPaid 0.52s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes addTutorSuccessPop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.add-tutor-success-pop {
+  animation: addTutorSuccessPop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Ukryty pasek przewijania (treść nadal przewijalna) */
 .scrollbar-hide {
   scrollbar-width: none;

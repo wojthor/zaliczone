@@ -50,6 +50,17 @@ export function IconWallet(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Wypłaty / przelew — banknot z okienkiem (inny styl niż portfel). */
+export function IconPayroll(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M7 9v6M17 9v6" />
+    </svg>
+  );
+}
+
 export function IconUser(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden {...props}>
@@ -65,6 +76,35 @@ export function IconMenu(props: SVGProps<SVGSVGElement>) {
       <line x1="4" y1="6" x2="20" y2="6" strokeLinecap="round" />
       <line x1="4" y1="12" x2="20" y2="12" strokeLinecap="round" />
       <line x1="4" y1="18" x2="20" y2="18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Folder — obrys, styl zbliżony do ikon systemowych (Finder / Eksplorator). */
+export function IconFolder(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path
+        d="M3 8V7a2 2 0 0 1 2-2h4.2l1.6 1.5H19a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function IconFileDoc(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path
+        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" opacity={0.5} />
     </svg>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { AppShell } from "@/components/app-shell";
+import { AppRoot } from "@/components/app-root";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <body className="antialiased ">
-        <AppShell>{children}</AppShell>
+        <AppRoot>{children}</AppRoot>
       </body>
     </html>
   );
