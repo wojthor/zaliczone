@@ -1,298 +1,445 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { DEMO_FINANCE_LINES } from "@/lib/demo-data";
-import { ADMIN_TUTORS } from "@/lib/admin-demo";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { adminRejectLessonPayment, adminVerifyLesson } from "@/lib/actions/admin";
+import { formatDateDdMm } from "@/lib/data/mappers";
+import type { FinanceLineUi } from "@/lib/types/database";
+import { isIsoDateInWeek, dateLabelToIsoKey } from "@/lib/date/week-utils";
+import { WeekNavigator, useWeekMondayIso } from "@/components/week-navigator";
+import { Spinner, useToast } from "@/components/ui/toast";
 
-type PaymentMethod = "Przelew" | "BLIK";
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
-type PayRow = (typeof DEMO_FINANCE_LINES)[number] & {
-  tutorName: string;
-  subject: string;
-  paymentMethod: PaymentMethod;
-  paidAt?: string;
-};
+function ensureDateIso(line: FinanceLineUi): FinanceLineUi {
+  return {
+    ...line,
+    dateIso: line.dateIso || dateLabelToIsoKey(line.date),
+  };
+}
 
-export function RozliczeniaClient() {
-  const [rows, setRows] = useState<PayRow[]>(() =>
-    DEMO_FINANCE_LINES.map((r, i) => ({
-      ...r,
-      tutorName: ADMIN_TUTORS[i % ADMIN_TUTORS.length]?.name ?? "Nieprzypisany",
-      subject: normalizeSubject(extractSubject(r.label)),
-      paymentMethod: i % 2 === 0 ? "Przelew" : "BLIK",
-      paidAt: i >= 3 ? formatYmd(new Date()) : undefined,
-    })),
-  );
+export function RozliczeniaClient({
+  pendingLines,
+  verifiedLines,
+  unpaidLines,
+}: {
+  pendingLines: FinanceLineUi[];
+  verifiedLines: FinanceLineUi[];
+  unpaidLines: FinanceLineUi[];
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [pending, setPending] = useState<FinanceLineUi[]>(() => pendingLines.map(ensureDateIso));
+  const [verified, setVerified] = useState<FinanceLineUi[]>(() => verifiedLines.map(ensureDateIso));
+  const [unpaid, setUnpaid] = useState<FinanceLineUi[]>(() => unpaidLines.map(ensureDateIso));
   const [query, setQuery] = useState("");
-  const [counterDay, setCounterDay] = useState<"today" | "yesterday">("yesterday");
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(-1);
+  const [paymentDates, setPaymentDates] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setPending(pendingLines.map(ensureDateIso));
+    setVerified(verifiedLines.map(ensureDateIso));
+    setUnpaid(unpaidLines.map(ensureDateIso));
+  }, [pendingLines, verifiedLines, unpaidLines]);
+
+  useEffect(() => {
+    setPaymentDates((prev) => {
+      const next = { ...prev };
+      for (const row of [...pending, ...unpaid]) {
+        if (!next[row.id]) next[row.id] = todayIso();
+      }
+      for (const row of verified) {
+        if (row.paymentReceivedAtIso) next[row.id] = row.paymentReceivedAtIso;
+      }
+      return next;
+    });
+  }, [pending, unpaid, verified]);
 
   const queryNorm = query.trim().toLowerCase();
-  const matchesQuery = (r: PayRow) =>
-    [r.tutorName, r.subject, r.date, r.studentName, String(r.amountPln), r.paymentMethod, r.paidAt ?? ""]
+  const matchesQuery = (r: FinanceLineUi) => {
+    if (!queryNorm) return true;
+    return [
+      r.tutorName,
+      r.subject,
+      r.date,
+      r.paymentReceivedAt ?? "",
+      r.studentName,
+      String(r.amountPln),
+      r.status,
+      r.label,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(queryNorm);
+  };
 
-  const pending = useMemo(() => rows.filter((r) => !r.paidAt && matchesQuery(r)), [rows, queryNorm]);
-  const paid = useMemo(() => rows.filter((r) => !!r.paidAt && matchesQuery(r)), [rows, queryNorm]);
+  const inSelectedWeek = (r: FinanceLineUi) => isIsoDateInWeek(r.dateIso, weekMondayIso);
 
-  const dayKey = useMemo(() => getDayKey(counterDay), [counterDay]);
-  const dayTotals = useMemo(() => {
-    const allForDay = rows.filter((r) => dateLabelToKey(r.date) === dayKey);
-    const paidForDay = allForDay.filter((r) => !!r.paidAt).length;
-    return { paid: paidForDay, total: allForDay.length };
-  }, [rows, dayKey]);
-  const dayLabel = useMemo(() => dayKeyToLabel(dayKey), [dayKey]);
-  const dayAllPaid = dayTotals.total > 0 && dayTotals.paid === dayTotals.total;
+  const pendingInWeek = pending.filter((r) => matchesQuery(r) && inSelectedWeek(r));
+  const verifiedInWeek = verified.filter((r) => matchesQuery(r) && inSelectedWeek(r));
+  const unpaidInWeek = unpaid.filter((r) => matchesQuery(r) && inSelectedWeek(r));
 
-  const pendingByDay = useMemo(() => groupByDayDesc(pending), [pending]);
-  const paidByDay = useMemo(() => groupByDayDesc(paid), [paid]);
+  const pendingByDay = groupByDayDesc(pendingInWeek);
+  const verifiedByDay = groupByDayDesc(verifiedInWeek);
+  const unpaidByDay = groupByDayDesc(unpaidInWeek);
 
-  function markPaid(id: string) {
+  const weekTotalCount = pendingInWeek.length + verifiedInWeek.length + unpaidInWeek.length;
+
+  function paymentIsoFor(id: string): string {
+    return paymentDates[id] ?? todayIso();
+  }
+
+  function applyVerifiedPayment(row: FinanceLineUi, paidIso: string): FinanceLineUi {
+    return {
+      ...row,
+      status: "VERIFIED",
+      paymentReceivedAt: formatDateDdMm(paidIso),
+      paymentReceivedAtIso: paidIso,
+    };
+  }
+
+  async function markVerified(id: string) {
+    if (movingId) return;
+    const paidIso = paymentIsoFor(id);
+    setMovingId(id);
+    try {
+      await adminVerifyLesson(id, paidIso);
+      const row = pending.find((x) => x.id === id);
+      if (row) {
+        setPending((prev) => prev.filter((x) => x.id !== id));
+        setVerified((prev) => [applyVerifiedPayment(row, paidIso), ...prev]);
+      }
+      toast.success("Zatwierdzono", `Wpłata z datą ${formatDateDdMm(paidIso)}.`);
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Nie udało się zatwierdzić lekcji.";
+      toast.error("Błąd zatwierdzenia", msg);
+    } finally {
+      setMovingId(null);
+    }
+  }
+
+  async function markUnpaid(id: string) {
     if (movingId) return;
     setMovingId(id);
-    window.setTimeout(() => {
-      setRows((prev) => prev.map((x) => (x.id === id ? { ...x, paidAt: formatYmd(new Date()) } : x)));
+    try {
+      await adminRejectLessonPayment(id);
+      const row = pending.find((x) => x.id === id);
+      if (row) {
+        setPending((prev) => prev.filter((x) => x.id !== id));
+        setUnpaid((prev) => [
+          { ...row, status: "UNPAID", paymentReceivedAt: null, paymentReceivedAtIso: null },
+          ...prev,
+        ]);
+      }
+      toast.success("Oznaczono jako nieopłacone", "Lekcja przeniesiona do listy nieopłaconych.");
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Nie udało się oznaczyć jako nieopłacone.";
+      toast.error("Błąd", msg);
+    } finally {
       setMovingId(null);
-    }, 520);
+    }
+  }
+
+  async function markVerifiedFromUnpaid(id: string) {
+    if (movingId) return;
+    const paidIso = paymentIsoFor(id);
+    setMovingId(id);
+    try {
+      await adminVerifyLesson(id, paidIso);
+      const row = unpaid.find((x) => x.id === id);
+      if (row) {
+        setUnpaid((prev) => prev.filter((x) => x.id !== id));
+        setVerified((prev) => [applyVerifiedPayment(row, paidIso), ...prev]);
+      }
+      toast.success("Zatwierdzono ponownie", `Wpłata z datą ${formatDateDdMm(paidIso)}.`);
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Nie udało się zatwierdzić lekcji.";
+      toast.error("Błąd zatwierdzenia", msg);
+    } finally {
+      setMovingId(null);
+    }
   }
 
   return (
-    <div className="min-w-0 space-y-3 sm:space-y-4">
+    <div className="min-w-0 space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-depths text-lg font-semibold tracking-tight sm:text-xl">Rozliczenia</h1>
           <p className="text-muted mt-0.5 text-[0.7rem] leading-snug sm:text-xs">
-            Zaliczone lekcje — Przelew / BLIK. Od lg: dwie kolumny obok siebie.
+            Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
+            zmienić.
           </p>
         </div>
-        <Link
-          href="/admin/ksiegowosc"
-          className="shrink-0 rounded-full bg-[#000C4A] px-2.5 py-1 text-center text-[0.65rem] font-bold text-lime transition-opacity hover:opacity-90 sm:px-3 sm:py-1.5 sm:text-xs"
-        >
-          Księgowość →
-        </Link>
       </div>
 
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Szukaj…"
+        placeholder="Szukaj po korepetytorze, uczniu, dacie…"
         className="w-full min-w-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:px-3 sm:py-2"
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[0.7rem] sm:text-xs">
-        <p className="font-semibold text-depths">
-          Stan — {dayLabel}:{" "}
-          <span className={dayAllPaid ? "text-green-700" : "text-orange-600"}>
-            {dayTotals.paid}/{dayTotals.total}
-          </span>
-        </p>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => setCounterDay("today")}
-            className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold sm:px-2.5 sm:text-xs ${
-              counterDay === "today" ? "bg-[#000C4A] text-lime" : "bg-jodhpur text-depths"
-            }`}
-          >
-            Dzisiaj
-          </button>
-          <button
-            type="button"
-            onClick={() => setCounterDay("yesterday")}
-            className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold sm:px-2.5 sm:text-xs ${
-              counterDay === "yesterday" ? "bg-[#000C4A] text-lime" : "bg-jodhpur text-depths"
-            }`}
-          >
-            Wczoraj
-          </button>
-        </div>
-      </div>
+      <WeekNavigator
+        weekMondayIso={weekMondayIso}
+        onWeekMondayIsoChange={setWeekMondayIso}
+        summary={
+          <p className="text-muted mt-0.5 text-[0.65rem]">
+            {weekTotalCount === 0
+              ? "Brak pozycji w tym tygodniu"
+              : `${weekTotalCount} pozycji · ${pendingInWeek.length} do zatwierdzenia · ${verifiedInWeek.length} zatwierdzonych · ${unpaidInWeek.length} nieopłaconych`}
+          </p>
+        }
+      />
 
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start lg:gap-3">
-        <PaymentsTable
-          title="Oczekujące wpłaty"
-          subtitle="Tylko zaliczone lekcje."
-          empty="Brak oczekujących wpłat."
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start lg:gap-3">
+        <PaymentsPanel
+          title="Do zatwierdzenia"
+          subtitle="PENDING_VERIFICATION — sprawdź przelew i ustaw datę wpływu."
+          empty="Brak lekcji do weryfikacji w wybranym tygodniu."
           groups={pendingByDay}
           variant="pending"
+          count={pendingInWeek.length}
+          tall
           movingId={movingId}
-          onMarkPaid={markPaid}
+          paymentDates={paymentDates}
+          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+          onVerify={markVerified}
+          onReject={markUnpaid}
         />
-        <PaymentsTable
-          title="Opłacone"
-          subtitle="Data zapłaty z momentu oznaczenia w systemie."
-          empty="Brak opłaconych pozycji."
-          groups={paidByDay}
-          variant="paid"
-          movingId={null}
-          onMarkPaid={() => {}}
-        />
+
+        <div className="flex min-w-0 flex-col gap-4">
+          <PaymentsPanel
+            title="Zatwierdzone"
+            subtitle="VERIFIED — data wpływu zablokowana · idą do wypłat / księgowości."
+            empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
+            groups={verifiedByDay}
+            variant="verified"
+            count={verifiedInWeek.length}
+            movingId={movingId}
+            paymentDates={paymentDates}
+            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+          />
+          <PaymentsPanel
+            title="Nieopłacone"
+            subtitle="UNPAID — po wpływie ustaw datę i zatwierdź ponownie."
+            empty="Brak nieopłaconych lekcji w wybranym tygodniu."
+            groups={unpaidByDay}
+            variant="unpaid"
+            count={unpaidInWeek.length}
+            movingId={movingId}
+            paymentDates={paymentDates}
+            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+            onVerify={markVerifiedFromUnpaid}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function PaymentsTable({
+function PaymentsPanel({
   title,
   subtitle,
   empty,
   groups,
   variant,
+  count,
+  tall = false,
   movingId,
-  onMarkPaid,
+  paymentDates,
+  onPaymentDateChange,
+  onVerify,
+  onReject,
 }: {
   title: string;
   subtitle: string;
   empty: string;
-  groups: [string, PayRow[]][];
-  variant: "pending" | "paid";
+  groups: [string, FinanceLineUi[]][];
+  variant: "pending" | "verified" | "unpaid";
+  count: number;
+  tall?: boolean;
   movingId: string | null;
-  onMarkPaid: (id: string) => void;
+  paymentDates: Record<string, string>;
+  onPaymentDateChange: (id: string, iso: string) => void;
+  onVerify?: (id: string) => void;
+  onReject?: (id: string) => void;
 }) {
-  const th =
-    "border-b border-panel-frame/40 bg-jodhpur/90 px-1 py-1 text-left text-[0.55rem] font-bold uppercase leading-tight text-depths sm:px-1.5 sm:py-1.5 sm:text-[0.6rem]";
-  const td =
-    "border-b border-panel-frame/15 px-1 py-1 align-top text-[0.62rem] leading-tight break-words sm:px-1.5 sm:py-1.5 sm:text-[0.7rem]";
-  const row = "bg-snow even:bg-luster/40 hover:bg-luster/60";
+  const accent =
+    variant === "pending"
+      ? "border-aster/40"
+      : variant === "verified"
+        ? "border-green-600/30"
+        : "border-red-400/40";
+
+  const maxH = tall
+    ? "max-h-[min(40rem,72vh)] lg:max-h-[min(44rem,78vh)]"
+    : "max-h-[min(18rem,36vh)] lg:max-h-[min(20rem,38vh)]";
 
   return (
-    <div className="min-w-0">
-      <h2 className="text-depths text-sm font-semibold">{title}</h2>
-      <p className="text-muted mb-1 text-[0.65rem] leading-tight">{subtitle}</p>
+    <section className={`min-w-0 rounded-app border bg-snow ${accent} p-3 sm:p-4`}>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-depths text-sm font-semibold sm:text-base">{title}</h2>
+          <p className="text-muted mt-0.5 text-[0.65rem] leading-tight sm:text-xs">{subtitle}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-[#000C4A] px-2 py-0.5 text-[0.65rem] font-bold tabular-nums text-lime">
+          {count}
+        </span>
+      </div>
+
       {groups.length === 0 ? (
-        <p className="text-muted py-4 text-xs">{empty}</p>
+        <p className="text-muted py-6 text-center text-xs">{empty}</p>
       ) : (
-        <div className="max-h-[min(20rem,42vh)] overflow-y-auto overflow-x-hidden rounded-lg border border-panel-frame/35 scrollbar-panel sm:max-h-[min(22rem,48vh)] sm:rounded-app">
-          <table className="table-fixed w-full min-w-0 border-collapse">
-            <thead className="sticky top-0 z-1 bg-jodhpur/95 shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)]">
-              <tr>
-                <th scope="col" className={`${th} w-[10%]`}>
-                  Data
-                </th>
-                <th scope="col" className={`${th} w-[16%]`}>
-                  Korep.
-                </th>
-                <th scope="col" className={`${th} w-[16%]`}>
-                  Przedm.
-                </th>
-                <th scope="col" className={`${th} w-[18%]`}>
-                  Uczeń
-                </th>
-                <th scope="col" className={`${th} w-[11%] text-right`}>
-                  Kwota
-                </th>
-                <th scope="col" className={`${th} w-[9%]`}>
-                  Płatn.
-                </th>
-                {variant === "pending" ? (
-                  <th scope="col" className={`${th} w-[20%] text-right`}>
-                    Akcja
-                  </th>
-                ) : (
-                  <th scope="col" className={`${th} w-[20%]`}>
-                    Zapłata
-                  </th>
-                )}
-              </tr>
-            </thead>
-            {groups.map(([dayLabelText, dayRows]) => (
-              <tbody key={dayLabelText}>
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="border-b border-panel-frame/25 bg-luster/80 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-muted"
-                  >
-                    {dayLabelText}
-                  </td>
-                </tr>
+        <div className={`space-y-3 overflow-y-auto overflow-x-hidden scrollbar-panel pr-0.5 ${maxH}`}>
+          {groups.map(([dayLabelText, dayRows]) => (
+            <div key={dayLabelText} className="min-w-0">
+              <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-muted">{dayLabelText}</p>
+              <ul className="space-y-1.5">
                 {dayRows.map((r) => (
-                  <tr key={r.id} className={`${row} ${movingId === r.id ? "hop-to-paid" : ""}`}>
-                    <td className={`${td} tabular-nums`}>{r.date}</td>
-                    <td className={td}>{r.tutorName}</td>
-                    <td className={td}>{r.subject}</td>
-                    <td className={`${td} font-medium`}>{r.studentName}</td>
-                    <td className={`${td} text-right tabular-nums font-bold ${variant === "paid" ? "text-green-700" : "text-aster"}`}>
-                      {r.amountPln} zł
-                    </td>
-                    <td className={td}>{r.paymentMethod}</td>
-                    {variant === "pending" ? (
-                      <td className={`${td} text-right`}>
-                        <button
-                          type="button"
-                          title="Oznacz jako opłacone"
-                          onClick={() => onMarkPaid(r.id)}
-                          disabled={movingId !== null}
-                          className="w-full max-w-full rounded-md bg-[#000C4A] px-0.5 py-1 text-center text-[0.55rem] font-bold leading-[1.15] text-lime sm:px-1 sm:text-[0.6rem] disabled:opacity-60"
-                        >
-                          Opłać
-                        </button>
-                      </td>
-                    ) : (
-                      <td className={`${td} tabular-nums`}>{r.paidAt}</td>
-                    )}
-                  </tr>
+                  <LessonRow
+                    key={r.id}
+                    row={r}
+                    variant={variant}
+                    busy={movingId === r.id}
+                    disabled={movingId !== null}
+                    paymentDate={paymentDates[r.id] ?? todayIso()}
+                    onPaymentDateChange={(iso) => onPaymentDateChange(r.id, iso)}
+                    onVerify={onVerify ? () => onVerify(r.id) : undefined}
+                    onReject={onReject ? () => onReject(r.id) : undefined}
+                  />
                 ))}
-              </tbody>
-            ))}
-          </table>
+              </ul>
+            </div>
+          ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
-function groupByDayDesc(rows: PayRow[]): [string, PayRow[]][] {
-  const map = new Map<string, PayRow[]>();
+function LessonRow({
+  row,
+  variant,
+  busy,
+  disabled,
+  paymentDate,
+  onPaymentDateChange,
+  onVerify,
+  onReject,
+}: {
+  row: FinanceLineUi;
+  variant: "pending" | "verified" | "unpaid";
+  busy: boolean;
+  disabled: boolean;
+  paymentDate: string;
+  onPaymentDateChange: (iso: string) => void;
+  onVerify?: () => void;
+  onReject?: () => void;
+}) {
+  const amountClass =
+    variant === "verified" ? "text-green-700" : variant === "unpaid" ? "text-red-700" : "text-aster";
+
+  return (
+    <li
+      className={`rounded-app border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
+        variant === "unpaid" ? "border-red-300/40 bg-red-50/60" : ""
+      } ${busy ? "opacity-80" : ""}`}
+    >
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        <div className="min-w-0 flex-1">
+          <p className="text-depths truncate text-xs font-semibold sm:text-sm">{row.studentName}</p>
+          <p className="text-muted mt-0.5 truncate text-[0.65rem] sm:text-xs">
+            {row.tutorName} · {row.subject} · <span className="tabular-nums">{row.date}</span>
+          </p>
+        </div>
+        <p className={`shrink-0 text-xs font-bold tabular-nums sm:text-sm ${amountClass}`}>{row.amountPln} zł</p>
+      </div>
+
+      <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <label className="min-w-0 flex-1">
+          <span className="text-muted mb-0.5 block text-[0.55rem] font-bold uppercase tracking-wide">Data wpływu</span>
+          {variant === "verified" ? (
+            <span className="text-depths inline-block text-xs font-semibold tabular-nums">
+              {row.paymentReceivedAt ?? "—"}
+            </span>
+          ) : (
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => onPaymentDateChange(e.target.value)}
+              disabled={disabled}
+              className="text-depths w-full min-w-0 max-w-[11rem] rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-xs tabular-nums disabled:opacity-60"
+              aria-label={`Data wpływu — ${row.studentName}`}
+            />
+          )}
+        </label>
+
+        {variant === "pending" ? (
+          <div className="flex shrink-0 gap-1.5">
+            <button
+              type="button"
+              onClick={onVerify}
+              disabled={disabled}
+              className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-app bg-green-700 px-2 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+            >
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
+              Zatwierdź
+            </button>
+            <button
+              type="button"
+              onClick={onReject}
+              disabled={disabled}
+              className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-app bg-red-700 px-2 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+            >
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
+              Brak wpłaty
+            </button>
+          </div>
+        ) : null}
+
+        {variant === "unpaid" ? (
+          <button
+            type="button"
+            onClick={onVerify}
+            disabled={disabled}
+            className="inline-flex shrink-0 items-center justify-center gap-1 rounded-app bg-green-700 px-2.5 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+          >
+            {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
+            Zatwierdź ponownie
+          </button>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function groupByDayDesc(rows: FinanceLineUi[]): [string, FinanceLineUi[]][] {
+  const map = new Map<string, FinanceLineUi[]>();
   for (const r of rows) {
-    const k = dateLabelToKey(r.date);
+    const k = r.dateIso;
     const list = map.get(k) ?? [];
     list.push(r);
     map.set(k, list);
   }
   return [...map.entries()]
     .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
-    .map(([k, list]) => [dayKeyToLabel(k), list] as [string, PayRow[]]);
-}
-
-function normalizeSubject(s: string): string {
-  const t = s.trim();
-  const lower = t.toLowerCase();
-  if (lower.includes("polski")) {
-    if (lower.includes("j.") || lower.startsWith("j")) return "Język polski";
-    return t.charAt(0).toUpperCase() + t.slice(1);
-  }
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-function extractSubject(label: string): string {
-  return label.split("·")[0]?.trim().replace("J. ", "") ?? "Lekcja";
-}
-
-function formatYmd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function getDayKey(day: "today" | "yesterday"): string {
-  const now = new Date();
-  if (day === "yesterday") now.setDate(now.getDate() - 1);
-  return formatYmd(now);
-}
-
-function dateLabelToKey(dateLabel: string): string {
-  const [d, m] = dateLabel.split(".").map(Number);
-  const y = new Date().getFullYear();
-  return formatYmd(new Date(y, (m ?? 1) - 1, d ?? 1));
+    .map(([k, list]) => [dayKeyToLabel(k), list] as [string, FinanceLineUi[]]);
 }
 
 function dayKeyToLabel(dayKey: string): string {
   const [y, mo, da] = dayKey.split("-").map(Number);
-  const date = new Date(y ?? 0, (mo ?? 1) - 1, da ?? 1);
-  return new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "long", year: "numeric" }).format(date);
+  const date = new Date(y ?? 0, (mo ?? 1) - 1, da ?? 1, 12, 0, 0, 0);
+  return new Intl.DateTimeFormat("pl-PL", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }

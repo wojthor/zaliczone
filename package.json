@@ -4,14 +4,22 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:clean": "rm -rf .next && next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed": "node --env-file=.env.local scripts/seed-users.mjs",
+    "seed:battle": "node --env-file=.env.local scripts/seed-battle.mjs",
+    "seed:clean": "node --env-file=.env.local scripts/seed-clean.mjs",
+    "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "resend": "^6.17.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

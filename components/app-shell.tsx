@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   IconBell,
   IconCalendar,
   IconDashboard,
+  IconLogout,
   IconMenu,
   IconUser,
   IconUsers,
   IconWallet,
 } from "@/components/icons";
+import { signOut } from "@/lib/data/mutations";
 import { logoFont } from "@/lib/logo-font";
 
 const nav = [
@@ -42,6 +44,7 @@ function useLgUp() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [open, setOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -59,6 +62,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       document.body.style.overflow = prev;
     };
   }, [showMobileDrawer]);
+
+  async function handleLogout() {
+    await signOut();
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <div className="text-depths flex h-dvh max-h-dvh gap-1.5 overflow-hidden p-1 sm:p-1.5">
@@ -136,6 +145,22 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+        <div className="shrink-0 border-t border-white/10 px-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (!isLg) setMobileOpen(false);
+              void handleLogout();
+            }}
+            title={!showNavText ? "Wyloguj" : undefined}
+            className={`text-luster flex w-full items-center gap-2.5 py-1.5 text-sm font-medium transition-colors hover:text-lime touch-manipulation ${showNavText ? "justify-start px-0.5" : "justify-center"}`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-luster">
+              <IconLogout className="h-5 w-5 shrink-0" />
+            </span>
+            {showNavText ? <span className="min-w-0 flex-1 truncate leading-snug">Wyloguj</span> : null}
+          </button>
+        </div>
       </aside>
       <main
         className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden py-0 pr-1 pl-0 max-lg:min-w-0 max-lg:pl-1 ${

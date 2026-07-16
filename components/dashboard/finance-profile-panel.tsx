@@ -1,16 +1,31 @@
+"use client";
+
 import Link from "next/link";
-import { IconUser, IconWallet } from "@/components/icons";
+import { useRouter } from "next/navigation";
+import { IconLogout, IconUser, IconWallet } from "@/components/icons";
 import { SeeMoreLink } from "@/components/see-more-link";
-import { DEMO_FINANCE_LINES, DEMO_STUDENTS } from "@/lib/demo-data";
+import { signOut } from "@/lib/data/mutations";
 
-function minutesFromFinanceLabel(label: string): number {
-  const match = label.match(/(\d+)\s*min/);
-  return match ? Number(match[1]) : 60;
-}
+type FinanceProfilePanelProps = {
+  tutorName: string;
+  totalPayout: number;
+  totalHours: number;
+  studentCount: number;
+};
 
-export function FinanceProfilePanel() {
-  const totalPayout = DEMO_FINANCE_LINES.reduce((sum, line) => sum + line.amountPln, 0);
-  const totalHours = Math.round((DEMO_FINANCE_LINES.reduce((sum, line) => sum + minutesFromFinanceLabel(line.label), 0) / 60) * 10) / 10;
+export function FinanceProfilePanel({
+  tutorName,
+  totalPayout,
+  totalHours,
+  studentCount,
+}: FinanceProfilePanelProps) {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await signOut();
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-1.5 overflow-hidden">
@@ -38,7 +53,7 @@ export function FinanceProfilePanel() {
           </div>
           <div className="text-center">
             <p className="text-muted text-[0.625rem] font-bold uppercase tracking-wide">Łącznie</p>
-            <p className="text-depths mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight sm:text-3xl">{DEMO_STUDENTS.length}</p>
+            <p className="text-depths mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight sm:text-3xl">{studentCount}</p>
             <p className="text-depths/75 mt-0.5 text-[0.65rem] font-bold">uczniów</p>
           </div>
         </div>
@@ -47,21 +62,35 @@ export function FinanceProfilePanel() {
         </div>
       </div>
 
-      <Link
-        href="/profil"
-        className="flex min-h-0 flex-1 items-center gap-2.5 overflow-hidden rounded-app bg-[#000C4A] px-2.5 py-2 text-luster"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-steel/20 text-luster">
-          <IconUser className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-luster/75">Profil</p>
-          <p className="mt-0.5 truncate text-sm font-semibold leading-tight">Jan Kowalczyk</p>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-app bg-[#000C4A] px-2.5 py-2 text-luster">
+        <Link href="/profil" className="flex min-h-0 min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-steel/20 text-luster">
+            <IconUser className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-luster/75">Profil</p>
+            <p className="mt-0.5 truncate text-sm font-semibold leading-tight">{tutorName}</p>
+          </div>
+          <span className="shrink-0 text-2xl font-light leading-none text-lime" aria-hidden>
+            ›
+          </span>
+        </Link>
+        <div className="mt-2 border-t border-white/10 pt-2">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="group flex w-full items-center justify-between rounded-app bg-white/6 px-3 py-2 text-xs font-semibold text-luster/90 transition hover:bg-white/10 hover:text-lime"
+          >
+            <span className="flex items-center gap-2">
+              <IconLogout className="h-3.5 w-3.5" />
+              Wyloguj
+            </span>
+            <span className="text-base leading-none text-luster/50 transition group-hover:text-lime" aria-hidden>
+              ›
+            </span>
+          </button>
         </div>
-        <span className="shrink-0 text-2xl font-light leading-none text-lime" aria-hidden>
-          ›
-        </span>
-      </Link>
+      </div>
     </div>
   );
 }

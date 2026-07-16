@@ -1,5 +1,7 @@
 export type Lesson = {
   id: string;
+  /** ISO date YYYY-MM-DD */
+  date?: string;
   dayIndex: number;
   /** HH:mm */
   start: string;
@@ -9,8 +11,13 @@ export type Lesson = {
   initials: string;
   classLabel: string;
   studentName: string;
+  studentId?: string;
+  status?: LessonStatus;
+  isCompleted?: boolean;
   notes?: string;
 };
+
+export type LessonStatus = "PLANNED" | "PENDING_VERIFICATION" | "VERIFIED" | "UNPAID";
 
 const STUDENT_BY_INITIALS: Record<string, string> = {
   TK: "Tomasz Kowalski",
@@ -64,6 +71,13 @@ export function calendarDayToMondayWeekday(year: number, month0: number, day: nu
 }
 
 export function lessonsOnCalendarDate(year: number, month0: number, day: number, lessons: Lesson[]): Lesson[] {
+  const mm = String(month0 + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  const dateIso = `${year}-${mm}-${dd}`;
+  const dated = lessons.filter((l) => l.date);
+  if (dated.length > 0) {
+    return lessons.filter((l) => l.date === dateIso);
+  }
   const wd = calendarDayToMondayWeekday(year, month0, day);
   return lessonsForWeekdayMon0(wd, lessons);
 }

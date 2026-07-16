@@ -1,24 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { DEMO_FINANCE_LINES, type DemoFinanceLine } from "@/lib/demo-data";
-import { ADMIN_TUTORS, type AdminTutor } from "@/lib/admin-demo";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { markPayoutPaid } from "@/lib/actions/admin";
+import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
+import type { FinanceLineUi, Payout } from "@/lib/types/database";
 
-/** Udział w kwocie wpłaty od klienta przypisywany nauczycielowi (demo). Reszta = zysk agencji. */
-const TUTOR_SHARE_OF_CLIENT_PAYMENT = 0.7;
-const AGENCY_SHARE_OF_CLIENT_PAYMENT = 1 - TUTOR_SHARE_OF_CLIENT_PAYMENT;
+const TUTOR_SHARE_OF_CLIENT_PAYMENT = TUTOR_SHARE;
 
 function currentMonthKey(d = new Date()): string {
   const y = d.getFullYear();
   const m = d.getMonth() + 1;
   return `${y}-${String(m).padStart(2, "0")}`;
-}
-
-function monthKeyFromLessonDateDdMm(dateLabel: string): string {
-  const [, mm] = dateLabel.split(".");
-  const y = new Date().getFullYear();
-  return `${y}-${String(Number(mm ?? "1")).padStart(2, "0")}`;
 }
 
 function formatMonthLongPl(monthKey: string): string {
@@ -27,38 +20,49 @@ function formatMonthLongPl(monthKey: string): string {
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
 }
 
-function getLineIndexInDemo(line: DemoFinanceLine): number {
-  return DEMO_FINANCE_LINES.findIndex((l) => l.id === line.id);
-}
-
-function tutorForLine(line: DemoFinanceLine): AdminTutor {
-  const idx = Math.max(0, getLineIndexInDemo(line));
-  return ADMIN_TUTORS[idx % ADMIN_TUTORS.length]!;
-}
-
 type TutorRollup = {
   tutorId: string;
   tutorName: string;
   lessonCount: number;
+  hours: number;
   clientTotalPln: number;
+  lessonsPayoutPln: number;
+  bonusPln: number;
   tutorPayoutPln: number;
+  payoutStatus: Payout["status"] | null;
 };
 
-function buildRollups(lines: DemoFinanceLine[]): TutorRollup[] {
+function minutesFromLabel(label: string): number {
+  const match = label.match(/(\d+)\s*min/);
+  return match ? Number(match[1]) : 60;
+}
+
+function buildRollups(lines: FinanceLineUi[], payouts: Payout[]): TutorRollup[] {
+  const payoutMap = new Map(payouts.map((p) => [p.tutor_id, p]));
   const map = new Map<string, TutorRollup>();
   for (const line of lines) {
-    const t = tutorForLine(line);
-    const prev = map.get(t.id) ?? {
-      tutorId: t.id,
-      tutorName: t.name,
+    const prev = map.get(line.tutorId) ?? {
+      tutorId: line.tutorId,
+      tutorName: line.tutorName,
       lessonCount: 0,
+      hours: 0,
       clientTotalPln: 0,
+      lessonsPayoutPln: 0,
+      bonusPln: 0,
       tutorPayoutPln: 0,
+      payoutStatus: payoutMap.get(line.tutorId)?.status ?? null,
     };
     prev.lessonCount += 1;
+    prev.hours += minutesFromLabel(line.label) / 60;
     prev.clientTotalPln += line.amountPln;
-    prev.tutorPayoutPln += Math.round(line.amountPln * TUTOR_SHARE_OF_CLIENT_PAYMENT * 100) / 100;
-    map.set(t.id, prev);
+    prev.lessonsPayoutPln += Math.round(line.amountPln * TUTOR_SHARE_OF_CLIENT_PAYMENT * 100) / 100;
+    map.set(line.tutorId, prev);
+  }
+  for (const row of map.values()) {
+    row.hours = Math.round(row.hours * 10) / 10;
+    const b = bonusProgress(row.lessonCount);
+    row.bonusPln = b.achieved ? b.bonusPln : 0;
+    row.tutorPayoutPln = Math.round((row.lessonsPayoutPln + row.bonusPln) * 100) / 100;
   }
   return [...map.values()].sort((a, b) => a.tutorName.localeCompare(b.tutorName, "pl"));
 }
@@ -67,36 +71,54 @@ function formatMoney(pln: number): string {
   return `${pln.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
 }
 
-export function WyplatyClient() {
+export function WyplatyClient({
+  financeLines,
+  payouts,
+}: {
+  financeLines: FinanceLineUi[];
+  payouts: Payout[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const nowKey = useMemo(() => currentMonthKey(), []);
   const monthOptions = useMemo(() => {
-    const keys = [...new Set(DEMO_FINANCE_LINES.map((l) => monthKeyFromLessonDateDdMm(l.date)))];
+    const keys = [...new Set(financeLines.map((l) => l.monthKey))];
     keys.sort();
     if (!keys.includes(nowKey)) keys.push(nowKey);
     return keys.slice().reverse();
-  }, [nowKey]);
+  }, [financeLines, nowKey]);
 
   const [selectedMonthKey, setSelectedMonthKey] = useState(nowKey);
-  const [payoutDatesByTutor, setPayoutDatesByTutor] = useState<Record<string, string>>({});
 
   const linesForMonth = useMemo(
-    () => DEMO_FINANCE_LINES.filter((l) => monthKeyFromLessonDateDdMm(l.date) === selectedMonthKey),
-    [selectedMonthKey],
+    () => financeLines.filter((l) => l.monthKey === selectedMonthKey),
+    [financeLines, selectedMonthKey],
+  );
+
+  const payoutsForMonth = useMemo(
+    () => payouts.filter((p) => p.month === selectedMonthKey),
+    [payouts, selectedMonthKey],
   );
 
   const { rollups, totals } = useMemo(() => {
     const przychod = linesForMonth.reduce((s, l) => s + l.amountPln, 0);
-    const r = buildRollups(linesForMonth);
+    const r = buildRollups(linesForMonth, payoutsForMonth);
     const koszty = Math.round(r.reduce((acc, x) => acc + x.tutorPayoutPln, 0) * 100) / 100;
     const zysk = Math.round((przychod - koszty) * 100) / 100;
     return { rollups: r, totals: { przychod, koszty, zysk } };
-  }, [linesForMonth]);
+  }, [linesForMonth, payoutsForMonth]);
 
   const monthLabel = formatMonthLongPl(selectedMonthKey);
 
-  const markPaid = (tutorId: string) => {
-    const d = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium" }).format(new Date());
-    setPayoutDatesByTutor((prev) => ({ ...prev, [tutorId]: d }));
+  const handleMarkPaid = (row: TutorRollup) => {
+    startTransition(async () => {
+      await markPayoutPaid(row.tutorId, selectedMonthKey, row.tutorPayoutPln, {
+        lessonCount: row.lessonCount,
+        lessonsAmount: row.lessonsPayoutPln,
+        bonusAmount: row.bonusPln,
+      });
+      router.refresh();
+    });
   };
 
   const th =
@@ -110,102 +132,83 @@ export function WyplatyClient() {
         <div className="min-w-0">
           <h1 className="text-depths text-xl font-semibold tracking-tight sm:text-2xl">Wypłaty i Bilans</h1>
           <p className="text-muted mt-1 max-w-2xl text-xs leading-relaxed sm:text-sm">
-            Podsumowanie wpłat od klientów vs wypłat dla nauczycieli w wybranym miesiącu. W demo przyjęto podział:{" "}
-            <strong className="font-semibold text-depths/85">{Math.round(TUTOR_SHARE_OF_CLIENT_PAYMENT * 100)}%</strong> dla zespołu,{" "}
-            <strong className="font-semibold text-depths/85">{Math.round(AGENCY_SHARE_OF_CLIENT_PAYMENT * 100)}%</strong> zysk agencji od
-            każdej opłaconej lekcji.
+            Wyłącznie lekcje VERIFIED · model marżowy 70% tutor / 30% agencja.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="grid gap-1">
-            <span className="text-depths/80 text-[0.65rem] font-semibold sm:text-xs">Miesiąc</span>
-            <select
-              className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
-              value={selectedMonthKey}
-              onChange={(e) => setSelectedMonthKey(e.target.value)}
-              aria-label="Wybierz miesiąc"
-            >
-              {monthOptions.map((key) => (
-                <option key={key} value={key}>
-                  {formatMonthLongPl(key)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Link
-            href="/admin/rozliczenia"
-            className="rounded-full border border-panel-frame/50 bg-snow px-3 py-2 text-xs font-bold text-depths"
+        <label className="grid gap-1">
+          <span className="text-depths/80 text-[0.65rem] font-semibold sm:text-xs">Miesiąc</span>
+          <select
+            className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+            value={selectedMonthKey}
+            onChange={(e) => setSelectedMonthKey(e.target.value)}
+            aria-label="Wybierz miesiąc"
           >
-            Rozliczenia
-          </Link>
-        </div>
+            {monthOptions.map((key) => (
+              <option key={key} value={key}>
+                {formatMonthLongPl(key)}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-3">
         <article className="rounded-app border-2 border-panel-frame bg-snow p-4 shadow-sm">
-          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Przychód</p>
+          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Przychód (VERIFIED)</p>
           <p className="text-depths mt-1 text-2xl font-black tabular-nums sm:text-[1.75rem]">{formatMoney(totals.przychod)}</p>
-          <p className="text-depths/70 mt-2 text-xs font-medium leading-snug">Wpłaty od klientów (suma kwot lekcji w miesiącu).</p>
         </article>
         <article className="rounded-app border-2 border-panel-frame bg-snow p-4 shadow-sm">
-          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Koszty</p>
-          <p className="text-depths mt-1 text-2xl font-black tabular-nums sm:text-[1.75rem]">{formatMoney(totals.koszty)}</p>
-          <p className="text-depths/70 mt-2 text-xs font-medium leading-snug">Wypłaty dla zespołu ({Math.round(TUTOR_SHARE_OF_CLIENT_PAYMENT * 100)}% przychodu).</p>
+          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Koszty 70%</p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-amber-800 sm:text-[1.75rem]">{formatMoney(totals.koszty)}</p>
         </article>
         <article className="rounded-app border-2 border-green-700/35 bg-green-700/[0.07] p-4 shadow-sm ring-1 ring-green-700/20">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-green-900">Twój zysk netto</p>
+          <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-green-900">Zysk netto 30%</p>
           <p className="mt-1 text-2xl font-black tabular-nums text-green-800 sm:text-[1.75rem]">{formatMoney(totals.zysk)}</p>
-          <p className="mt-2 text-xs font-medium leading-snug text-green-900/85">
-            Przychód − koszty (= {Math.round(AGENCY_SHARE_OF_CLIENT_PAYMENT * 100)}% przychodu w tym modelu).
-          </p>
         </article>
       </section>
 
       <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
         <h2 className="text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
-        <p className="text-muted mt-1 text-xs capitalize">{monthLabel} — nauczyciele z co najmniej jedną lekcją w danych demo.</p>
+        <p className="text-muted mt-1 text-xs capitalize">{monthLabel}</p>
 
         {rollups.length === 0 ? (
-          <p className="text-muted mt-6 py-6 text-center text-sm font-medium">Brak lekcji w tym miesiącu (demo).</p>
+          <p className="text-muted mt-6 py-6 text-center text-sm font-medium">Brak zatwierdzonych lekcji w tym miesiącu.</p>
         ) : (
           <div className="mt-4 max-h-[min(28rem,55vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
             <table className="table-fixed min-w-[36rem] w-full border-collapse">
               <thead>
                 <tr>
-                  <th scope="col" className={`${th} w-[28%]`}>
-                    Nauczyciel
-                  </th>
-                  <th scope="col" className={`${th} w-[16%]`}>
-                    Lekcje
-                  </th>
-                  <th scope="col" className={`${th} w-[22%]`}>
-                    Do wypłaty
-                  </th>
-                  <th scope="col" className={`${th} w-[34%]`}>
-                    Status
-                  </th>
+                  <th scope="col" className={`${th} w-[24%]`}>Nauczyciel</th>
+                  <th scope="col" className={`${th} w-[12%]`}>Godziny</th>
+                  <th scope="col" className={`${th} w-[16%]`}>Premia</th>
+                  <th scope="col" className={`${th} w-[20%]`}>Do wypłaty</th>
+                  <th scope="col" className={`${th} w-[28%]`}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {rollups.map((row, i) => {
-                  const paidLabel = payoutDatesByTutor[row.tutorId];
+                  const isPaid = row.payoutStatus === "PAID";
                   return (
                     <tr key={row.tutorId} className={`${i % 2 === 1 ? "bg-luster/35" : "bg-snow"} hover:bg-luster/50`}>
                       <td className={`${td} font-semibold text-depths`}>{row.tutorName}</td>
-                      <td className={`${td} tabular-nums font-bold text-depths`}>{row.lessonCount}</td>
+                      <td className={`${td} font-bold tabular-nums text-depths`}>{row.hours}</td>
+                      <td className={`${td} font-bold tabular-nums ${row.bonusPln > 0 ? "text-green-800" : "text-muted"}`}>
+                        {row.bonusPln > 0 ? `+${formatMoney(row.bonusPln)}` : "—"}
+                      </td>
                       <td className={`${td} font-bold tabular-nums text-depths`}>{formatMoney(row.tutorPayoutPln)}</td>
                       <td className={td}>
-                        {paidLabel ? (
+                        {isPaid ? (
                           <span className="inline-flex items-center rounded-full bg-green-700/15 px-2.5 py-1 text-[0.7rem] font-bold text-green-800">
-                            Wypłacono {paidLabel}
+                            Wypłacone
                           </span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => markPaid(row.tutorId)}
-                            className="rounded-full bg-[#000C4A] px-3 py-1.5 text-[0.7rem] font-bold text-lime transition-opacity hover:opacity-90"
+                            onClick={() => handleMarkPaid(row)}
+                            disabled={pending}
+                            className="rounded-full bg-[#000C4A] px-3 py-1.5 text-[0.7rem] font-bold text-lime transition-opacity hover:opacity-90 disabled:opacity-60"
                           >
-                            Oznacz jako wypłacone
+                            Wypłacone
                           </button>
                         )}
                       </td>

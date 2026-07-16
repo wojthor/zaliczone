@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PanelHeader } from "@/components/panel-header";
-import { DASHBOARD_LESSONS, lessonsOnCalendarDate, type Lesson } from "@/components/dashboard/lesson-data";
+import { lessonsOnCalendarDate, type Lesson } from "@/components/dashboard/lesson-data";
 import {
   dateKeyFromYMD,
   useLessonCompletion,
@@ -17,9 +17,22 @@ function dayCompletionState(
   isDone: (lessonId: string, dateKey: string) => boolean,
   lessons: Lesson[],
 ): "free" | "open" | "done" {
+  const dk = dateKeyFromYMD(year, month0, day);
   const dayLessons = lessonsOnCalendarDate(year, month0, day, lessons);
   if (dayLessons.length === 0) return "free";
-  const dk = dateKeyFromYMD(year, month0, day);
+
+  const usesDbCompletion = dayLessons.some((lesson) => lesson.date !== undefined);
+  if (usesDbCompletion) {
+    const allSettled = dayLessons.every((lesson) => {
+      const s = lesson.status ?? (lesson.isCompleted ? "PENDING_VERIFICATION" : "PLANNED");
+      return s === "VERIFIED" || s === "PENDING_VERIFICATION";
+    });
+    const allVerified = dayLessons.every((lesson) => (lesson.status ?? "PLANNED") === "VERIFIED");
+    if (allVerified) return "done";
+    if (allSettled) return "open";
+    return "open";
+  }
+
   const allDone = dayLessons.every((l) => isDone(l.id, dk));
   if (allDone) return "done";
   return "open";
@@ -31,9 +44,9 @@ type MonthlyCalendarProps = {
   className?: string;
 };
 
-export function MonthlyCalendar({ lessons = DASHBOARD_LESSONS, hideHeader, className }: MonthlyCalendarProps) {
+export function MonthlyCalendar({ lessons = [], hideHeader, className }: MonthlyCalendarProps) {
   const { isLessonDoneOnDate } = useLessonCompletion();
-  const [view, setView] = useState(() => new Date(2026, 2, 1));
+  const [view, setView] = useState(() => new Date());
 
   const { year, month0, cells } = useMemo(() => {
     const y = view.getFullYear();

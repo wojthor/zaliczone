@@ -1,22 +1,32 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LessonCompletionProvider } from "@/components/dashboard/lesson-completion-context";
-import { MonthlyCalendar } from "@/components/dashboard/monthly-calendar";
 import { WeeklySchedule } from "@/components/dashboard/weekly-schedule";
 import {
-  DASHBOARD_LESSONS,
-  DAY_LABELS_SHORT,
   dayLabel,
   type Lesson,
 } from "@/components/dashboard/lesson-data";
-import { DEMO_ACTIVE_SUBJECTS, DEMO_STUDENTS } from "@/lib/demo-data";
+import { LessonStatusBadge, resolveLessonStatus } from "@/components/lesson/lesson-status-badge";
+import { MonthNavigator, formatMonthLongFromKey, useMonthKey } from "@/components/month-navigator";
+import { useWeekMondayIso } from "@/components/week-navigator";
+import { Spinner, useToast } from "@/components/ui/toast";
+import { subjectsFromLine } from "@/lib/data/mappers";
+import {
+  deleteLesson,
+  insertLessons,
+  lessonDatesFromDraft,
+  updateLesson,
+} from "@/lib/data/mutations";
+import type { StudentUi } from "@/lib/types/database";
 
 type RecurrenceMode = "once" | "weekly" | "custom";
 
 type LessonDraft = {
   subject: string;
+  studentId: string;
   studentName: string;
   initials: string;
   classLabel: string;
@@ -34,29 +44,10 @@ function todayIso(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function weekdayMon0FromIso(dateIso: string): number {
-  const d = new Date(`${dateIso}T12:00:00`);
-  return (d.getDay() + 6) % 7;
-}
-
-function nearestIsoForWeekday(dayIndex: number, anchor = new Date()): string {
-  const base = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 12, 0, 0, 0);
-  const baseDay = (base.getDay() + 6) % 7;
-  const delta = dayIndex - baseDay;
-  base.setDate(base.getDate() + delta);
-  return todayIso(base);
-}
-
-function subjectsFromLine(subjectsLine: string): string[] {
-  return subjectsLine
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function makeEmptyDraft(): LessonDraft {
   return {
     subject: "",
+    studentId: "",
     studentName: "",
     initials: "",
     classLabel: "",
@@ -72,38 +63,17 @@ function makeEmptyDraft(): LessonDraft {
 function buildDraftFromLesson(lesson: Lesson): LessonDraft {
   return {
     subject: lesson.subject,
+    studentId: lesson.studentId ?? "",
     studentName: lesson.studentName,
     initials: lesson.initials,
     classLabel: lesson.classLabel,
-    dateIso: nearestIsoForWeekday(lesson.dayIndex),
+    dateIso: lesson.date ?? todayIso(),
     start: lesson.start,
     end: lesson.end,
     recurrence: "once",
     selectedWeekdays: [lesson.dayIndex],
     notes: lesson.notes ?? "",
   };
-}
-
-function buildLessonFromDraft(draft: LessonDraft, dayIndex: number, id: string): Lesson {
-  return {
-    id,
-    dayIndex,
-    start: draft.start,
-    end: draft.end,
-    subject: draft.subject,
-    initials: draft.initials,
-    classLabel: draft.classLabel,
-    studentName: draft.studentName,
-    notes: draft.notes.trim() || undefined,
-  };
-}
-
-function targetWeekdays(draft: LessonDraft): number[] {
-  const dateDay = weekdayMon0FromIso(draft.dateIso);
-  if (draft.recurrence === "once" || draft.recurrence === "weekly") {
-    return [dateDay];
-  }
-  return draft.selectedWeekdays.length > 0 ? draft.selectedWeekdays : [dateDay];
 }
 
 function formatDateChip(dateIso: string): string {
@@ -116,8 +86,13 @@ function monthLabelFor(dateIso: string): string {
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
 }
 
-function studentForName(name: string) {
-  return DEMO_STUDENTS.find((student) => student.name === name) ?? null;
+function formatLessonDatePl(dateIso: string): string {
+  const d = new Date(`${dateIso}T12:00:00`);
+  return new Intl.DateTimeFormat("pl-PL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(d);
 }
 
 function MiniCalendar({
@@ -153,7 +128,9 @@ function MiniCalendar({
         >
           ‹
         </button>
-        <p className="text-depths text-center text-[0.7rem] font-semibold capitalize">{monthLabelFor(todayIso(new Date(year, month0, 15)))}</p>
+        <p className="text-depths text-center text-[0.7rem] font-semibold capitalize">
+          {monthLabelFor(todayIso(new Date(year, month0, 15)))}
+        </p>
         <button
           type="button"
           onClick={() => setView((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1, 12, 0, 0, 0))}
@@ -195,19 +172,25 @@ function LessonModal({
   mode,
   draft,
   setDraft,
+  students,
+  activeSubjects,
   onClose,
   onSave,
+  saving,
 }: {
   mode: "add" | "edit";
   draft: LessonDraft;
   setDraft: Dispatch<SetStateAction<LessonDraft>>;
+  students: StudentUi[];
+  activeSubjects: string[];
   onClose: () => void;
   onSave: () => void;
+  saving: boolean;
 }) {
   const eligibleStudents = useMemo(() => {
     if (!draft.subject) return [];
-    return DEMO_STUDENTS.filter((student) => subjectsFromLine(student.subjectsLine).includes(draft.subject));
-  }, [draft.subject]);
+    return students.filter((student) => subjectsFromLine(student.subjectsLine).includes(draft.subject));
+  }, [draft.subject, students]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -224,41 +207,51 @@ function LessonModal({
         <div className="mt-4 grid gap-3">
           <label className="grid gap-1">
             <span className="text-depths/80 text-xs font-semibold">Przedmiot</span>
-            <select
-              className="text-depths rounded-app bg-luster px-3 py-2 text-sm"
-              value={draft.subject}
-              onChange={(e) => {
-                const subject = e.target.value;
-                const activeStudent = studentForName(draft.studentName);
-                const stillMatches = activeStudent ? subjectsFromLine(activeStudent.subjectsLine).includes(subject) : false;
-                setDraft((prev) => ({
-                  ...prev,
-                  subject,
-                  studentName: stillMatches ? prev.studentName : "",
-                  initials: stillMatches ? prev.initials : "",
-                  classLabel: stillMatches ? prev.classLabel : "",
-                }));
-              }}
-            >
-              <option value="">Wybierz przedmiot</option>
-              {DEMO_ACTIVE_SUBJECTS.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
-                </option>
-              ))}
-            </select>
+            {activeSubjects.length === 0 ? (
+              <p className="text-muted rounded-app bg-luster/60 px-3 py-2 text-sm">
+                Brak aktywnych przedmiotów — poproś o dodanie w Profilu
+              </p>
+            ) : (
+              <select
+                className="text-depths rounded-app bg-luster px-3 py-2 text-sm"
+                value={draft.subject}
+                onChange={(e) => {
+                  const subject = e.target.value;
+                  const activeStudent = students.find((s) => s.id === draft.studentId);
+                  const stillMatches = activeStudent
+                    ? subjectsFromLine(activeStudent.subjectsLine).includes(subject)
+                    : false;
+                  setDraft((prev) => ({
+                    ...prev,
+                    subject,
+                    studentId: stillMatches ? prev.studentId : "",
+                    studentName: stillMatches ? prev.studentName : "",
+                    initials: stillMatches ? prev.initials : "",
+                    classLabel: stillMatches ? prev.classLabel : "",
+                  }));
+                }}
+              >
+                <option value="">Wybierz przedmiot</option>
+                {activeSubjects.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
 
           <label className="grid gap-1">
             <span className="text-depths/80 text-xs font-semibold">Uczeń</span>
             <select
               className="text-depths rounded-app bg-luster px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              value={draft.studentName}
+              value={draft.studentId}
               disabled={!draft.subject}
               onChange={(e) => {
-                const student = studentForName(e.target.value);
+                const student = students.find((s) => s.id === e.target.value);
                 setDraft((prev) => ({
                   ...prev,
+                  studentId: student?.id ?? "",
                   studentName: student?.name ?? "",
                   initials: student?.initials ?? "",
                   classLabel: student?.classLabel ?? "",
@@ -267,7 +260,7 @@ function LessonModal({
             >
               <option value="">{draft.subject ? "Wybierz ucznia" : "Najpierw wybierz przedmiot"}</option>
               {eligibleStudents.map((student) => (
-                <option key={student.id} value={student.name}>
+                <option key={student.id} value={student.id}>
                   {student.name}
                 </option>
               ))}
@@ -367,16 +360,6 @@ function LessonModal({
               <input className="text-depths rounded-app bg-luster px-3 py-2 text-sm" value={draft.classLabel} readOnly />
             </label>
           </div>
-
-          <label className="grid gap-1">
-            <span className="text-depths/80 text-xs font-semibold">Notatki</span>
-            <textarea
-              className="text-depths min-h-24 rounded-app bg-luster px-3 py-2 text-sm"
-              value={draft.notes}
-              onChange={(e) => setDraft((prev) => ({ ...prev, notes: e.target.value }))}
-              placeholder="Np. materiały do powtórki, forma zajęć, ważne uwagi."
-            />
-          </label>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -391,10 +374,12 @@ function LessonModal({
             </button>
             <button
               type="button"
-              className="rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+              className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-60"
               onClick={onSave}
+              disabled={saving || activeSubjects.length === 0}
             >
-              Zapisz
+              {saving ? <Spinner /> : null}
+              {saving ? "Zapisywanie…" : "Zapisz"}
             </button>
           </div>
         </div>
@@ -403,17 +388,53 @@ function LessonModal({
   );
 }
 
-function TerminarzInner() {
-  const [lessons, setLessons] = useState<Lesson[]>(() => DASHBOARD_LESSONS.map((lesson) => ({ ...lesson })));
+function TerminarzInner({
+  initialLessons,
+  students,
+  activeSubjects,
+}: {
+  initialLessons: Lesson[];
+  students: StudentUi[];
+  activeSubjects: string[];
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
+  const today = useMemo(() => todayIso(), []);
+
+  useEffect(() => {
+    setLessons(initialLessons);
+  }, [initialLessons]);
   const [modal, setModal] = useState<{ type: "closed" } | { type: "add" } | { type: "edit"; id: string }>({
     type: "closed",
   });
   const [draft, setDraft] = useState<LessonDraft>(() => makeEmptyDraft());
+  const [saving, setSaving] = useState(false);
+  const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(0);
+  const [listMonthKey, setListMonthKey] = useMonthKey();
 
-  const sorted = useMemo(
-    () => [...lessons].sort((a, b) => a.dayIndex - b.dayIndex || a.start.localeCompare(b.start) || a.studentName.localeCompare(b.studentName)),
-    [lessons],
-  );
+  const sortedForMonth = useMemo(() => {
+    return [...lessons]
+      .filter((lesson) => lesson.date?.startsWith(listMonthKey))
+      .sort(
+        (a, b) =>
+          (a.date ?? "").localeCompare(b.date ?? "") ||
+          a.start.localeCompare(b.start) ||
+          a.studentName.localeCompare(b.studentName),
+      );
+  }, [lessons, listMonthKey]);
+
+  const monthStats = useMemo(() => {
+    const counts = { planned: 0, pending: 0, verified: 0, unpaid: 0 };
+    for (const lesson of sortedForMonth) {
+      const s = resolveLessonStatus(lesson.status, lesson.isCompleted);
+      if (s === "PLANNED") counts.planned += 1;
+      else if (s === "PENDING_VERIFICATION") counts.pending += 1;
+      else if (s === "VERIFIED") counts.verified += 1;
+      else if (s === "UNPAID") counts.unpaid += 1;
+    }
+    return counts;
+  }, [sortedForMonth]);
 
   function openAdd() {
     setDraft(makeEmptyDraft());
@@ -421,6 +442,7 @@ function TerminarzInner() {
   }
 
   function openEdit(lesson: Lesson) {
+    if (lesson.date && lesson.date < today) return;
     setDraft(buildDraftFromLesson(lesson));
     setModal({ type: "edit", id: lesson.id });
   }
@@ -429,98 +451,168 @@ function TerminarzInner() {
     setModal({ type: "closed" });
   }
 
-  function saveModal() {
-    if (!draft.subject || !draft.studentName || !draft.start || !draft.end) return;
-    const weekdays = targetWeekdays(draft);
-    if (weekdays.length === 0) return;
+  async function saveModal() {
+    if (!draft.subject || !draft.studentId || !draft.start || !draft.end || saving) return;
 
-    if (modal.type === "add") {
-      const created = weekdays.map((dayIndex, index) => buildLessonFromDraft(draft, dayIndex, `l-${Date.now()}-${index}`));
-      setLessons((prev) => [...prev, ...created]);
-    } else if (modal.type === "edit") {
-      const [firstDay, ...otherDays] = weekdays;
-      const updatedCurrent = buildLessonFromDraft(draft, firstDay!, modal.id);
-      const created = otherDays.map((dayIndex, index) => buildLessonFromDraft(draft, dayIndex, `l-${Date.now()}-${index}`));
-      setLessons((prev) => prev.map((lesson) => (lesson.id === modal.id ? updatedCurrent : lesson)).concat(created));
+    setSaving(true);
+    try {
+      if (modal.type === "add") {
+        const dates = lessonDatesFromDraft({
+          dateIso: draft.dateIso,
+          recurrence: draft.recurrence,
+          selectedWeekdays: draft.selectedWeekdays,
+        });
+        await insertLessons({
+          studentId: draft.studentId,
+          subject: draft.subject,
+          dates,
+          start: draft.start,
+          end: draft.end,
+        });
+        toast.success("Dodano lekcję", draft.subject);
+      } else if (modal.type === "edit") {
+        await updateLesson(modal.id, {
+          studentId: draft.studentId,
+          subject: draft.subject,
+          date: draft.dateIso,
+          start: draft.start,
+          end: draft.end,
+        });
+        toast.success("Zapisano lekcję", draft.subject);
+      }
+      closeModal();
+      router.refresh();
+    } catch {
+      toast.error("Nie udało się zapisać lekcji");
+    } finally {
+      setSaving(false);
     }
-
-    closeModal();
   }
 
-  function removeLesson(id: string) {
+  async function removeLesson(id: string) {
     if (!confirm("Usunąć tę lekcję z listy?")) return;
-    setLessons((prev) => prev.filter((lesson) => lesson.id !== id));
+    try {
+      await deleteLesson(id);
+      setLessons((prev) => prev.filter((lesson) => lesson.id !== id));
+      toast.success("Usunięto lekcję");
+      router.refresh();
+    } catch {
+      toast.error("Nie udało się usunąć lekcji");
+    }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-muted text-sm font-medium">
-        Plan lekcji, kalendarz miesiąca i pełna lista wszystkich wpisów. Ta wersja odtwarza bogatszy formularz z późniejszej iteracji projektu.
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <p className="text-muted max-w-2xl text-sm font-medium">
+          Plan lekcji, kalendarz miesiąca i pełna lista wpisów zsynchronizowana z bazą Supabase.
+        </p>
+        <button
+          type="button"
+          className="shrink-0 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+          onClick={openAdd}
+        >
+          + Dodaj lekcję
+        </button>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="flex min-h-[min(260px,44svh)] flex-col lg:col-span-2 lg:min-h-[min(48dvh,28rem)]">
-          <WeeklySchedule lessons={lessons} hideHeader />
-        </div>
-        <div className="flex min-h-[min(240px,40svh)] flex-col lg:min-h-[min(48dvh,28rem)]">
-          <MonthlyCalendar lessons={lessons} hideHeader />
-        </div>
+      <div className="flex min-h-[min(280px,46svh)] flex-col lg:min-h-[min(52dvh,32rem)]">
+        <WeeklySchedule
+          lessons={lessons}
+          hideHeader
+          weekMondayIso={weekMondayIso}
+          onWeekMondayIsoChange={setWeekMondayIso}
+        />
       </div>
 
       <section className="rounded-app border-2 border-panel-frame bg-luster/50 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-depths text-base font-semibold tracking-tight">Lista lekcji</h2>
-          <button
-            type="button"
-            className="shrink-0 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
-            onClick={openAdd}
-          >
-            + Dodaj lekcję
-          </button>
+        <div>
+          <h2 className="text-depths text-base font-semibold tracking-tight">Lista lekcji — miesiąc</h2>
+          <p className="text-muted mt-0.5 text-xs capitalize">{formatMonthLongFromKey(listMonthKey)}</p>
+        </div>
+
+        <MonthNavigator monthKey={listMonthKey} onMonthKeyChange={setListMonthKey} className="mt-3" />
+
+        <div className="mt-3 flex flex-wrap gap-2 text-[0.65rem] font-semibold">
+          <span className="rounded-full bg-luster px-2 py-0.5 text-depths">{monthStats.planned} zaplanowanych</span>
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-950">{monthStats.pending} oczekujących</span>
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-900">{monthStats.verified} zatwierdzonych</span>
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-900">{monthStats.unpaid} nieopłaconych</span>
         </div>
 
         <ul className="mt-4 flex flex-col gap-2.5">
-          {sorted.map((lesson) => (
-            <li
-              key={lesson.id}
-              className="flex flex-col gap-3 rounded-app border border-panel-frame/30 bg-snow/95 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#000C4A] text-sm font-bold text-luster">
-                  {lesson.initials}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-depths">{lesson.studentName}</p>
-                  <p className="truncate text-xs text-muted">
-                    {lesson.subject} · {lesson.classLabel}
-                  </p>
-                  <p className="text-[0.6875rem] text-muted">
-                    {dayLabel(lesson.dayIndex)} · {lesson.start}–{lesson.end}
-                    {lesson.notes ? (
-                      <span className="hidden sm:inline"> {" | "} {lesson.notes}</span>
-                    ) : null}
-                  </p>
-                  {lesson.notes ? <p className="mt-1 text-xs text-muted sm:hidden">{lesson.notes}</p> : null}
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  className="rounded-full bg-jodhpur px-3 py-1.5 text-xs font-semibold text-depths"
-                  onClick={() => openEdit(lesson)}
+          {sortedForMonth.length === 0 ? (
+            <li className="text-muted py-6 text-center text-sm">Brak lekcji w wybranym miesiącu.</li>
+          ) : (
+            sortedForMonth.map((lesson) => {
+              const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
+              const needsAction = status === "UNPAID" || status === "PLANNED";
+              const isPast = Boolean(lesson.date && lesson.date < today);
+              return (
+                <li
+                  key={lesson.id}
+                  className={`flex flex-col gap-3 rounded-app border px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                    status === "UNPAID"
+                      ? "border-red-400/60 bg-red-50"
+                      : status === "PLANNED"
+                        ? "border-panel-frame/30 bg-snow/95"
+                        : "border-panel-frame/30 bg-snow/95"
+                  }`}
                 >
-                  Edytuj
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
-                  onClick={() => removeLesson(lesson.id)}
-                >
-                  Usuń
-                </button>
-              </div>
-            </li>
-          ))}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        status === "UNPAID" ? "bg-red-800 text-white" : "bg-[#000C4A] text-luster"
+                      }`}
+                    >
+                      {lesson.initials}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-depths">{lesson.studentName}</p>
+                        <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
+                      </div>
+                      <p className="truncate text-xs text-muted">
+                        {lesson.subject} · {lesson.classLabel}
+                      </p>
+                      <p className="text-[0.6875rem] text-muted">
+                        {lesson.date ? formatLessonDatePl(lesson.date) : dayLabel(lesson.dayIndex)} · {lesson.start}–{lesson.end}
+                      </p>
+                      {status === "UNPAID" ? (
+                        <p className="mt-1 text-[0.65rem] font-bold text-red-800">
+                          Brak wpłaty od rodzica — skontaktuj się i ponów w planie tygodnia.
+                        </p>
+                      ) : null}
+                      {needsAction && status === "PLANNED" ? (
+                        <p className="text-muted mt-1 text-[0.65rem]">Po zajęciach zalicz lekcję w planie tygodnia.</p>
+                      ) : null}
+                      {isPast ? (
+                        <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone — bez edycji</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  {isPast ? null : (
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full bg-jodhpur px-3 py-1.5 text-xs font-semibold text-depths"
+                        onClick={() => openEdit(lesson)}
+                      >
+                        Edytuj
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
+                        onClick={() => removeLesson(lesson.id)}
+                      >
+                        Usuń
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })
+          )}
         </ul>
       </section>
 
@@ -529,18 +621,33 @@ function TerminarzInner() {
           mode={modal.type}
           draft={draft}
           setDraft={setDraft}
+          students={students}
+          activeSubjects={activeSubjects}
           onClose={closeModal}
           onSave={saveModal}
+          saving={saving}
         />
       ) : null}
     </div>
   );
 }
 
-export function TerminarzPageView() {
+export function TerminarzPageView({
+  initialLessons,
+  students,
+  activeSubjects,
+}: {
+  initialLessons: Lesson[];
+  students: StudentUi[];
+  activeSubjects: string[];
+}) {
   return (
     <LessonCompletionProvider>
-      <TerminarzInner />
+      <TerminarzInner
+        initialLessons={initialLessons}
+        students={students}
+        activeSubjects={activeSubjects}
+      />
     </LessonCompletionProvider>
   );
 }

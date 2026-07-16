@@ -45,64 +45,7 @@ export function subjectsFromLine(subjectsLine: string): string[] {
     .filter(Boolean);
 }
 
-export const DEMO_STUDENTS: DemoStudent[] = [
-  {
-    id: "1",
-    name: "Tomasz Kowalski",
-    initials: "TK",
-    subjectsLine: "Matematyka, Fizyka",
-    phone: "+48 601 234 567",
-    email: "tomasz.k@mail.example",
-    guardian: "Rodzic: Piotr Kowalski",
-    classLabel: "Egzamin ósmoklasisty",
-    schoolClass: "Klasa 8",
-    notes: "Przygotowanie do egzaminu ósmoklasisty. Preferuje zadania tekstowe.",
-    ratePerHourPln: 75,
-    nextLesson: "Jutro 16:00 · Matematyka",
-  },
-  {
-    id: "2",
-    name: "Anna Nowak",
-    initials: "AN",
-    subjectsLine: "Język polski, Historia",
-    phone: "+48 602 345 678",
-    email: "anna.nowak@mail.example",
-    guardian: "Rodzic: Katarzyna Nowak",
-    classLabel: "Szkoła podstawowa (kl. 1-8)",
-    schoolClass: "Klasa 6",
-    notes: "Czytanie ze zrozumieniem, wypracowania.",
-    ratePerHourPln: 60,
-    nextLesson: "Środa 14:30 · Polski",
-  },
-  {
-    id: "3",
-    name: "Kuba Wiśniewski",
-    initials: "KW",
-    subjectsLine: "Język angielski",
-    phone: "+48 603 456 789",
-    email: "kuba.w@mail.example",
-    guardian: "Rodzic: Magdalena Wiśniewska",
-    classLabel: "Szkoła podstawowa (kl. 1-8)",
-    schoolClass: "Klasa 4",
-    notes: "Poziom A2, gry i dialogi.",
-    ratePerHourPln: 60,
-    nextLesson: "Dziś 17:15 · Angielski",
-  },
-  {
-    id: "4",
-    name: "Zofia Lewandowska",
-    initials: "ZL",
-    subjectsLine: "Biologia, Chemia",
-    phone: "+48 604 567 890",
-    email: "zofia.l@mail.example",
-    guardian: "Rodzic: Adam Lewandowski",
-    classLabel: "Szkoła podstawowa (kl. 1-8)",
-    schoolClass: "Klasa 7",
-    notes: "Powtórki przed klasówkami, tablice.",
-    ratePerHourPln: 60,
-    nextLesson: "Piątek 15:00 · Biologia",
-  },
-];
+export const DEMO_STUDENTS: DemoStudent[] = [];
 
 export type DemoMessageCategory = "employer" | "system";
 
@@ -180,13 +123,4 @@ export type DemoFinanceLine = {
   date: string;
 };
 
-export const DEMO_FINANCE_LINES: DemoFinanceLine[] = [
-  { id: "1", studentName: "Tomasz Kowalski", label: "Matematyka · 90 min", amountPln: 90, date: "24.03" },
-  { id: "2", studentName: "Anna Nowak", label: "J. polski · 60 min", amountPln: 55, date: "23.03" },
-  { id: "3", studentName: "Kuba Wiśniewski", label: "Angielski · 60 min", amountPln: 50, date: "23.03" },
-  { id: "4", studentName: "Zofia Lewandowska", label: "Biologia · 90 min", amountPln: 82, date: "22.03" },
-  { id: "5", studentName: "Tomasz Kowalski", label: "Matematyka · 60 min", amountPln: 60, date: "20.03" },
-  { id: "6", studentName: "Anna Nowak", label: "Historia · 60 min", amountPln: 55, date: "18.02" },
-  { id: "7", studentName: "Kuba Wiśniewski", label: "Angielski · 60 min", amountPln: 50, date: "14.02" },
-  { id: "8", studentName: "Zofia Lewandowska", label: "Chemia · 60 min", amountPln: 55, date: "16.01" },
-] as const;
+export const DEMO_FINANCE_LINES: DemoFinanceLine[] = [];
