@@ -128,7 +128,8 @@ export function AdminDashboardClient({
   todayLabel,
   monthLabel,
   verifiedMonthSumPln,
-  tutorCostPln,
+  payoutCostPln,
+  totalCostPln,
   agencyProfitPln,
   unpaidMonthSumPln,
   tutorCount,
@@ -141,7 +142,8 @@ export function AdminDashboardClient({
   todayLabel: string;
   monthLabel: string;
   verifiedMonthSumPln: number;
-  tutorCostPln: number;
+  payoutCostPln: number;
+  totalCostPln: number;
   agencyProfitPln: number;
   unpaidMonthSumPln: number;
   tutorCount: number;
@@ -155,52 +157,52 @@ export function AdminDashboardClient({
     <div className="space-y-7">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-muted text-xs font-semibold uppercase tracking-[0.14em]">Panel sterowania</p>
-          <h1 className="text-depths mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Główna</h1>
-          <p className="text-muted mt-1.5 text-sm capitalize">{todayLabel}</p>
+          <h1 className="text-depths text-2xl font-semibold tracking-tight sm:text-3xl">Główna</h1>
         </div>
-        <p className="text-muted text-xs font-semibold uppercase tracking-wide">
-          Miesiąc: <span className="text-depths capitalize">{monthLabel}</span>
-        </p>
+        <div className="text-right">
+          <p className="text-muted text-sm capitalize">{todayLabel}</p>
+          <p className="text-muted mt-1 text-xs font-semibold uppercase tracking-wide">
+            Miesiąc: <span className="text-depths capitalize">{monthLabel}</span>
+          </p>
+        </div>
       </header>
 
       <section>
         <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Finanse miesiąca</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-green-900/80">
-              Przychód VERIFIED
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
+              Przychód
             </p>
-            <p className="mt-2 text-3xl font-black tabular-nums text-green-800 sm:text-4xl">
+            <p className="text-depths mt-1 text-2xl font-black tabular-nums">
               {formatPln(verifiedMonthSumPln)}
             </p>
           </article>
 
-          <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
-              Koszty wypłat 70%
+          <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
+              Koszty wypłaty/wszystkie
             </p>
-            <p className="mt-2 text-3xl font-black tabular-nums text-amber-900 sm:text-4xl">
-              {formatPln(tutorCostPln)}
+            <p className="mt-1 text-2xl font-black tabular-nums text-amber-900">
+              {formatPln(payoutCostPln)}
+              <span className="text-amber-900/50"> / </span>
+              {formatPln(totalCostPln)}
             </p>
           </article>
 
-          <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-green-900/80">
-              Marża agencji ~30%
+          <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-green-900/80">
+              Marża agencji
             </p>
-            <p className="mt-2 text-3xl font-black tabular-nums text-green-800 sm:text-4xl">
+            <p className="mt-1 text-2xl font-black tabular-nums text-green-800">
               {formatPln(agencyProfitPln)}
             </p>
           </article>
 
-          <article className="rounded-app border border-red-400/50 bg-red-50/80 p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-red-900/80">Nieopłacone</p>
-            <p className="mt-2 text-3xl font-black tabular-nums text-red-700 sm:text-4xl">
+          <article className="rounded-app border border-red-400/50 bg-red-50/80 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-red-900/80">Nieopłacone</p>
+            <p className="mt-1 text-2xl font-black tabular-nums text-red-700">
               −{formatPln(unpaidMonthSumPln)}
-            </p>
-            <p className="mt-2 text-xs font-medium text-red-800/80">
-              strata — lekcje bez wpływu w tym miesiącu
             </p>
           </article>
         </div>
@@ -209,34 +211,37 @@ export function AdminDashboardClient({
       <section>
         <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Zespół i lekcje</h2>
         <div className="grid gap-3 lg:grid-cols-3">
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Nauczyciele</p>
-            <p className="text-depths mt-1 text-3xl font-black tabular-nums">{tutorCount}</p>
-            <p className="text-muted mt-1 text-xs">aktywnych w systemie</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
+            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
+              Nauczyciele{" "}
+              <span className="font-medium normal-case tracking-normal">· aktywnych w systemie</span>
+            </p>
+            <p className="text-depths mt-1 text-2xl font-black tabular-nums">{tutorCount}</p>
           </article>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Uczniowie</p>
-            <p className="text-depths mt-1 text-3xl font-black tabular-nums">{studentCount}</p>
-            <p className="text-muted mt-1 text-xs">w bazie</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
+            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
+              Uczniowie <span className="font-medium normal-case tracking-normal">· w bazie</span>
+            </p>
+            <p className="text-depths mt-1 text-2xl font-black tabular-nums">{studentCount}</p>
           </article>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
             <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
               Lekcje · {monthLabel}
             </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Do zatwierdz.</p>
-                <p className="mt-0.5 text-2xl font-black tabular-nums text-amber-900">{pendingMonthCount}</p>
+                <p className="mt-0.5 text-xl font-black tabular-nums text-amber-900">{pendingMonthCount}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-green-800">Zatwierdzone</p>
-                <p className="mt-0.5 text-2xl font-black tabular-nums text-green-800">{verifiedMonthCount}</p>
+                <p className="mt-0.5 text-xl font-black tabular-nums text-green-800">{verifiedMonthCount}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-red-800">Nieopłacone</p>
-                <p className="mt-0.5 text-2xl font-black tabular-nums text-red-700">{unpaidMonthCount}</p>
+                <p className="mt-0.5 text-xl font-black tabular-nums text-red-700">{unpaidMonthCount}</p>
               </div>
             </div>
           </article>

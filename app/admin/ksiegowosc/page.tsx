@@ -1,13 +1,24 @@
 import { KsiegowoscClient } from "./ksiegowosc-client";
-import { getAllCompletedFinanceLines, getAllPayouts, getClosedMonths } from "@/lib/data/queries";
+import {
+  getAllCompletedFinanceLines,
+  getAllOperatingExpenses,
+  getAllPayouts,
+  getClosedMonths,
+} from "@/lib/data/queries";
 
 export default async function KsiegowoscPage() {
-  const [financeLines, payouts, closedMonths] = await Promise.all([
+  const [financeLines, payouts, closedMonths, operatingExpenses] = await Promise.all([
     getAllCompletedFinanceLines(),
     getAllPayouts(),
     getClosedMonths(),
+    getAllOperatingExpenses(),
   ]);
   return (
-    <KsiegowoscClient financeLines={financeLines} payouts={payouts} closedMonths={closedMonths} />
+    <KsiegowoscClient
+      financeLines={financeLines}
+      payouts={payouts}
+      closedMonths={closedMonths}
+      operatingExpenses={operatingExpenses}
+    />
   );
 }

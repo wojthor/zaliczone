@@ -90,8 +90,14 @@ export type StudentUi = {
 export type FinanceLineUi = {
   id: string;
   studentName: string;
+  /** Id ucznia — unikalne zliczanie w zestawieniach */
+  studentId: string;
+  /** Poziom / klasa ucznia (nabywcy) */
+  classLevel: string | null;
   label: string;
   amountPln: number;
+  /** Czas lekcji w minutach */
+  durationMinutes: number;
   /** dd.mm — wyświetlanie */
   date: string;
   /** YYYY-MM-DD — filtrowanie tygodni / sortowanie */
@@ -136,6 +142,23 @@ export type TutorDocumentMonth = {
   verifiedLessonCount: number;
   ewidencjaUnlocked: boolean;
   payoutStatus: PayoutStatus | null;
+};
+
+/** Wydatek operacyjny (faktura / rachunek) w księgowości miesięcznej */
+export type OperatingExpense = {
+  id: string;
+  month: string;
+  invoice_date: string;
+  document_number: string;
+  expense_name: string;
+  issuer_name: string;
+  amount_pln: number;
+  created_at: string;
+  created_by?: string | null;
+  attachment_name?: string | null;
+  attachment_path?: string | null;
+  attachment_mime?: string | null;
+  attachment_size_bytes?: number | null;
 };
 
 export type TutorDocumentTree = {

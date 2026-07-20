@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteTutorAccount, updateTutorProfile } from "@/lib/actions/admin";
+import {
+  archiveTutorAccount,
+  deleteTutorAccount,
+  updateTutorProfile,
+} from "@/lib/actions/admin";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
+import { IconFolder } from "@/components/icons";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { AdminTutorSummary, FinanceLineUi } from "@/lib/types/database";
 import type { AdminStudentRow } from "@/lib/types/messages";
@@ -59,7 +64,7 @@ export function NauczycielProfilClient({
         (verified.reduce((s, l) => s + minutesFromLabel(l.label), 0) / 60) * 10,
       ) / 10;
     const share = Math.round(revenue * TUTOR_SHARE * 100) / 100;
-    const bonus = bonusProgress(verified.length);
+    const bonus = bonusProgress(hours);
     const payout = Math.round((share + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100;
     return {
       lessons: verified.length,
@@ -92,6 +97,25 @@ export function NauczycielProfilClient({
         router.refresh();
       } catch (e) {
         setFeedback(e instanceof Error ? e.message : "Nie udało się zapisać.");
+      }
+    });
+  }
+
+  function handleArchive() {
+    if (
+      !confirm(
+        `Archiwizować nauczyciela ${tutor.name}? Ustawimy datę zakończenia umowy na dziś.`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await archiveTutorAccount(tutor.id);
+        setFeedback("Zarchiwizowano.");
+        router.refresh();
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Nie udało się zarchiwizować.");
       }
     });
   }
@@ -167,25 +191,43 @@ export function NauczycielProfilClient({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setEditing((v) => !v);
-              setFeedback("");
-            }}
-            className="rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths"
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setEditing((v) => !v);
+                setFeedback("");
+              }}
+              className="rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths"
+            >
+              {editing ? "Anuluj edycję" : "Edytuj"}
+            </button>
+            <button
+              type="button"
+              onClick={handleArchive}
+              disabled={busy}
+              className="rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths disabled:opacity-60"
+            >
+              Archiwizuj
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={busy}
+              className="rounded-full border border-red-300 bg-transparent px-4 py-2 text-xs font-bold text-red-700 disabled:opacity-60"
+            >
+              Usuń konto
+            </button>
+          </div>
+          <Link
+            href={`/admin/dokumenty?tab=employees&tutor=${tutor.id}`}
+            className="flex aspect-square w-[6.5rem] flex-col items-center justify-center gap-2 rounded-app border border-panel-frame/35 bg-snow text-center transition hover:border-[#000C4A]/40 hover:bg-luster/40"
+            title={`Dokumenty → Pracownicy → ${tutor.name}`}
           >
-            {editing ? "Anuluj edycję" : "Edytuj"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={busy}
-            className="rounded-full border border-red-300 bg-transparent px-4 py-2 text-xs font-bold text-red-700 disabled:opacity-60"
-          >
-            Usuń konto
-          </button>
+            <IconFolder className="h-9 w-9 text-[#000C4A]" />
+            <span className="text-depths text-xs font-bold leading-none">Dokumenty</span>
+          </Link>
         </div>
       </div>
 
@@ -266,8 +308,6 @@ export function NauczycielProfilClient({
         </section>
       ) : null}
 
-      <BonusProgressBar lessonsDone={monthStats.lessons} minimal className="max-w-xs" />
-
       {/* Dwa obszary: finanse | uczniowie */}
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-app border border-panel-frame/35 bg-snow p-4">
@@ -286,6 +326,7 @@ export function NauczycielProfilClient({
               }
             />
           </div>
+          <BonusProgressBar hoursDone={monthStats.hours} minimal className="mt-4 w-full max-w-none" />
         </div>
 
         <div className="rounded-app border border-panel-frame/35 bg-snow p-4">

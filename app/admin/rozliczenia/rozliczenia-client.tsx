@@ -83,11 +83,14 @@ export function RozliczeniaClient({
   const verifiedInWeek = verified.filter((r) => matchesQuery(r) && inSelectedWeek(r));
   const unpaidInWeek = unpaid.filter((r) => matchesQuery(r) && inSelectedWeek(r));
 
+  const pendingWeekAll = pending.filter(inSelectedWeek).length;
+  const verifiedWeekAll = verified.filter(inSelectedWeek).length;
+  const unpaidWeekAll = unpaid.filter(inSelectedWeek).length;
+  const weekTotalAll = pendingWeekAll + verifiedWeekAll + unpaidWeekAll;
+
   const pendingByDay = groupByDayDesc(pendingInWeek);
   const verifiedByDay = groupByDayDesc(verifiedInWeek);
   const unpaidByDay = groupByDayDesc(unpaidInWeek);
-
-  const weekTotalCount = pendingInWeek.length + verifiedInWeek.length + unpaidInWeek.length;
 
   function paymentIsoFor(id: string): string {
     return paymentDates[id] ?? todayIso();
@@ -168,37 +171,36 @@ export function RozliczeniaClient({
   }
 
   return (
-    <div className="min-w-0 space-y-4 sm:space-y-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-depths text-lg font-semibold tracking-tight sm:text-xl">Rozliczenia</h1>
-          <p className="text-muted mt-0.5 text-[0.7rem] leading-snug sm:text-xs">
-            Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
-            zmienić.
-          </p>
+    <div className="flex h-auto min-h-0 min-w-0 flex-col gap-3 overflow-visible sm:gap-4 lg:h-full lg:overflow-hidden">
+      <div className="min-w-0 shrink-0 space-y-2">
+        <h1 className="text-depths text-lg font-semibold tracking-tight sm:text-xl">Rozliczenia</h1>
+        <p className="text-muted text-[0.7rem] leading-snug sm:text-xs">
+          Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
+          zmienić.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <WeekVerificationBar
+            total={weekTotalAll}
+            pending={pendingWeekAll}
+            verified={verifiedWeekAll}
+            unpaid={unpaidWeekAll}
+          />
+          <WeekNavigator
+            className="min-w-0 flex-1 justify-center px-0 py-0"
+            weekMondayIso={weekMondayIso}
+            onWeekMondayIsoChange={setWeekMondayIso}
+            compact
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Szukaj…"
+            className="w-full shrink-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:w-56"
+          />
         </div>
       </div>
 
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Szukaj po korepetytorze, uczniu, dacie…"
-        className="w-full min-w-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:px-3 sm:py-2"
-      />
-
-      <WeekNavigator
-        weekMondayIso={weekMondayIso}
-        onWeekMondayIsoChange={setWeekMondayIso}
-        summary={
-          <p className="text-muted mt-0.5 text-[0.65rem]">
-            {weekTotalCount === 0
-              ? "Brak pozycji w tym tygodniu"
-              : `${weekTotalCount} pozycji · ${pendingInWeek.length} do zatwierdzenia · ${verifiedInWeek.length} zatwierdzonych · ${unpaidInWeek.length} nieopłaconych`}
-          </p>
-        }
-      />
-
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start lg:gap-3">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-3 lg:overflow-hidden">
         <PaymentsPanel
           title="Do zatwierdzenia"
           subtitle="PENDING_VERIFICATION — sprawdź przelew i ustaw datę wpływu."
@@ -206,7 +208,6 @@ export function RozliczeniaClient({
           groups={pendingByDay}
           variant="pending"
           count={pendingInWeek.length}
-          tall
           movingId={movingId}
           paymentDates={paymentDates}
           onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
@@ -214,31 +215,92 @@ export function RozliczeniaClient({
           onReject={markUnpaid}
         />
 
-        <div className="flex min-w-0 flex-col gap-4">
-          <PaymentsPanel
-            title="Zatwierdzone"
-            subtitle="VERIFIED — data wpływu zablokowana · idą do wypłat / księgowości."
-            empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
-            groups={verifiedByDay}
-            variant="verified"
-            count={verifiedInWeek.length}
-            movingId={movingId}
-            paymentDates={paymentDates}
-            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-          />
-          <PaymentsPanel
-            title="Nieopłacone"
-            subtitle="UNPAID — po wpływie ustaw datę i zatwierdź ponownie."
-            empty="Brak nieopłaconych lekcji w wybranym tygodniu."
-            groups={unpaidByDay}
-            variant="unpaid"
-            count={unpaidInWeek.length}
-            movingId={movingId}
-            paymentDates={paymentDates}
-            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-            onVerify={markVerifiedFromUnpaid}
+        <PaymentsPanel
+          title="Zatwierdzone"
+          subtitle="VERIFIED — data wpływu zablokowana · idą do wypłat / księgowości."
+          empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
+          groups={verifiedByDay}
+          variant="verified"
+          count={verifiedInWeek.length}
+          movingId={movingId}
+          paymentDates={paymentDates}
+          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+        />
+
+        <PaymentsPanel
+          title="Nieopłacone"
+          subtitle="UNPAID — po wpływie ustaw datę i zatwierdź ponownie."
+          empty="Brak nieopłaconych lekcji w wybranym tygodniu."
+          groups={unpaidByDay}
+          variant="unpaid"
+          count={unpaidInWeek.length}
+          movingId={movingId}
+          paymentDates={paymentDates}
+          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+          onVerify={markVerifiedFromUnpaid}
+        />
+      </div>
+    </div>
+  );
+}
+
+function WeekVerificationBar({
+  total,
+  pending,
+  verified,
+  unpaid,
+}: {
+  total: number;
+  pending: number;
+  verified: number;
+  unpaid: number;
+}) {
+  const done = verified + unpaid;
+  const donePct = total > 0 ? (done / total) * 100 : 0;
+  const verifiedDeg = total > 0 ? (verified / total) * 360 : 0;
+  const unpaidDeg = total > 0 ? (unpaid / total) * 360 : 0;
+  const pendingDeg = total > 0 ? (pending / total) * 360 : 0;
+
+  const pieBackground =
+    total === 0
+      ? "conic-gradient(#e8edf5 0deg 360deg)"
+      : `conic-gradient(
+          #15803d 0deg ${verifiedDeg}deg,
+          #dc2626 ${verifiedDeg}deg ${verifiedDeg + unpaidDeg}deg,
+          #f59e0b ${verifiedDeg + unpaidDeg}deg ${verifiedDeg + unpaidDeg + pendingDeg}deg
+        )`;
+
+  return (
+    <div className="flex w-[14rem] shrink-0 items-center gap-2 sm:w-[16rem]">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div
+          className="h-1 w-full overflow-hidden rounded-full bg-luster"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={total || 100}
+          aria-valuenow={done}
+          aria-label={`Zweryfikowano ${done} z ${total} lekcji`}
+        >
+          <div
+            className="h-full rounded-full bg-[#000C4A] transition-[width] duration-300 ease-out"
+            style={{ width: `${donePct}%` }}
           />
         </div>
+        <p className="text-muted text-[0.55rem] tabular-nums leading-none">
+          {total === 0 ? "Brak lekcji" : `${done}/${total} zweryfikowane`}
+        </p>
+      </div>
+
+      <div
+        className="relative size-7 shrink-0 rounded-full"
+        style={{ background: pieBackground }}
+        title={`Zatwierdzone ${verified} · Nieopłacone ${unpaid} · Niezweryfikowane ${pending}`}
+        aria-label={`Zatwierdzone ${verified}, nieopłacone ${unpaid}, niezweryfikowane ${pending} z ${total}`}
+      >
+        <div className="absolute inset-[3px] rounded-full bg-snow" />
+        <span className="text-depths absolute inset-0 flex items-center justify-center text-[0.5rem] font-bold tabular-nums">
+          {total}
+        </span>
       </div>
     </div>
   );
@@ -251,7 +313,6 @@ function PaymentsPanel({
   groups,
   variant,
   count,
-  tall = false,
   movingId,
   paymentDates,
   onPaymentDateChange,
@@ -264,7 +325,6 @@ function PaymentsPanel({
   groups: [string, FinanceLineUi[]][];
   variant: "pending" | "verified" | "unpaid";
   count: number;
-  tall?: boolean;
   movingId: string | null;
   paymentDates: Record<string, string>;
   onPaymentDateChange: (id: string, iso: string) => void;
@@ -278,13 +338,11 @@ function PaymentsPanel({
         ? "border-green-600/30"
         : "border-red-400/40";
 
-  const maxH = tall
-    ? "max-h-[min(40rem,72vh)] lg:max-h-[min(44rem,78vh)]"
-    : "max-h-[min(18rem,36vh)] lg:max-h-[min(20rem,38vh)]";
-
   return (
-    <section className={`min-w-0 rounded-app border bg-snow ${accent} p-3 sm:p-4`}>
-      <div className="mb-2 flex items-start justify-between gap-2">
+    <section
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-app border bg-snow ${accent} p-3 sm:p-4 max-h-[min(22rem,55dvh)] lg:max-h-none lg:h-full`}
+    >
+      <div className="mb-2 flex shrink-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-depths text-sm font-semibold sm:text-base">{title}</h2>
           <p className="text-muted mt-0.5 text-[0.65rem] leading-tight sm:text-xs">{subtitle}</p>
@@ -297,7 +355,7 @@ function PaymentsPanel({
       {groups.length === 0 ? (
         <p className="text-muted py-6 text-center text-xs">{empty}</p>
       ) : (
-        <div className={`space-y-3 overflow-y-auto overflow-x-hidden scrollbar-panel pr-0.5 ${maxH}`}>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-panel pr-0.5">
           {groups.map(([dayLabelText, dayRows]) => (
             <div key={dayLabelText} className="min-w-0">
               <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-muted">{dayLabelText}</p>

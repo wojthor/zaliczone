@@ -14,6 +14,8 @@ import type { DocumentFile, DocumentFolder, DocumentTreeResult } from "@/lib/typ
 
 type TabId = "company" | "employees";
 type DiskMode = "company" | "employees";
+type FilterKind = "all" | "folders" | "files";
+type SortMode = "name-asc" | "name-desc" | "date-desc" | "date-asc";
 
 function formatBytes(n: number | null): string {
   if (n == null || n <= 0) return "—";
@@ -22,12 +24,37 @@ function formatBytes(n: number | null): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function matchesNameQuery(name: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return name.toLowerCase().includes(q);
+}
+
+function compareBySortMode(
+  a: { name: string; created_at: string },
+  b: { name: string; created_at: string },
+  sortMode: SortMode,
+): number {
+  if (sortMode === "name-asc") return a.name.localeCompare(b.name, "pl");
+  if (sortMode === "name-desc") return b.name.localeCompare(a.name, "pl");
+  if (sortMode === "date-desc") return b.created_at.localeCompare(a.created_at);
+  return a.created_at.localeCompare(b.created_at);
+}
+
 function isTutorRootFolder(folder: DocumentFolder): boolean {
   return folder.scope === "TUTOR" && folder.parent_id == null;
 }
 
-export function DokumentyClient({ documentTree }: { documentTree: DocumentTreeResult }) {
-  const [tab, setTab] = useState<TabId>("employees");
+export function DokumentyClient({
+  documentTree,
+  initialTab = "employees",
+  initialTutorId = null,
+}: {
+  documentTree: DocumentTreeResult;
+  initialTab?: TabId;
+  initialTutorId?: string | null;
+}) {
+  const [tab, setTab] = useState<TabId>(initialTab);
 
   return (
     <div className="space-y-5">
@@ -79,6 +106,7 @@ export function DokumentyClient({ documentTree }: { documentTree: DocumentTreeRe
           files={documentTree.files.filter((f) => f.scope === "TUTOR")}
           available={documentTree.available}
           errorMessage={documentTree.errorMessage}
+          initialTutorId={initialTutorId}
         />
       )}
     </div>
@@ -94,6 +122,7 @@ function DiskBrowser({
   files,
   available,
   errorMessage,
+  initialTutorId = null,
 }: {
   mode: DiskMode;
   title: string;
@@ -103,13 +132,18 @@ function DiskBrowser({
   files: DocumentFile[];
   available: boolean;
   errorMessage?: string;
+  initialTutorId?: string | null;
 }) {
   const toast = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
-  const [uploadTargetFolderId, setUploadTargetFolderId] = useState<string | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const initialFolderId =
+    initialTutorId != null
+      ? (folders.find((f) => f.tutor_id === initialTutorId && f.parent_id == null)?.id ?? null)
+      : null;
+  const [uploadTargetFolderId, setUploadTargetFolderId] = useState<string | null>(initialFolderId);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(initialFolderId);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const f of folders) {
@@ -118,6 +152,9 @@ function DiskBrowser({
     return initial;
   });
   const [newFolderName, setNewFolderName] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filterKind, setFilterKind] = useState<FilterKind>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("name-asc");
   const [dragActive, setDragActive] = useState(false);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -151,33 +188,43 @@ function DiskBrowser({
   );
 
   const sortedFolders = useMemo(
-    () => [...folders].sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [folders],
+    () => [...folders].sort((a, b) => compareBySortMode(a, b, sortMode)),
+    [folders, sortMode],
   );
 
   const visibleRootFolders = useMemo(() => {
     if (selectedFolderId) return [];
-    return sortedFolders.filter((f) => f.parent_id == null);
-  }, [sortedFolders, selectedFolderId]);
+    if (filterKind === "files") return [];
+    return sortedFolders.filter(
+      (f) => f.parent_id == null && matchesNameQuery(f.name, filterQuery),
+    );
+  }, [sortedFolders, selectedFolderId, filterKind, filterQuery]);
 
   const visibleRootFiles = useMemo(() => {
     if (selectedFolderId) return [];
+    if (filterKind === "folders") return [];
     return files
-      .filter((f) => f.folder_id == null)
-      .sort((a, b) => a.name.localeCompare(b.name, "pl"));
-  }, [files, selectedFolderId]);
+      .filter((f) => f.folder_id == null && matchesNameQuery(f.name, filterQuery))
+      .sort((a, b) => compareBySortMode(a, b, sortMode));
+  }, [files, selectedFolderId, filterKind, filterQuery, sortMode]);
 
   const currentFolderFiles = useMemo(() => {
     if (!selectedFolderId) return [];
+    if (filterKind === "folders") return [];
     return files
-      .filter((f) => f.folder_id === selectedFolderId)
-      .sort((a, b) => a.name.localeCompare(b.name, "pl"));
-  }, [files, selectedFolderId]);
+      .filter(
+        (f) => f.folder_id === selectedFolderId && matchesNameQuery(f.name, filterQuery),
+      )
+      .sort((a, b) => compareBySortMode(a, b, sortMode));
+  }, [files, selectedFolderId, filterKind, filterQuery, sortMode]);
 
   const currentChildFolders = useMemo(() => {
     if (!selectedFolderId) return [];
-    return sortedFolders.filter((f) => f.parent_id === selectedFolderId);
-  }, [sortedFolders, selectedFolderId]);
+    if (filterKind === "files") return [];
+    return sortedFolders.filter(
+      (f) => f.parent_id === selectedFolderId && matchesNameQuery(f.name, filterQuery),
+    );
+  }, [sortedFolders, selectedFolderId, filterKind, filterQuery]);
 
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, DocumentFolder[]>();
@@ -199,10 +246,10 @@ function DiskBrowser({
       map.set(key, list);
     }
     for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name, "pl"));
+      list.sort((a, b) => compareBySortMode(a, b, sortMode));
     }
     return map;
-  }, [files]);
+  }, [files, sortMode]);
 
   const folderPathLabel = useCallback(
     (folderId: string | null): string => {
@@ -437,6 +484,61 @@ function DiskBrowser({
         ))}
       </nav>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={filterQuery}
+          onChange={(e) => setFilterQuery(e.target.value)}
+          placeholder={mode === "employees" && !selectedFolderId ? "Szukaj pracownika…" : "Szukaj…"}
+          className="w-full min-w-0 flex-1 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:max-w-xs"
+        />
+        <div className="flex rounded-app border border-panel-frame/35 bg-luster/40 p-0.5">
+          {(
+            [
+              ["all", "Wszystko"],
+              ["folders", "Foldery"],
+              ["files", "Pliki"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilterKind(id)}
+              className={`rounded-app px-2.5 py-1.5 text-[10px] font-bold transition sm:text-xs ${
+                filterKind === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="inline-flex items-center gap-1.5">
+          <span className="text-muted text-[10px] font-semibold uppercase">Sortuj</span>
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="rounded-app border border-panel-frame/40 bg-white px-2 py-1.5 text-xs text-depths"
+          >
+            <option value="name-asc">Nazwa A–Z</option>
+            <option value="name-desc">Nazwa Z–A</option>
+            <option value="date-desc">Najnowsze</option>
+            <option value="date-asc">Najstarsze</option>
+          </select>
+        </label>
+        {filterQuery || filterKind !== "all" || sortMode !== "name-asc" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setFilterQuery("");
+              setFilterKind("all");
+              setSortMode("name-asc");
+            }}
+            className="text-muted text-[10px] font-semibold hover:text-depths sm:text-xs"
+          >
+            Wyczyść
+          </button>
+        ) : null}
+      </div>
+
       {uploadAllowed ? (
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded-app border border-panel-frame/25 bg-luster/30 p-3">
           {mode === "company" ? (
@@ -509,10 +611,19 @@ function DiskBrowser({
         <div className="space-y-1.5 p-3">
           {!selectedFolderId ? (
             <>
-              {mode === "employees" && visibleRootFolders.length === 0 ? (
+              {mode === "employees" &&
+              visibleRootFolders.length === 0 &&
+              visibleRootFiles.length === 0 &&
+              !filterQuery &&
+              filterKind === "all" ? (
                 <p className="text-muted py-8 text-center text-sm">
                   Brak nauczycieli — dodaj konto nauczyciela, a folder utworzy się automatycznie.
                 </p>
+              ) : null}
+              {visibleRootFolders.length === 0 &&
+              visibleRootFiles.length === 0 &&
+              (filterQuery || filterKind !== "all") ? (
+                <p className="text-muted py-8 text-center text-sm">Brak wyników dla wybranego filtra.</p>
               ) : null}
               {visibleRootFiles.map((file) => (
                 <FileRow
@@ -589,7 +700,9 @@ function DiskBrowser({
               ))}
               {currentFolderFiles.length === 0 && currentChildFolders.length === 0 ? (
                 <p className="text-muted py-8 text-center text-sm">
-                  Folder pusty — przeciągnij pliki tutaj.
+                  {filterQuery || filterKind !== "all"
+                    ? "Brak wyników dla wybranego filtra."
+                    : "Folder pusty — przeciągnij pliki tutaj."}
                 </p>
               ) : null}
               {currentFolderFiles.map((file) => (

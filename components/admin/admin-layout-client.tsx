@@ -22,6 +22,7 @@ export function AdminLayoutClient({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isPrintDoc = pathname.startsWith("/admin/ksiegowosc/ewidencja");
+  const isRozliczenia = pathname === "/admin/rozliczenia";
 
   async function handleLogout() {
     await signOut();
@@ -34,8 +35,8 @@ export function AdminLayoutClient({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="text-depths flex min-h-[calc(100dvh-0.75rem)] gap-2">
-      <aside className="hidden w-72 shrink-0 rounded-app bg-[#000C4A] p-3 text-luster lg:block">
+    <div className="text-depths flex h-[calc(100dvh-0.75rem)] gap-2">
+      <aside className="hidden h-full w-72 shrink-0 flex-col overflow-y-auto rounded-app bg-[#000C4A] p-3 text-luster lg:flex">
         <div className="mb-3 border-b border-white/10 pb-3 text-center">
           <p className={`${logoFont.className} text-lime text-2xl font-black italic tracking-tight`}>ZALICZONE</p>
           <p className="text-steel text-[10px] font-semibold uppercase tracking-[0.2em]">Panel Admina</p>
@@ -72,7 +73,9 @@ export function AdminLayoutClient({ children }: { children: ReactNode }) {
           </p>
         </div>
       </aside>
-      <div className="min-w-0 flex-1 rounded-app border-2 border-panel-frame bg-snow/90 p-4 sm:p-6">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-app border-2 border-panel-frame bg-snow/90 p-4 sm:p-6">
+        <div className={`min-h-0 flex-1 ${isRozliczenia ? "overflow-y-auto lg:overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
+      </div>
     </div>
   );
 }

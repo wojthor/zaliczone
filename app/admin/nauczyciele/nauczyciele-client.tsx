@@ -118,7 +118,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                     <Stat value={String(t.lessonsDoneMonth)} label="lekcji" />
                     <Stat value={String(t.hoursDoneMonth)} label="godz." />
                   </div>
-                  <BonusProgressBar lessonsDone={t.lessonsDoneMonth} minimal />
+                  <BonusProgressBar hoursDone={t.hoursDoneMonth} minimal />
                 </div>
 
                 <Link

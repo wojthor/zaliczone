@@ -1,14 +1,22 @@
--- ZALICZONE: premie, dokumenty (Storage), zamknięcie miesiąca
--- Uruchom w Supabase SQL Editor PO 0004_payment_received_at.sql
+-- ZALICZONE: finalna migracja PO 0004_payment_received_at.sql
+-- Scalone: dokumenty/Storage, zamknięcie miesiąca, premie, daty umowy, koszty + załączniki.
+-- Uruchom w Supabase SQL Editor. Idempotentne (bezpieczne przy ponownym uruchomieniu).
 
 -- ---------------------------------------------------------------------------
--- payment_received_at (idempotent — jeśli 0004 nie był uruchomiony)
+-- 1) payment_received_at (gdyby 0004 nie był uruchomiony)
 -- ---------------------------------------------------------------------------
 alter table public.lessons
   add column if not exists payment_received_at date;
 
 -- ---------------------------------------------------------------------------
--- closed_months — zamknięcie miesiąca księgowego
+-- 2) Daty umowy zlecenia na profilu nauczyciela
+-- ---------------------------------------------------------------------------
+alter table public.profiles
+  add column if not exists contract_start date,
+  add column if not exists contract_end date;
+
+-- ---------------------------------------------------------------------------
+-- 3) closed_months — zamknięcie miesiąca księgowego
 -- ---------------------------------------------------------------------------
 create table if not exists public.closed_months (
   month text primary key,
@@ -32,7 +40,7 @@ create policy "closed_months_tutor_select"
   using (auth.uid() is not null);
 
 -- ---------------------------------------------------------------------------
--- bonus_rules — konfiguracja premiowa (domyślnie 1 reguła globalna)
+-- 4) bonus_rules — konfiguracja premiowa
 -- ---------------------------------------------------------------------------
 create table if not exists public.bonus_rules (
   id uuid primary key default gen_random_uuid(),
@@ -61,7 +69,7 @@ create policy "bonus_rules_admin_all"
   with check (public.current_user_role() = 'ADMIN');
 
 -- ---------------------------------------------------------------------------
--- payouts: premia + podział kwot
+-- 5) payouts: premia + podział kwot
 -- ---------------------------------------------------------------------------
 alter table public.payouts
   add column if not exists lessons_amount numeric(10, 2) not null default 0,
@@ -70,7 +78,7 @@ alter table public.payouts
   add column if not exists student_count int not null default 0;
 
 -- ---------------------------------------------------------------------------
--- document_folders / document_files — dysk dokumentów
+-- 6) document_folders / document_files — dysk dokumentów
 -- ---------------------------------------------------------------------------
 create table if not exists public.document_folders (
   id uuid primary key default gen_random_uuid(),
@@ -133,7 +141,7 @@ create policy "document_files_tutor_select"
   );
 
 -- ---------------------------------------------------------------------------
--- Storage bucket (uruchom też w Dashboard → Storage jeśli insert nie zadziała)
+-- 7) Storage bucket documents (załączniki kosztów + dokumenty)
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('documents', 'documents', false)
@@ -156,3 +164,40 @@ create policy "documents_storage_tutor_read"
       or (storage.foldername(name))[1] = 'company'
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- 8) operating_expenses — koszty + załączniki faktur/rachunków
+-- ---------------------------------------------------------------------------
+create table if not exists public.operating_expenses (
+  id uuid primary key default gen_random_uuid(),
+  month text not null,
+  invoice_date date not null,
+  document_number text not null default '',
+  expense_name text not null,
+  issuer_name text not null,
+  amount_pln numeric(10, 2) not null check (amount_pln >= 0),
+  attachment_name text,
+  attachment_path text,
+  attachment_mime text,
+  attachment_size_bytes bigint,
+  created_at timestamptz not null default now(),
+  created_by uuid references public.profiles (id) on delete set null
+);
+
+-- Gdy tabela powstała wcześniej bez załączników:
+alter table public.operating_expenses
+  add column if not exists attachment_name text,
+  add column if not exists attachment_path text,
+  add column if not exists attachment_mime text,
+  add column if not exists attachment_size_bytes bigint;
+
+create index if not exists operating_expenses_month_idx on public.operating_expenses (month);
+create index if not exists operating_expenses_invoice_date_idx on public.operating_expenses (invoice_date);
+
+alter table public.operating_expenses enable row level security;
+
+drop policy if exists "operating_expenses_admin_all" on public.operating_expenses;
+create policy "operating_expenses_admin_all"
+  on public.operating_expenses for all
+  using (public.current_user_role() = 'ADMIN')
+  with check (public.current_user_role() = 'ADMIN');

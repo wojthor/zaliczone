@@ -1,10 +1,19 @@
 import { WyplatyClient } from "./wyplaty-client";
-import { getAllVerifiedFinanceLines, getAllPayouts } from "@/lib/data/queries";
+import { getAllVerifiedFinanceLines, getAllPayouts, getAllTutorProfiles } from "@/lib/data/queries";
 
 export default async function AdminWyplatyPage() {
-  const [financeLines, payouts] = await Promise.all([
+  const [financeLines, payouts, tutors] = await Promise.all([
     getAllVerifiedFinanceLines(),
     getAllPayouts(),
+    getAllTutorProfiles(),
   ]);
-  return <WyplatyClient financeLines={financeLines} payouts={payouts} />;
+
+  const bankAccounts: Record<string, string | null> = {};
+  for (const t of tutors) {
+    bankAccounts[t.id] = t.bank_account ?? null;
+  }
+
+  return (
+    <WyplatyClient financeLines={financeLines} payouts={payouts} bankAccounts={bankAccounts} />
+  );
 }

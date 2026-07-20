@@ -167,7 +167,7 @@ export function WeeklySchedule({
         weekMondayIso={weekMondayIso}
         onWeekMondayIsoChange={handleWeekChange}
         compact
-        className="mb-2 shrink-0 border-panel-frame/25 bg-luster/50 py-1.5"
+        className="mb-2 shrink-0 py-1.5"
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain [align-items:stretch] lg:grid lg:grid-cols-7 lg:grid-rows-1 lg:gap-1 lg:overflow-hidden">

@@ -108,8 +108,11 @@ export function dbLessonToFinanceLine(row: DbLessonWithRelations): FinanceLineUi
   return {
     id: row.id,
     studentName: student.name,
+    studentId: row.student_id,
+    classLevel: student.class_level ?? null,
     label: `${row.subject} · ${minutes} min`,
     amountPln,
+    durationMinutes: minutes,
     date: formatDateDdMm(row.date),
     dateIso: row.date,
     monthKey: monthKeyFromIsoDate(row.date),

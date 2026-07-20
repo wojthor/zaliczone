@@ -82,17 +82,17 @@ export function FinanseClient({
     () => Math.round(clientTotal * TUTOR_SHARE * 100) / 100,
     [clientTotal],
   );
-  const bonus = useMemo(() => bonusProgress(linesForMonth.length), [linesForMonth.length]);
-  const expectedPayoutPln = useMemo(
-    () => Math.round((lessonsSharePln + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100,
-    [lessonsSharePln, bonus],
-  );
   const hoursMonth = useMemo(
     () =>
       Math.round(
         (linesForMonth.reduce((sum, line) => sum + minutesFromFinanceLabel(line.label), 0) / 60) * 10,
       ) / 10,
     [linesForMonth],
+  );
+  const bonus = useMemo(() => bonusProgress(hoursMonth), [hoursMonth]);
+  const expectedPayoutPln = useMemo(
+    () => Math.round((lessonsSharePln + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100,
+    [lessonsSharePln, bonus],
   );
   const studentsInMonth = useMemo(
     () => new Set(linesForMonth.map((line) => line.studentName)).size,

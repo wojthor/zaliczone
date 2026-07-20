@@ -16,6 +16,7 @@ import type {
   DocumentTreeResult,
   FinanceLineUi,
   LessonStatus,
+  OperatingExpense,
   Payout,
   Profile,
   StudentUi,
@@ -311,6 +312,28 @@ export async function getClosedMonths(): Promise<string[]> {
   return (data ?? []).map((row) => row.month as string);
 }
 
+export async function getAllOperatingExpenses(): Promise<OperatingExpense[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("operating_expenses")
+    .select("*")
+    .order("invoice_date", { ascending: true });
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (
+      msg.includes("operating_expenses") ||
+      msg.includes("schema cache") ||
+      error.code === "42P01" ||
+      error.code === "PGRST205"
+    ) {
+      return [];
+    }
+    throw error;
+  }
+  return (data ?? []) as OperatingExpense[];
+}
+
 export async function getTutorVerifiedLessonsForMonth(
   tutorId: string,
   monthKey: string,
@@ -423,7 +446,7 @@ export async function getTutorInboxMessages(): Promise<InboxMessage[]> {
 }
 
 const DOCS_MIGRATION_HINT =
-  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_bonus_documents_month_close.sql w Supabase.";
+  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_final_after_0004.sql w Supabase.";
 
 function isMissingDocsSchema(error: { message?: string; code?: string; details?: string } | null): boolean {
   if (!error) return false;

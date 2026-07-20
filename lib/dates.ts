@@ -42,10 +42,10 @@ export const DATES = {
 
   /**
    * Premia miesięczna dla nauczyciela.
-   * Po osiągnięciu `lessonsThreshold` lekcji VERIFIED w miesiącu — dodatek `bonusPln` do wypłaty.
+   * Po osiągnięciu `hoursThreshold` godzin lekcji VERIFIED w miesiącu — dodatek `bonusPln` do wypłaty.
    */
   bonus: {
-    lessonsThreshold: 40,
+    hoursThreshold: 40,
     bonusPln: 100,
   },
 
@@ -81,8 +81,8 @@ export function canCloseMonth(monthKey: string, today = new Date()): boolean {
   return today >= earliest;
 }
 
-/** Postęp do premii: lessonsDone / threshold, clamped 0–1. */
-export function bonusProgress(lessonsDone: number): {
+/** Postęp do premii: hoursDone / threshold (godziny VERIFIED), clamped 0–1. */
+export function bonusProgress(hoursDone: number): {
   done: number;
   threshold: number;
   remaining: number;
@@ -90,10 +90,10 @@ export function bonusProgress(lessonsDone: number): {
   achieved: boolean;
   bonusPln: number;
 } {
-  const threshold = DATES.bonus.lessonsThreshold;
+  const threshold = DATES.bonus.hoursThreshold;
   const bonusPln = DATES.bonus.bonusPln;
-  const done = Math.max(0, lessonsDone);
-  const remaining = Math.max(0, threshold - done);
+  const done = Math.max(0, hoursDone);
+  const remaining = Math.max(0, Math.round((threshold - done) * 10) / 10);
   return {
     done,
     threshold,

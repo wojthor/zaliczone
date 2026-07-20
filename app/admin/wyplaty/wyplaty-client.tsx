@@ -23,6 +23,7 @@ function formatMonthLongPl(monthKey: string): string {
 type TutorRollup = {
   tutorId: string;
   tutorName: string;
+  bankAccount: string | null;
   lessonCount: number;
   hours: number;
   clientTotalPln: number;
@@ -37,13 +38,18 @@ function minutesFromLabel(label: string): number {
   return match ? Number(match[1]) : 60;
 }
 
-function buildRollups(lines: FinanceLineUi[], payouts: Payout[]): TutorRollup[] {
+function buildRollups(
+  lines: FinanceLineUi[],
+  payouts: Payout[],
+  bankAccounts: Record<string, string | null>,
+): TutorRollup[] {
   const payoutMap = new Map(payouts.map((p) => [p.tutor_id, p]));
   const map = new Map<string, TutorRollup>();
   for (const line of lines) {
     const prev = map.get(line.tutorId) ?? {
       tutorId: line.tutorId,
       tutorName: line.tutorName,
+      bankAccount: bankAccounts[line.tutorId] ?? null,
       lessonCount: 0,
       hours: 0,
       clientTotalPln: 0,
@@ -60,7 +66,7 @@ function buildRollups(lines: FinanceLineUi[], payouts: Payout[]): TutorRollup[] 
   }
   for (const row of map.values()) {
     row.hours = Math.round(row.hours * 10) / 10;
-    const b = bonusProgress(row.lessonCount);
+    const b = bonusProgress(row.hours);
     row.bonusPln = b.achieved ? b.bonusPln : 0;
     row.tutorPayoutPln = Math.round((row.lessonsPayoutPln + row.bonusPln) * 100) / 100;
   }
@@ -74,9 +80,11 @@ function formatMoney(pln: number): string {
 export function WyplatyClient({
   financeLines,
   payouts,
+  bankAccounts,
 }: {
   financeLines: FinanceLineUi[];
   payouts: Payout[];
+  bankAccounts: Record<string, string | null>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -102,13 +110,25 @@ export function WyplatyClient({
 
   const { rollups, totals } = useMemo(() => {
     const przychod = linesForMonth.reduce((s, l) => s + l.amountPln, 0);
-    const r = buildRollups(linesForMonth, payoutsForMonth);
-    const koszty = Math.round(r.reduce((acc, x) => acc + x.tutorPayoutPln, 0) * 100) / 100;
+    const r = buildRollups(linesForMonth, payoutsForMonth, bankAccounts);
+    const rowTotal = (x: TutorRollup) =>
+      Math.round((x.lessonsPayoutPln + x.bonusPln) * 100) / 100;
+    const koszty = Math.round(r.reduce((acc, x) => acc + rowTotal(x), 0) * 100) / 100;
+    const doWyplaty =
+      Math.round(
+        r.filter((x) => x.payoutStatus !== "PAID").reduce((acc, x) => acc + rowTotal(x), 0) * 100,
+      ) / 100;
+    const wyplacone =
+      Math.round(
+        r.filter((x) => x.payoutStatus === "PAID").reduce((acc, x) => acc + rowTotal(x), 0) * 100,
+      ) / 100;
     const zysk = Math.round((przychod - koszty) * 100) / 100;
-    return { rollups: r, totals: { przychod, koszty, zysk } };
-  }, [linesForMonth, payoutsForMonth]);
+    return { rollups: r, totals: { przychod, koszty, doWyplaty, wyplacone, zysk } };
+  }, [linesForMonth, payoutsForMonth, bankAccounts]);
 
   const monthLabel = formatMonthLongPl(selectedMonthKey);
+
+  const paidCount = rollups.filter((r) => r.payoutStatus === "PAID").length;
 
   const handleMarkPaid = (row: TutorRollup) => {
     startTransition(async () => {
@@ -153,41 +173,52 @@ export function WyplatyClient({
       </div>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <article className="rounded-app border-2 border-panel-frame bg-snow p-4 shadow-sm">
-          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Przychód (VERIFIED)</p>
-          <p className="text-depths mt-1 text-2xl font-black tabular-nums sm:text-[1.75rem]">{formatMoney(totals.przychod)}</p>
+        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+          <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Przychód</p>
+          <p className="text-depths mt-1 text-2xl font-black tabular-nums">{formatMoney(totals.przychod)}</p>
         </article>
-        <article className="rounded-app border-2 border-panel-frame bg-snow p-4 shadow-sm">
-          <p className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">Koszty 70%</p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-amber-800 sm:text-[1.75rem]">{formatMoney(totals.koszty)}</p>
+        <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
+            Do wypłaty/Wypłacone
+          </p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-amber-900">
+            {formatMoney(totals.doWyplaty)}
+            <span className="text-amber-900/50"> / </span>
+            {formatMoney(totals.wyplacone)}
+          </p>
         </article>
-        <article className="rounded-app border-2 border-green-700/35 bg-green-700/[0.07] p-4 shadow-sm ring-1 ring-green-700/20">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-green-900">Zysk netto 30%</p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-green-800 sm:text-[1.75rem]">{formatMoney(totals.zysk)}</p>
+        <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-green-900/80">Marża agencji</p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-green-800">{formatMoney(totals.zysk)}</p>
         </article>
       </section>
 
       <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
-        <h2 className="text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
+          <PayoutProgressStat total={rollups.length} paid={paidCount} />
+        </div>
         <p className="text-muted mt-1 text-xs capitalize">{monthLabel}</p>
 
         {rollups.length === 0 ? (
           <p className="text-muted mt-6 py-6 text-center text-sm font-medium">Brak zatwierdzonych lekcji w tym miesiącu.</p>
         ) : (
           <div className="mt-4 max-h-[min(28rem,55vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-            <table className="table-fixed min-w-[36rem] w-full border-collapse">
+            <table className="table-fixed min-w-[44rem] w-full border-collapse">
               <thead>
                 <tr>
-                  <th scope="col" className={`${th} w-[24%]`}>Nauczyciel</th>
-                  <th scope="col" className={`${th} w-[12%]`}>Godziny</th>
-                  <th scope="col" className={`${th} w-[16%]`}>Premia</th>
-                  <th scope="col" className={`${th} w-[20%]`}>Do wypłaty</th>
-                  <th scope="col" className={`${th} w-[28%]`}>Status</th>
+                  <th scope="col" className={`${th} w-[18%]`}>Nauczyciel</th>
+                  <th scope="col" className={`${th} w-[10%]`}>Godziny</th>
+                  <th scope="col" className={`${th} w-[12%]`}>Premia</th>
+                  <th scope="col" className={`${th} w-[16%]`}>Do wypłaty</th>
+                  <th scope="col" className={`${th} w-[26%]`}>Nr rachunku</th>
+                  <th scope="col" className={`${th} w-[18%]`}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {rollups.map((row, i) => {
                   const isPaid = row.payoutStatus === "PAID";
+                  const account = row.bankAccount?.trim() || null;
                   return (
                     <tr key={row.tutorId} className={`${i % 2 === 1 ? "bg-luster/35" : "bg-snow"} hover:bg-luster/50`}>
                       <td className={`${td} font-semibold text-depths`}>{row.tutorName}</td>
@@ -196,6 +227,15 @@ export function WyplatyClient({
                         {row.bonusPln > 0 ? `+${formatMoney(row.bonusPln)}` : "—"}
                       </td>
                       <td className={`${td} font-bold tabular-nums text-depths`}>{formatMoney(row.tutorPayoutPln)}</td>
+                      <td className={td}>
+                        {account ? (
+                          <span className="text-depths break-all text-[0.75rem] font-medium tabular-nums leading-snug sm:text-[0.8rem]">
+                            {account}
+                          </span>
+                        ) : (
+                          <span className="text-[0.7rem] font-semibold text-red-700">brak rachunku</span>
+                        )}
+                      </td>
                       <td className={td}>
                         {isPaid ? (
                           <span className="inline-flex items-center rounded-full bg-green-700/15 px-2.5 py-1 text-[0.7rem] font-bold text-green-800">
@@ -220,6 +260,37 @@ export function WyplatyClient({
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function PayoutProgressStat({
+  total,
+  paid,
+}: {
+  total: number;
+  paid: number;
+}) {
+  const donePct = total > 0 ? (paid / total) * 100 : 0;
+
+  return (
+    <div className="w-full max-w-[14rem] shrink-0 space-y-0.5 sm:w-[14rem]">
+      <div
+        className="h-1 w-full overflow-hidden rounded-full bg-luster"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total || 100}
+        aria-valuenow={paid}
+        aria-label={`Wypłacono ${paid} z ${total} pozycji`}
+      >
+        <div
+          className="h-full rounded-full bg-[#000C4A] transition-[width] duration-300 ease-out"
+          style={{ width: `${donePct}%` }}
+        />
+      </div>
+      <p className="text-muted text-[0.55rem] tabular-nums leading-none">
+        {total === 0 ? "Brak pozycji" : `${paid}/${total} wypłacone`}
+      </p>
     </div>
   );
 }

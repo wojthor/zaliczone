@@ -129,6 +129,19 @@ export async function savePriceTiers(
   revalidatePath("/profil");
 }
 
+export async function archiveTutorAccount(tutorId: string) {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { error } = await supabase
+    .from("profiles")
+    .update({ contract_end: today })
+    .eq("id", tutorId);
+
+  if (error) throw error;
+  revalidatePath("/admin/nauczyciele");
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
+}
+
 export async function deleteTutorAccount(tutorId: string) {
   const supabase = createServiceClient();
   const { error } = await supabase.auth.admin.deleteUser(tutorId);
@@ -250,7 +263,7 @@ export async function closeMonth(monthKey: string, checklist: MonthCloseChecklis
       error.code === "PGRST205"
     ) {
       throw new Error(
-        "Tabela closed_months nie istnieje. Uruchom migrację 0005_bonus_documents_month_close.sql w Supabase.",
+        "Tabela closed_months nie istnieje. Uruchom migrację 0005_final_after_0004.sql w Supabase.",
       );
     }
     throw new Error(msg || "Nie udało się zamknąć miesiąca.");
@@ -276,7 +289,7 @@ export async function markPayoutPaid(
   if (lessonCount == null || lessonsAmount == null || bonusAmount == null) {
     const { data: lessons } = await supabase
       .from("lessons")
-      .select("id, date, students(rate_pln)")
+      .select("id, date, start_time, end_time, students(rate_pln)")
       .eq("tutor_id", tutorId)
       .eq("status", "VERIFIED")
       .gte("date", `${month}-01`)
@@ -289,12 +302,23 @@ export async function markPayoutPaid(
       return sum + Number((student as { rate_pln?: number } | null)?.rate_pln ?? 0);
     }, 0);
     lessonsAmount = lessonsAmount ?? Math.round(clientTotal * TUTOR_SHARE * 100) / 100;
-    const progress = bonusProgress(lessonCount);
+    const hoursDone =
+      Math.round(
+        (rows.reduce((sum, row) => {
+          const start = String(row.start_time ?? "00:00").slice(0, 5);
+          const end = String(row.end_time ?? "00:00").slice(0, 5);
+          const [sh, sm] = start.split(":").map(Number);
+          const [eh, em] = end.split(":").map(Number);
+          return sum + ((eh! * 60 + em!) - (sh! * 60 + sm!));
+        }, 0) /
+          60) *
+          10,
+      ) / 10;
+    const progress = bonusProgress(hoursDone);
     bonusAmount = bonusAmount ?? (progress.achieved ? progress.bonusPln : 0);
   }
 
-  const progress = bonusProgress(lessonCount);
-  const resolvedBonus = bonusAmount ?? (progress.achieved ? progress.bonusPln : 0);
+  const resolvedBonus = bonusAmount ?? 0;
   const resolvedLessons = lessonsAmount ?? Math.round((amount - resolvedBonus) * 100) / 100;
 
   const fullRow = {
@@ -447,4 +471,160 @@ export async function notifyCennikUpdate() {
   });
 
   return { count: emails.length };
+}
+
+export type OperatingExpenseInput = {
+  month: string;
+  invoiceDate: string;
+  documentNumber: string;
+  expenseName: string;
+  issuerName: string;
+  amountPln: number;
+};
+
+const MAX_EXPENSE_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+
+function sanitizeExpenseFileName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[^\w.\-]+/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 120);
+}
+
+export async function createOperatingExpense(formData: FormData) {
+  const adminId = await requireAdminUserId();
+
+  const month = String(formData.get("month") ?? "");
+  const invoiceDate = String(formData.get("invoiceDate") ?? "");
+  const documentNumber = String(formData.get("documentNumber") ?? "");
+  const expenseName = String(formData.get("expenseName") ?? "");
+  const issuerName = String(formData.get("issuerName") ?? "");
+  const amountRaw = String(formData.get("amountPln") ?? "").replace(",", ".");
+  const amountPln = Number(amountRaw);
+
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new Error("Nieprawidłowy format miesiąca (oczekiwano YYYY-MM).");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) {
+    throw new Error("Nieprawidłowa data rachunku/faktury.");
+  }
+  if (!expenseName.trim()) throw new Error("Podaj nazwę wydatku.");
+  if (!issuerName.trim()) throw new Error("Podaj dane wystawcy.");
+  if (!(amountPln >= 0) || Number.isNaN(amountPln)) {
+    throw new Error("Nieprawidłowa kwota.");
+  }
+
+  const file = formData.get("file");
+  let attachmentName: string | null = null;
+  let attachmentPath: string | null = null;
+  let attachmentMime: string | null = null;
+  let attachmentSize: number | null = null;
+
+  const supabase = createServiceClient();
+
+  if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_EXPENSE_ATTACHMENT_BYTES) {
+      throw new Error("Załącznik jest za duży (max 12 MB).");
+    }
+    const safeName = sanitizeExpenseFileName(file.name || "zalacznik");
+    const unique = crypto.randomUUID();
+    attachmentPath = `expenses/${month}/${unique}-${safeName}`;
+    attachmentName = safeName;
+    attachmentMime = file.type || "application/octet-stream";
+    attachmentSize = file.size;
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const { error: uploadError } = await supabase.storage.from("documents").upload(attachmentPath, buffer, {
+      contentType: attachmentMime,
+      upsert: false,
+    });
+    if (uploadError) {
+      throw new Error(uploadError.message || "Nie udało się wgrać załącznika.");
+    }
+  }
+
+  const insertBase = {
+    month,
+    invoice_date: invoiceDate,
+    document_number: documentNumber.trim(),
+    expense_name: expenseName.trim(),
+    issuer_name: issuerName.trim(),
+    amount_pln: Math.round(amountPln * 100) / 100,
+    created_by: adminId,
+  };
+
+  const insertRow = attachmentPath
+    ? {
+        ...insertBase,
+        attachment_name: attachmentName,
+        attachment_path: attachmentPath,
+        attachment_mime: attachmentMime,
+        attachment_size_bytes: attachmentSize,
+      }
+    : insertBase;
+
+  let { data, error } = await supabase.from("operating_expenses").insert(insertRow).select("*").single();
+
+  if (
+    error &&
+    !attachmentPath &&
+    (error.message?.includes("attachment_") || error.code === "PGRST204")
+  ) {
+    const fallback = await supabase.from("operating_expenses").insert(insertBase).select("*").single();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) {
+    if (attachmentPath) {
+      await supabase.storage.from("documents").remove([attachmentPath]);
+    }
+    const msg = error.message ?? "";
+    if (msg.includes("attachment_") || error.code === "PGRST204") {
+      throw new Error(
+        "Załączniki / koszty wymagają migracji 0005_final_after_0004.sql w Supabase.",
+      );
+    }
+    if (msg.includes("operating_expenses") || error.code === "42P01" || error.code === "PGRST205") {
+      throw new Error(
+        "Tabela operating_expenses nie istnieje. Uruchom migrację 0005_final_after_0004.sql w Supabase.",
+      );
+    }
+    throw new Error(msg || "Nie udało się dodać wydatku.");
+  }
+
+  revalidatePath("/admin/ksiegowosc");
+  return data;
+}
+
+export async function deleteOperatingExpense(id: string) {
+  await requireAdminUserId();
+  if (!id) throw new Error("Brak identyfikatora wydatku.");
+
+  const supabase = createServiceClient();
+  const { data: row } = await supabase
+    .from("operating_expenses")
+    .select("attachment_path")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await supabase.from("operating_expenses").delete().eq("id", id);
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (msg.includes("operating_expenses") || error.code === "42P01" || error.code === "PGRST205") {
+      throw new Error(
+        "Tabela operating_expenses nie istnieje. Uruchom migrację 0005_final_after_0004.sql w Supabase.",
+      );
+    }
+    throw new Error(msg || "Nie udało się usunąć wydatku.");
+  }
+
+  const path = (row as { attachment_path?: string | null } | null)?.attachment_path;
+  if (path) {
+    await supabase.storage.from("documents").remove([path]);
+  }
+
+  revalidatePath("/admin/ksiegowosc");
 }

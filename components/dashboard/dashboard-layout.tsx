@@ -17,7 +17,7 @@ type DashboardLayoutProps = {
   totalPayout: number;
   totalHours: number;
   inboxMessages: InboxMessage[];
-  verifiedLessonsThisMonth: number;
+  verifiedHoursThisMonth: number;
 };
 
 export function DashboardLayout({
@@ -27,11 +27,11 @@ export function DashboardLayout({
   totalPayout,
   totalHours,
   inboxMessages,
-  verifiedLessonsThisMonth,
+  verifiedHoursThisMonth,
 }: DashboardLayoutProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
-      <BonusProgressBar lessonsDone={verifiedLessonsThisMonth} compact showCelebration />
+      <BonusProgressBar hoursDone={verifiedHoursThisMonth} compact showCelebration />
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
         <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">
           <WeeklySchedule lessons={lessons} />

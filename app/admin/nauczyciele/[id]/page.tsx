@@ -5,6 +5,7 @@ import {
   getUnpaidFinanceLines,
 } from "@/lib/data/queries";
 import { getTutorStudentsForAdmin } from "@/lib/actions/messages";
+import { ensureTutorRootFolder } from "@/lib/actions/documents";
 import type { AdminStudentRow } from "@/lib/types/messages";
 import { NauczycielProfilClient } from "./nauczyciel-profil-client";
 
@@ -25,6 +26,12 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ i
 
   const tutor = tutors.find((t) => t.id === id);
   if (!tutor) return <p className="text-muted">Nie znaleziono nauczyciela.</p>;
+
+  try {
+    await ensureTutorRootFolder(tutor.id, tutor.name);
+  } catch {
+    // Folder opcjonalny gdy migracja dokumentów nie jest jeszcze uruchomiona
+  }
 
   const forTutor = <T extends { tutorId: string }>(rows: T[]) => rows.filter((l) => l.tutorId === id);
 

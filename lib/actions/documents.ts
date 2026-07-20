@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import type { DocumentFile, DocumentFolder } from "@/lib/types/database";
 
 const MIGRATION_HINT =
-  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_bonus_documents_month_close.sql w Supabase.";
+  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_final_after_0004.sql w Supabase.";
 
 type DocsError = { message?: string; code?: string; details?: string } | null;
 

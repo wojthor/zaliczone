@@ -25,9 +25,18 @@ export default async function Home() {
   ]);
 
   const monthKey = currentMonthKey();
-  const verifiedLessonsThisMonth = financeLines.filter(
+  const verifiedThisMonth = financeLines.filter(
     (line) => line.monthKey === monthKey && line.status === "VERIFIED",
-  ).length;
+  );
+  const verifiedHoursThisMonth =
+    Math.round(
+      (verifiedThisMonth.reduce((sum, line) => {
+        const match = line.label.match(/(\d+)\s*min/);
+        return sum + (match ? Number(match[1]) : 60);
+      }, 0) /
+        60) *
+        10,
+    ) / 10;
 
   const totalPayout = financeLines.reduce((sum, line) => sum + line.amountPln, 0);
   const totalHours =
@@ -48,7 +57,7 @@ export default async function Home() {
       totalPayout={totalPayout}
       totalHours={totalHours}
       inboxMessages={inboxMessages}
-      verifiedLessonsThisMonth={verifiedLessonsThisMonth}
+      verifiedHoursThisMonth={verifiedHoursThisMonth}
     />
   );
 }

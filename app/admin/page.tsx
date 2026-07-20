@@ -7,6 +7,7 @@ import {
   ewidencjaDeadlineIso,
 } from "@/lib/dates";
 import {
+  getAllOperatingExpenses,
   getAllTutorProfiles,
   getAllVerifiedFinanceLines,
   getPendingVerificationLines,
@@ -62,12 +63,14 @@ export default async function AdminHomePage() {
   const monthKey = currentMonthKey(today);
   const prevKey = previousMonthKey(monthKey);
 
-  const [pendingLessons, unpaidLessons, verifiedLines, tutors] = await Promise.all([
-    getPendingVerificationLines(),
-    getUnpaidFinanceLines(),
-    getAllVerifiedFinanceLines(),
-    getAllTutorProfiles(),
-  ]);
+  const [pendingLessons, unpaidLessons, verifiedLines, tutors, operatingExpenses] =
+    await Promise.all([
+      getPendingVerificationLines(),
+      getUnpaidFinanceLines(),
+      getAllVerifiedFinanceLines(),
+      getAllTutorProfiles(),
+      getAllOperatingExpenses(),
+    ]);
 
   const supabase = await createClient();
   const { count: studentCount } = await supabase
@@ -81,21 +84,31 @@ export default async function AdminHomePage() {
   const verifiedMonthSumPln = verifiedThisMonth.reduce((s, l) => s + l.amountPln, 0);
   const unpaidMonthSumPln = unpaidThisMonth.reduce((s, l) => s + l.amountPln, 0);
 
-  const tutorCostById = new Map<string, { lessons: number; lessonsPln: number }>();
+  const tutorCostById = new Map<string, { hours: number; lessonsPln: number }>();
   for (const line of verifiedThisMonth) {
-    const prev = tutorCostById.get(line.tutorId) ?? { lessons: 0, lessonsPln: 0 };
-    prev.lessons += 1;
+    const prev = tutorCostById.get(line.tutorId) ?? { hours: 0, lessonsPln: 0 };
+    const match = line.label.match(/(\d+)\s*min/);
+    const minutes = match ? Number(match[1]) : 60;
+    prev.hours += minutes / 60;
     prev.lessonsPln += Math.round(line.amountPln * TUTOR_SHARE * 100) / 100;
     tutorCostById.set(line.tutorId, prev);
   }
 
   let tutorCostPln = 0;
   for (const row of tutorCostById.values()) {
-    const bonus = bonusProgress(row.lessons);
+    const hours = Math.round(row.hours * 10) / 10;
+    const bonus = bonusProgress(hours);
     tutorCostPln += row.lessonsPln + (bonus.achieved ? bonus.bonusPln : 0);
   }
   tutorCostPln = Math.round(tutorCostPln * 100) / 100;
-  const agencyProfitPln = Math.round((verifiedMonthSumPln - tutorCostPln) * 100) / 100;
+  const otherOperatingCostPln =
+    Math.round(
+      operatingExpenses
+        .filter((e) => e.month === monthKey)
+        .reduce((s, e) => s + Number(e.amount_pln), 0) * 100,
+    ) / 100;
+  const totalCostPln = Math.round((tutorCostPln + otherOperatingCostPln) * 100) / 100;
+  const agencyProfitPln = Math.round((verifiedMonthSumPln - totalCostPln) * 100) / 100;
 
   // Terminy
   const ewidencjaIso = ewidencjaDeadlineIso(monthKey); // za bieżący miesiąc → dzień 3 kolejnego
@@ -145,7 +158,8 @@ export default async function AdminHomePage() {
       todayLabel={formatTodayPl(today)}
       monthLabel={formatMonthLongPl(monthKey)}
       verifiedMonthSumPln={verifiedMonthSumPln}
-      tutorCostPln={tutorCostPln}
+      payoutCostPln={tutorCostPln}
+      totalCostPln={totalCostPln}
       agencyProfitPln={agencyProfitPln}
       unpaidMonthSumPln={unpaidMonthSumPln}
       tutorCount={tutors.length}
