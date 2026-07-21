@@ -14,12 +14,8 @@ import { MonthNavigator, formatMonthLongFromKey, useMonthKey } from "@/component
 import { useWeekMondayIso } from "@/components/week-navigator";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { subjectsFromLine } from "@/lib/data/mappers";
-import {
-  deleteLesson,
-  insertLessons,
-  lessonDatesFromDraft,
-  updateLesson,
-} from "@/lib/data/mutations";
+import { lessonDatesFromDraft } from "@/lib/data/mutations";
+import { deleteLesson, insertLessons, updateLesson } from "@/lib/actions/lessons";
 import type { StudentUi } from "@/lib/types/database";
 
 type RecurrenceMode = "once" | "weekly" | "custom";

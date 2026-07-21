@@ -2,17 +2,28 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  closeMonth,
-  createOperatingExpense,
-  deleteOperatingExpense,
-  type MonthCloseChecklist,
-} from "@/lib/actions/admin";
+import { closeMonth, createOperatingExpense, deleteOperatingExpense } from "@/lib/actions/admin";
 import { getSignedDownloadUrl } from "@/lib/actions/documents";
-import { canCloseMonth } from "@/lib/dates";
+import { IconLock } from "@/components/icons";
+import { ADMIN_PIT_RATE, canCloseMonth } from "@/lib/dates";
 import type { FinanceLineUi, OperatingExpense, Payout } from "@/lib/types/database";
+import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-const PIT_RATE = 0.12;
+const PIT_RATE = ADMIN_PIT_RATE;
+
+export type MonthSummary = {
+  grossRevenuePln: number;
+  payrollCostsPln: number;
+  operatingCostsPln: number;
+  taxableIncomePln: number;
+  estimatedPitPln: number;
+  netProfitPln: number;
+  /** Warunek 1 — brak lekcji PLANNED/PENDING_VERIFICATION w miesiącu (rewalidowane na serwerze przy zamknięciu). */
+  lessonsReady: boolean;
+  /** Warunek 2 — wszystkie payouts miesiąca mają status PAID (rewalidowane na serwerze przy zamknięciu). */
+  payoutsReady: boolean;
+};
 
 type ViewMode = "month" | "year";
 type JdgZusStage = "start" | "maly";
@@ -131,37 +142,33 @@ function buildLedgerRows(lines: FinanceLineUi[]): LedgerRow[] {
   });
 }
 
-const EMPTY_CHECKLIST: MonthCloseChecklist = {
-  ewidencjaGenerated: false,
-  pendingCleared: false,
-  payoutsCalculated: false,
-  pitZusNoted: false,
-};
-
 export function KsiegowoscClient({
   financeLines,
   payouts,
   closedMonths = [],
   operatingExpenses = [],
+  initialMonthKey,
+  monthSummary,
 }: {
   financeLines: FinanceLineUi[];
   payouts: Payout[];
   closedMonths?: string[];
   operatingExpenses?: OperatingExpense[];
+  initialMonthKey: string;
+  monthSummary: MonthSummary;
 }) {
   const router = useRouter();
-  const [pendingClose, startClose] = useTransition();
   const [pendingExpense, startExpense] = useTransition();
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const nowKey = useMemo(() => currentMonthKey(), []);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
-  const [selectedMonthKey, setSelectedMonthKey] = useState(nowKey);
-  const [selectedYear, setSelectedYear] = useState(() => nowKey.slice(0, 4));
+  const [selectedMonthKey, setSelectedMonthKey] = useState(initialMonthKey);
+  const [selectedYear, setSelectedYear] = useState(() => initialMonthKey.slice(0, 4));
   const [zusStage, setZusStage] = useState<JdgZusStage>("start");
-  const [checklist, setChecklist] = useState<MonthCloseChecklist>(EMPTY_CHECKLIST);
-  const [closeFeedback, setCloseFeedback] = useState("");
+  const [bankReconciled, setBankReconciled] = useState(false);
   const [expenseFeedback, setExpenseFeedback] = useState("");
   const [expenseForm, setExpenseForm] = useState({
-    invoiceDate: `${nowKey}-01`,
+    invoiceDate: `${initialMonthKey}-01`,
     documentNumber: "",
     expenseName: "",
     issuerName: "",
@@ -414,9 +421,10 @@ export function KsiegowoscClient({
   }, [viewMode, periodSummaryRows]);
 
   const taxableIncome = useMemo(() => {
-    const raw = totals.gross - paidPayoutsSum;
+    // Podstawa opodatkowania = Przychód brutto − (Koszty wynagrodzeń + Koszty operacyjne).
+    const raw = totals.gross - totals.allCosts;
     return Math.max(0, Math.round(raw * 100) / 100);
-  }, [totals.gross, paidPayoutsSum]);
+  }, [totals.gross, totals.allCosts]);
 
   const suggestedPit = useMemo(
     () => Math.round(taxableIncome * PIT_RATE * 100) / 100,
@@ -428,19 +436,28 @@ export function KsiegowoscClient({
   const zusTotal = selectedZus.monthlyAmount * zusMonthsInPeriod;
 
   const netProfit = useMemo(() => {
-    const raw = totals.gross - paidPayoutsSum - suggestedPit - zusTotal;
+    const raw = totals.gross - totals.allCosts - suggestedPit - zusTotal;
     return Math.round(raw * 100) / 100;
-  }, [totals.gross, paidPayoutsSum, suggestedPit, zusTotal]);
+  }, [totals.gross, totals.allCosts, suggestedPit, zusTotal]);
+
+  // Zamknięty miesiąc = zarchiwizowany rekord — ZUS zawsze „Ulga na start" (bez wyboru), niezależnie
+  // od tego, co akurat wybrane jest w kalkulatorze „Zrób to sam" dla otwartych miesięcy.
+  const closedZusTotal = ZUS_OPTIONS.start.monthlyAmount;
+  const closedNetProfit = useMemo(
+    () => Math.round((totals.gross - totals.allCosts - suggestedPit - closedZusTotal) * 100) / 100,
+    [totals.gross, totals.allCosts, suggestedPit, closedZusTotal],
+  );
 
   const periodLabel =
     viewMode === "month" ? formatMonthLongPl(selectedMonthKey) : `Rok ${selectedYear}`;
   const isMonthClosed = viewMode === "month" && effectiveClosedMonths.includes(selectedMonthKey);
   const canClose = viewMode === "month" && canCloseMonth(selectedMonthKey);
-  const checklistComplete =
-    checklist.ewidencjaGenerated &&
-    checklist.pendingCleared &&
-    checklist.payoutsCalculated &&
-    checklist.pitZusNoted;
+  // monthSummary jest liczony server-side dla initialMonthKey — jeśli użytkownik właśnie
+  // zmienił miesiąc (nawigacja w toku), traktujemy warunki jako niespełnione ostrożnie.
+  const summaryMatchesSelection = selectedMonthKey === initialMonthKey;
+  const lessonsReady = summaryMatchesSelection && monthSummary.lessonsReady;
+  const payoutsReady = summaryMatchesSelection && monthSummary.payoutsReady;
+  const checklistComplete = lessonsReady && payoutsReady && bankReconciled;
 
   const ewidencjaHref =
     viewMode === "month"
@@ -455,27 +472,13 @@ export function KsiegowoscClient({
   const pdfBtnClass =
     "rounded-full bg-[#000C4A] px-2.5 py-1 text-[0.65rem] font-bold text-lime sm:px-3 sm:py-1.5 sm:text-xs";
 
-  function toggleCheck(key: keyof MonthCloseChecklist) {
-    setChecklist((prev) => ({ ...prev, [key]: !prev[key] }));
-    setCloseFeedback("");
-  }
-
-  function handleCloseMonth() {
-    if (viewMode !== "month") return;
-    setCloseFeedback("");
-    startClose(async () => {
-      try {
-        await closeMonth(selectedMonthKey, checklist);
-        setLocalClosedMonths((prev) =>
-          prev.includes(selectedMonthKey) ? prev : [...prev, selectedMonthKey],
-        );
-        setCloseFeedback("Miesiąc został zamknięty.");
-        setChecklist(EMPTY_CHECKLIST);
-        router.refresh();
-      } catch (err) {
-        setCloseFeedback(err instanceof Error ? err.message : "Nie udało się zamknąć miesiąca.");
-      }
-    });
+  async function handleCloseMonth() {
+    await closeMonth(selectedMonthKey);
+    setLocalClosedMonths((prev) =>
+      prev.includes(selectedMonthKey) ? prev : [...prev, selectedMonthKey],
+    );
+    setBankReconciled(false);
+    router.refresh();
   }
 
   function handleAddExpense() {
@@ -555,7 +558,7 @@ export function KsiegowoscClient({
   }
 
   const th =
-    "border-b border-panel-frame/40 bg-jodhpur/90 px-1 py-1 text-left text-[0.55rem] font-bold uppercase leading-tight text-depths sm:px-1.5 sm:py-1.5 sm:text-[0.6rem]";
+    "dash-sans border-b border-panel-frame/40 bg-jodhpur/90 px-1 py-1 text-left text-[0.55rem] font-bold uppercase leading-tight text-depths sm:px-1.5 sm:py-1.5 sm:text-[0.6rem]";
   const td =
     "border-b border-panel-frame/15 px-1 py-1 align-top text-[0.62rem] leading-tight break-words sm:px-1.5 sm:py-1.5 sm:text-[0.7rem]";
   const rowZebra = "bg-snow even:bg-luster/40 hover:bg-luster/60";
@@ -565,9 +568,9 @@ export function KsiegowoscClient({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-depths text-lg font-semibold tracking-tight sm:text-xl">Księgowość</h1>
+            <h1 className="dash-sans text-depths text-lg font-semibold tracking-tight sm:text-xl">Księgowość</h1>
             {isMonthClosed ? (
-              <span className="rounded-full bg-green-700/15 px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-green-800">
+              <span className="rounded-full bg-moss/15 px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-moss">
                 Miesiąc zamknięty
               </span>
             ) : null}
@@ -584,10 +587,11 @@ export function KsiegowoscClient({
                 className="text-depths rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-xs font-medium sm:px-2.5 sm:py-1.5"
                 value={selectedMonthKey}
                 onChange={(e) => {
-                  setSelectedMonthKey(e.target.value);
-                  setChecklist(EMPTY_CHECKLIST);
-                  setCloseFeedback("");
-                  setExpenseForm((f) => ({ ...f, invoiceDate: `${e.target.value}-01` }));
+                  const next = e.target.value;
+                  setSelectedMonthKey(next);
+                  setBankReconciled(false);
+                  setExpenseForm((f) => ({ ...f, invoiceDate: `${next}-01` }));
+                  router.push(`/admin/ksiegowosc?month=${next}`);
                 }}
                 aria-label="Miesiąc ewidencji sprzedaży"
               >
@@ -619,54 +623,48 @@ export function KsiegowoscClient({
         </div>
       </div>
 
-      <div className="flex flex-col gap-1 rounded-app border border-panel-frame/35 bg-luster/50 p-1 sm:flex-row">
-        {(
-          [
-            ["month", "Księgowość miesięczna"],
-            ["year", "Księgowość roczna"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setViewMode(id)}
-            className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-              viewMode === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {!isMonthClosed ? (
+        <div className="flex flex-col gap-1 rounded-app border border-panel-frame/35 bg-luster/50 p-1 sm:flex-row">
+          {(
+            [
+              ["month", "Księgowość miesięczna"],
+              ["year", "Księgowość roczna"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setViewMode(id)}
+              className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
+                viewMode === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-4">
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Przychód</p>
-          <p className="text-depths mt-1 text-2xl font-black tabular-nums">{formatPln(totals.gross)}</p>
-        </article>
-        <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
-            Koszty wypłaty/wszystkie
-          </p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-amber-900">
-            {formatPln(totals.tutorShare)}
-            <span className="text-amber-900/50"> / </span>
-            {formatPln(totals.allCosts)}
-          </p>
-        </article>
-        <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-green-900/80">Marża agencji</p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-green-800">{formatPln(totals.agencyShare)}</p>
-        </article>
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Lekcje VERIFIED</p>
-          <p className="text-depths mt-1 text-2xl font-black tabular-nums">{totals.lessonCount}</p>
-        </article>
-      </section>
+      <LedgerBand columns={4}>
+        <LedgerStat label="Przychód" tick="neutral" ink="depths">
+          {formatPln(totals.gross)}
+        </LedgerStat>
+        <LedgerStat label="Koszty wypłaty / wszystkie" tick="butter" ink="toffee">
+          {formatPln(totals.tutorShare)}
+          <span className="text-toffee/50"> / </span>
+          {formatPln(totals.allCosts)}
+        </LedgerStat>
+        <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+          {formatPln(totals.agencyShare)}
+        </LedgerStat>
+        <LedgerStat label="Lekcje VERIFIED" tick="neutral" ink="depths">
+          {totals.lessonCount}
+        </LedgerStat>
+      </LedgerBand>
 
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-depths text-sm font-semibold">
+          <h2 className="dash-sans text-depths text-sm font-semibold">
             {viewMode === "year" ? `Ewidencja roczna · ${selectedYear}` : "Ewidencja sprzedaży"}
           </h2>
           <a href={ewidencjaHref} target="_blank" rel="noreferrer" className={pdfBtnClass}>
@@ -702,10 +700,10 @@ export function KsiegowoscClient({
                         return (
                           <tr key={row.monthKey} className={rowZebra}>
                             <td className={`${td} capitalize font-medium`}>{row.label}</td>
-                            <td className={`${td} text-right font-bold tabular-nums`}>
+                            <td className={`${td} text-right font-bold dash-mono`}>
                               {formatPln(row.gross)}
                             </td>
-                            <td className={`${td} text-right font-bold tabular-nums`}>
+                            <td className={`${td} text-right font-bold dash-mono`}>
                               {formatPln(running)}
                             </td>
                           </tr>
@@ -749,13 +747,13 @@ export function KsiegowoscClient({
               <tbody>
                 {ledgerRows.map((r, i) => (
                   <tr key={r.id} className={rowZebra}>
-                    <td className={`${td} tabular-nums text-muted`}>{i + 1}</td>
-                    <td className={`${td} tabular-nums`}>{r.lessonDate}</td>
-                    <td className={`${td} tabular-nums`}>{r.paidAt}</td>
+                    <td className={`${td} dash-mono text-muted`}>{i + 1}</td>
+                    <td className={`${td} dash-mono`}>{r.lessonDate}</td>
+                    <td className={`${td} dash-mono`}>{r.paidAt}</td>
                     <td className={`${td} font-medium`}>{r.serviceName}</td>
                     <td className={td}>{r.buyer}</td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>{r.grossPln} zł</td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>{r.cumulativePln} zł</td>
+                    <td className={`${td} text-right font-bold dash-mono`}>{r.grossPln} zł</td>
+                    <td className={`${td} text-right font-bold dash-mono`}>{r.cumulativePln} zł</td>
                   </tr>
                 ))}
               </tbody>
@@ -766,7 +764,7 @@ export function KsiegowoscClient({
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-depths text-sm font-semibold">Zestawienie kosztów</h2>
+          <h2 className="dash-sans text-depths text-sm font-semibold">Zestawienie kosztów</h2>
           <a href={kosztyHref} target="_blank" rel="noreferrer" className={pdfBtnClass}>
             Wygeneruj zestawienie PDF
           </a>
@@ -781,8 +779,13 @@ export function KsiegowoscClient({
 
         {viewMode === "month" ? (
           <>
+            {isMonthClosed ? (
+              <p className="dash-sans text-toffee mb-3 rounded-ledger border border-toffee/30 bg-butter/20 px-3 py-2 text-xs font-semibold">
+                Miesiąc zamknięty — dodawanie i usuwanie kosztów jest zablokowane.
+              </p>
+            ) : (
             <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto rounded-app border border-panel-frame/25 bg-white p-2">
-              <label className="grid min-w-[7.5rem] shrink gap-0.5">
+              <label className="grid min-w-30 shrink gap-0.5">
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">
                   Data rachunku/faktury
                 </span>
@@ -793,7 +796,7 @@ export function KsiegowoscClient({
                   className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
                 />
               </label>
-              <label className="grid min-w-[5.5rem] flex-1 gap-0.5">
+              <label className="grid min-w-22 flex-1 gap-0.5">
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Nr dok.</span>
                 <input
                   value={expenseForm.documentNumber}
@@ -802,7 +805,7 @@ export function KsiegowoscClient({
                   className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
                 />
               </label>
-              <label className="grid min-w-[6rem] flex-[1.2] gap-0.5">
+              <label className="grid min-w-24 flex-[1.2] gap-0.5">
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Nazwa</span>
                 <input
                   value={expenseForm.expenseName}
@@ -811,7 +814,7 @@ export function KsiegowoscClient({
                   className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
                 />
               </label>
-              <label className="grid min-w-[6rem] flex-[1.2] gap-0.5">
+              <label className="grid min-w-24 flex-[1.2] gap-0.5">
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Wystawca</span>
                 <input
                   value={expenseForm.issuerName}
@@ -820,17 +823,17 @@ export function KsiegowoscClient({
                   className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
                 />
               </label>
-              <label className="grid min-w-[4.25rem] shrink gap-0.5">
+              <label className="grid min-w-17 shrink gap-0.5">
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Kwota</span>
                 <input
                   value={expenseForm.amountPln}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, amountPln: ev.target.value }))}
                   placeholder="0,00"
                   inputMode="decimal"
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem] tabular-nums"
+                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem] dash-mono"
                 />
               </label>
-              <label className="grid min-w-[4.25rem] shrink gap-0.5" title={expenseFile?.name ?? "Dodaj plik"}>
+              <label className="grid min-w-17 shrink gap-0.5" title={expenseFile?.name ?? "Dodaj plik"}>
                 <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Plik</span>
                 <span className="relative flex cursor-pointer items-center justify-center rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-depths hover:bg-luster/40">
                   <input
@@ -842,7 +845,7 @@ export function KsiegowoscClient({
                     aria-label="Załącz plik"
                   />
                   {expenseFile ? (
-                    <span className="max-w-[4.5rem] truncate text-[0.65rem] font-medium leading-none">
+                    <span className="max-w-18 truncate text-[0.65rem] font-medium leading-none">
                       {expenseFile.name}
                     </span>
                   ) : (
@@ -870,26 +873,27 @@ export function KsiegowoscClient({
                 </button>
               </div>
             </div>
+            )}
             {expenseFeedback ? (
               <p
                 className={`mt-2 text-xs font-medium ${
                   expenseFeedback.includes("Dodano") || expenseFeedback.includes("Usunięto")
-                    ? "text-green-800"
-                    : "text-red-700"
+                    ? "text-moss"
+                    : "text-claret"
                 }`}
               >
                 {expenseFeedback}
               </p>
             ) : null}
 
-            <h3 className="text-depths mt-4 text-xs font-semibold uppercase tracking-wide">
+            <h3 className="dash-sans text-depths mt-4 text-xs font-semibold uppercase tracking-wide">
               Lista kosztów · według daty
             </h3>
             {expensesForPeriod.length === 0 ? (
               <p className="text-muted py-3 text-xs">Brak kosztów w tym miesiącu — dodaj powyżej.</p>
             ) : (
               <div className="mt-2 max-h-[min(16rem,36vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-                <table className="w-full min-w-[44rem] border-collapse">
+                <table className="w-full min-w-176 border-collapse">
                   <thead className="sticky top-0 z-1 bg-jodhpur/95">
                     <tr>
                       <th className={`${th} w-[5%]`}>Lp.</th>
@@ -905,12 +909,12 @@ export function KsiegowoscClient({
                   <tbody>
                     {expensesForPeriod.map((e, i) => (
                       <tr key={e.id} className={rowZebra}>
-                        <td className={`${td} tabular-nums text-muted`}>{i + 1}</td>
-                        <td className={`${td} tabular-nums`}>{formatExpenseDate(e.invoice_date)}</td>
+                        <td className={`${td} dash-mono text-muted`}>{i + 1}</td>
+                        <td className={`${td} dash-mono`}>{formatExpenseDate(e.invoice_date)}</td>
                         <td className={`${td} font-medium`}>{e.document_number || "—"}</td>
                         <td className={`${td} font-medium`}>{e.expense_name}</td>
                         <td className={td}>{e.issuer_name}</td>
-                        <td className={`${td} text-right font-bold tabular-nums text-amber-900`}>
+                        <td className={`${td} text-right font-bold dash-mono text-toffee`}>
                           {formatPln(Number(e.amount_pln))}
                         </td>
                         <td className={td}>
@@ -929,14 +933,18 @@ export function KsiegowoscClient({
                           )}
                         </td>
                         <td className={td}>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteExpense(e.id)}
-                            disabled={pendingExpense}
-                            className="text-[0.65rem] font-bold text-red-700 hover:underline disabled:opacity-50"
-                          >
-                            Usuń
-                          </button>
+                          {!isMonthClosed ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExpense(e.id)}
+                              disabled={pendingExpense}
+                              className="text-[0.65rem] font-bold text-claret hover:underline disabled:opacity-50"
+                            >
+                              Usuń
+                            </button>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -951,7 +959,7 @@ export function KsiegowoscClient({
           </p>
         ) : (
           <div className="max-h-[min(20rem,42vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-            <table className="w-full min-w-[36rem] border-collapse">
+            <table className="w-full min-w-xl border-collapse">
               <thead className="sticky top-0 z-1 bg-jodhpur/95">
                 <tr>
                   <th className={th}>Miesiąc</th>
@@ -965,10 +973,10 @@ export function KsiegowoscClient({
                 {yearCostRows.map((row) => (
                   <tr key={row.monthKey} className={rowZebra}>
                     <td className={`${td} capitalize font-medium`}>{row.label}</td>
-                    <td className={`${td} text-right tabular-nums`}>{formatPln(row.payoutsPln)}</td>
-                    <td className={`${td} text-right tabular-nums`}>{formatPln(row.bonusesPln)}</td>
-                    <td className={`${td} text-right tabular-nums`}>{formatPln(row.extraCostsPln)}</td>
-                    <td className={`${td} text-right font-bold tabular-nums text-amber-900`}>
+                    <td className={`${td} text-right dash-mono`}>{formatPln(row.payoutsPln)}</td>
+                    <td className={`${td} text-right dash-mono`}>{formatPln(row.bonusesPln)}</td>
+                    <td className={`${td} text-right dash-mono`}>{formatPln(row.extraCostsPln)}</td>
+                    <td className={`${td} text-right font-bold dash-mono text-toffee`}>
                       {formatPln(row.totalPln)}
                     </td>
                   </tr>
@@ -977,16 +985,16 @@ export function KsiegowoscClient({
               <tfoot>
                 <tr className="bg-jodhpur/70">
                   <td className={`${td} font-bold`}>Suma roku</td>
-                  <td className={`${td} text-right font-bold tabular-nums`}>
+                  <td className={`${td} text-right font-bold dash-mono`}>
                     {formatPln(yearCostTotals.payoutsPln)}
                   </td>
-                  <td className={`${td} text-right font-bold tabular-nums`}>
+                  <td className={`${td} text-right font-bold dash-mono`}>
                     {formatPln(yearCostTotals.bonusesPln)}
                   </td>
-                  <td className={`${td} text-right font-bold tabular-nums`}>
+                  <td className={`${td} text-right font-bold dash-mono`}>
                     {formatPln(yearCostTotals.extraCostsPln)}
                   </td>
-                  <td className={`${td} text-right font-black tabular-nums text-amber-900`}>
+                  <td className={`${td} text-right font-black dash-mono text-toffee`}>
                     {formatPln(yearCostTotals.totalPln)}
                   </td>
                 </tr>
@@ -996,8 +1004,9 @@ export function KsiegowoscClient({
         )}
       </section>
 
+      {!isMonthClosed ? (
       <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
-        <h2 className="text-depths text-sm font-semibold">
+        <h2 className="dash-sans text-depths text-sm font-semibold">
           {viewMode === "year"
             ? `Zestawienie roczne z podziałem miesięcznym · ${selectedYear}`
             : `Podsumowanie miesiąca · ${formatMonthLongPl(selectedMonthKey)}`}
@@ -1013,7 +1022,7 @@ export function KsiegowoscClient({
           </p>
         ) : (
           <div className="mt-3 max-h-[min(18rem,40vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-            <table className="w-full min-w-[48rem] border-collapse">
+            <table className="w-full min-w-3xl border-collapse">
               <thead>
                 <tr>
                   <th className={th}>Miesiąc</th>
@@ -1032,26 +1041,26 @@ export function KsiegowoscClient({
                 {periodSummaryRows.map((row) => (
                   <tr key={row.monthKey} className={rowZebra}>
                     <td className={`${td} capitalize font-medium`}>{row.label}</td>
-                    <td className={`${td} text-right tabular-nums`}>{formatPln(row.gross)}</td>
-                    <td className={`${td} text-right tabular-nums text-amber-900`}>
+                    <td className={`${td} text-right dash-mono`}>{formatPln(row.gross)}</td>
+                    <td className={`${td} text-right dash-mono text-toffee`}>
                       {formatPln(row.tutorShare)}
                     </td>
-                    <td className={`${td} text-right tabular-nums text-green-800`}>
+                    <td className={`${td} text-right dash-mono text-moss`}>
                       {formatPln(row.agencyShare)}
                     </td>
-                    <td className={`${td} text-right tabular-nums`}>{row.tutorCount}</td>
-                    <td className={`${td} text-right tabular-nums`}>{row.studentCount}</td>
-                    <td className={`${td} text-right tabular-nums`}>{row.lessonCount}</td>
-                    <td className={`${td} text-right tabular-nums`}>
+                    <td className={`${td} text-right dash-mono`}>{row.tutorCount}</td>
+                    <td className={`${td} text-right dash-mono`}>{row.studentCount}</td>
+                    <td className={`${td} text-right dash-mono`}>{row.lessonCount}</td>
+                    <td className={`${td} text-right dash-mono`}>
                       {row.hoursCount.toLocaleString("pl-PL", {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className={`${td} text-right tabular-nums`}>{formatPln(row.paidPayouts)}</td>
+                    <td className={`${td} text-right dash-mono`}>{formatPln(row.paidPayouts)}</td>
                     <td className={td}>
                       {row.closed ? (
-                        <span className="text-[0.6rem] font-bold uppercase text-green-800">Zamknięty</span>
+                        <span className="text-[0.6rem] font-bold uppercase text-moss">Zamknięty</span>
                       ) : (
                         <span className="text-[0.6rem] font-bold uppercase text-muted">Otwarty</span>
                       )}
@@ -1063,27 +1072,27 @@ export function KsiegowoscClient({
                 <tfoot>
                   <tr className="bg-jodhpur/70">
                     <td className={`${td} font-bold`}>Suma roku</td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>
+                    <td className={`${td} text-right font-bold dash-mono`}>
                       {formatPln(yearSummaryTotals.gross)}
                     </td>
-                    <td className={`${td} text-right font-bold tabular-nums text-amber-900`}>
+                    <td className={`${td} text-right font-bold dash-mono text-toffee`}>
                       {formatPln(yearSummaryTotals.costs)}
                     </td>
-                    <td className={`${td} text-right font-bold tabular-nums text-green-800`}>
+                    <td className={`${td} text-right font-bold dash-mono text-moss`}>
                       {formatPln(yearSummaryTotals.margin)}
                     </td>
-                    <td className={`${td} text-right tabular-nums text-muted`}>—</td>
-                    <td className={`${td} text-right tabular-nums text-muted`}>—</td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>
+                    <td className={`${td} text-right dash-mono text-muted`}>—</td>
+                    <td className={`${td} text-right dash-mono text-muted`}>—</td>
+                    <td className={`${td} text-right font-bold dash-mono`}>
                       {yearSummaryTotals.lessonCount}
                     </td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>
+                    <td className={`${td} text-right font-bold dash-mono`}>
                       {yearSummaryTotals.hoursCount.toLocaleString("pl-PL", {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className={`${td} text-right font-bold tabular-nums`}>
+                    <td className={`${td} text-right font-bold dash-mono`}>
                       {formatPln(yearSummaryTotals.paidPayouts)}
                     </td>
                     <td className={td} />
@@ -1093,21 +1102,12 @@ export function KsiegowoscClient({
             </table>
           </div>
         )}
-        {viewMode === "month" && closeFeedback ? (
-          <p
-            className={`mt-2 text-xs font-medium ${
-              closeFeedback.includes("zamknięty") || closeFeedback.includes("zamknięta")
-                ? "text-green-800"
-                : "text-red-700"
-            }`}
-          >
-            {closeFeedback}
-          </p>
-        ) : null}
       </section>
+      ) : null}
 
+      {!isMonthClosed ? (
       <section className="rounded-app border border-panel-frame/40 bg-white p-4 sm:p-5">
-        <h2 className="text-depths text-base font-semibold tracking-tight">Rozliczenia — Zrób to sam</h2>
+        <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia — Zrób to sam</h2>
         <p className="text-muted mt-1 text-xs">
           Tylko to, co dotyczy Twojej firmy ·{" "}
           <span className="capitalize">{periodLabel}</span> · dane VERIFIED + wypłaty PAID
@@ -1116,26 +1116,30 @@ export function KsiegowoscClient({
 
         <div className="mt-5 space-y-4">
           <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
-            <h3 className="text-depths text-sm font-bold">1. Twój podatek dochodowy (PIT-12)</h3>
+            <h3 className="dash-sans text-depths text-sm font-bold">1. Twój podatek dochodowy (PIT-12)</h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <span className="text-depths/90">Przychód (Ewidencja)</span>
-                <span className="font-bold tabular-nums">{formatPln(totals.gross)}</span>
+                <span className="font-bold dash-mono">{formatPln(totals.gross)}</span>
               </li>
               <li className="text-muted text-xs leading-snug">
                 Zwolnione z VAT na mocy art. 43 ust. 1 pkt 27 ustawy o VAT — nie doliczasz podatku VAT do lekcji.
               </li>
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <span className="text-depths/90">Koszt (Wynagrodzenia studentów)</span>
-                <span className="font-bold tabular-nums text-amber-900">{formatPln(paidPayoutsSum)}</span>
+                <span className="font-bold dash-mono text-toffee">{formatPln(paidPayoutsSum)}</span>
+              </li>
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className="text-depths/90">Koszt (Wydatki operacyjne — rachunki, faktury)</span>
+                <span className="font-bold dash-mono text-toffee">{formatPln(extraCostsSum)}</span>
               </li>
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-panel-frame/20 pt-2">
                 <span className="font-semibold text-depths">Dochód (Zysk)</span>
-                <span className="text-base font-black tabular-nums">{formatPln(taxableIncome)}</span>
+                <span className="text-base font-black dash-mono">{formatPln(taxableIncome)}</span>
               </li>
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <span className="font-semibold text-depths">Twój podatek PIT (12%)</span>
-                <span className="text-base font-black tabular-nums text-green-800">{formatPln(suggestedPit)}</span>
+                <span className="text-base font-black dash-mono text-moss">{formatPln(suggestedPit)}</span>
               </li>
             </ul>
             <p className="text-depths mt-3 text-xs leading-relaxed">
@@ -1155,23 +1159,23 @@ export function KsiegowoscClient({
           </article>
 
           <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
-            <h3 className="text-depths text-sm font-bold">2. Składki i podatki za studentów (poniżej 26 lat)</h3>
+            <h3 className="dash-sans text-depths text-sm font-bold">2. Składki i podatki za studentów (poniżej 26 lat)</h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex flex-wrap items-baseline justify-between gap-x-4">
                 <span className="text-depths/90">ZUS za studentów-zleceniobiorców</span>
-                <span className="font-bold tabular-nums text-green-800">0,00 zł</span>
+                <span className="font-bold dash-mono text-moss">0,00 zł</span>
               </li>
               <li className="text-muted text-xs">Status studenta zwalnia Cię całkowicie ze składek ZUS.</li>
               <li className="flex flex-wrap items-baseline justify-between gap-x-4">
                 <span className="text-depths/90">Podatek PIT-4 za studentów</span>
-                <span className="font-bold tabular-nums text-green-800">0,00 zł</span>
+                <span className="font-bold dash-mono text-moss">0,00 zł</span>
               </li>
               <li className="text-muted text-xs">Ulga dla młodych zwalnia ich z podatku — nic nie potrącasz.</li>
             </ul>
           </article>
 
           <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
-            <h3 className="text-depths text-sm font-bold">3. Twój własny ZUS (właściciel JDG)</h3>
+            <h3 className="dash-sans text-depths text-sm font-bold">3. Twój własny ZUS (właściciel JDG)</h3>
             <label className="mt-3 grid max-w-sm gap-1">
               <span className="text-muted text-xs font-semibold">Wybierz etap</span>
               <select
@@ -1188,7 +1192,7 @@ export function KsiegowoscClient({
                 {selectedZus.label}
                 {viewMode === "year" ? " · 12 miesięcy" : null}
               </span>
-              <span className="text-base font-black tabular-nums text-depths">
+              <span className="text-base font-black dash-mono text-depths">
                 {viewMode === "year" ? formatPln(zusTotal) : selectedZus.amountLabel}
               </span>
             </div>
@@ -1198,43 +1202,43 @@ export function KsiegowoscClient({
 
         <article
           className={`mt-5 rounded-app border-2 p-4 ${
-            netProfit < 0 ? "border-red-500/40 bg-red-50/70" : "border-green-700/40 bg-green-700/[0.08]"
+            netProfit < 0 ? "border-claret/40 bg-claret/5" : "border-moss/40 bg-moss/8"
           }`}
         >
-          <h3 className={`text-sm font-bold ${netProfit < 0 ? "text-red-900" : "text-green-900"}`}>
+          <h3 className={`dash-sans text-sm font-bold ${netProfit < 0 ? "text-claret" : "text-moss"}`}>
             Podsumowanie — zysk po wszystkich wydatkach
           </h3>
           <ul className="mt-3 space-y-1.5 text-sm">
             <li className="flex justify-between gap-4">
               <span className="text-depths/90">Przychód (Ewidencja)</span>
-              <span className="font-semibold tabular-nums">{formatPln(totals.gross)}</span>
+              <span className="font-semibold dash-mono">{formatPln(totals.gross)}</span>
             </li>
-            <li className="flex justify-between gap-4 text-amber-900">
+            <li className="flex justify-between gap-4 text-toffee">
               <span>− Wynagrodzenia studentów (PAID)</span>
-              <span className="font-semibold tabular-nums">{formatPln(paidPayoutsSum)}</span>
+              <span className="font-semibold dash-mono">{formatPln(paidPayoutsSum)}</span>
             </li>
-            <li className="flex justify-between gap-4 text-green-800">
+            <li className="flex justify-between gap-4 text-moss">
               <span>− Twój PIT (12%)</span>
-              <span className="font-semibold tabular-nums">{formatPln(suggestedPit)}</span>
+              <span className="font-semibold dash-mono">{formatPln(suggestedPit)}</span>
             </li>
             <li className="flex justify-between gap-4 text-depths">
               <span>
                 − Twój ZUS ({selectedZus.label}
                 {viewMode === "year" ? " × 12" : ""})
               </span>
-              <span className="font-semibold tabular-nums">{formatPln(zusTotal)}</span>
+              <span className="font-semibold dash-mono">{formatPln(zusTotal)}</span>
             </li>
             <li
               className={`flex justify-between gap-4 border-t pt-2 ${
-                netProfit < 0 ? "border-red-400/40" : "border-green-700/30"
+                netProfit < 0 ? "border-claret/40" : "border-moss/30"
               }`}
             >
-              <span className={`text-base font-bold ${netProfit < 0 ? "text-red-900" : "text-green-900"}`}>
+              <span className={`text-base font-bold ${netProfit < 0 ? "text-claret" : "text-moss"}`}>
                 {netProfit < 0 ? "Strata na rękę" : "Zostaje zysku na rękę"}
               </span>
               <span
-                className={`text-xl font-black tabular-nums ${
-                  netProfit < 0 ? "text-red-700" : "text-green-800"
+                className={`text-xl font-black dash-mono ${
+                  netProfit < 0 ? "text-claret" : "text-moss"
                 }`}
               >
                 {formatPln(netProfit)}
@@ -1243,82 +1247,108 @@ export function KsiegowoscClient({
           </ul>
         </article>
 
-        <p className="mt-4 text-xs font-medium text-red-800">
+        <p className="mt-4 text-xs font-medium text-claret">
           {viewMode === "month"
             ? "Pamiętaj, aby do 25. dnia miesiąca wysłać plik JPK_V7 (KPiR) z Twojego programu księgowego!"
             : "W ciągu roku JPK_V7 wysyłasz miesięcznie — ten widok pomaga kontrolować sumy roczne."}
         </p>
       </section>
+      ) : null}
 
       {viewMode === "month" ? (
-        <section className="rounded-app border border-panel-frame/40 bg-white p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+        isMonthClosed ? (
+          <section className="rounded-ledger border-2 border-moss/25 bg-moss/[0.04] p-4 sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
+                <IconLock className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="dash-sans text-depths text-base font-black uppercase tracking-wide">
+                  Miesiąc zamknięty — ukończony etap
+                </p>
+                <p className="text-muted mt-0.5 text-xs capitalize">
+                  {periodLabel} — rozliczenie zakończone i zarchiwizowane. Poniższe liczby są ostateczne i
+                  niemodyfikowalne.
+                </p>
+              </div>
+            </div>
+
+            <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
+              <ClosedFigure label="Przychód" value={formatPln(totals.gross)} />
+              <ClosedFigure label="Koszty wypłat" value={formatPln(paidPayoutsSum)} />
+              <ClosedFigure label="Koszty operacyjne" value={formatPln(extraCostsSum)} />
+              <ClosedFigure label="Podstawa opodatkowania" value={formatPln(taxableIncome)} />
+              <ClosedFigure label="Twój PIT (12%)" value={formatPln(suggestedPit)} />
+              <ClosedFigure label="Twój ZUS — Ulga na start" value={ZUS_OPTIONS.start.amountLabel} />
+              <ClosedFigure
+                label={closedNetProfit < 0 ? "Strata na rękę" : "Zysk na rękę"}
+                value={formatPln(closedNetProfit)}
+                tone={closedNetProfit < 0 ? "claret" : "moss"}
+                emphasis
+              />
+            </dl>
+
+            <p className="text-muted mt-6 border-t border-dashed border-moss/25 pt-4 text-[0.7rem]">
+              Pliki PDF (ewidencja sprzedaży, zestawienie kosztów) są wciąż dostępne w sekcjach powyżej.
+            </p>
+          </section>
+        ) : (
+          <section className="rounded-ledger border-2 border-depths/15 bg-white p-4 sm:p-5">
             <div>
-              <h2 className="text-depths text-base font-semibold tracking-tight">Zamknięcie miesiąca</h2>
+              <h2 className="dash-sans text-depths text-base font-bold uppercase tracking-tight">Kreator zamknięcia miesiąca</h2>
               <p className="text-muted mt-1 text-xs capitalize">
                 {periodLabel}
-                {!canClose
-                  ? " — zamknięcie dostępne od 5. dnia następnego miesiąca."
-                  : isMonthClosed
-                    ? " — ten miesiąc jest już zamknięty (możesz ponowić zapis checklisty)."
-                    : " — potwierdź checklistę i zamknij miesiąc."}
+                {!canClose ? " — zamknięcie dostępne od 5. dnia następnego miesiąca." : " — spełnij warunki, aby zamknąć miesiąc."}
               </p>
             </div>
-            {isMonthClosed ? (
-              <span className="rounded-full bg-green-700/15 px-2.5 py-1 text-[0.65rem] font-bold text-green-800">
-                Zamknięty
-              </span>
-            ) : null}
-          </div>
 
-          <ul className="mt-4 space-y-2">
-            {(
-              [
-                ["ewidencjaGenerated", "Ewidencja sprzedaży wygenerowana"],
-                ["pendingCleared", "Wszystkie PENDING przeniesione / rozliczone"],
-                ["payoutsCalculated", "Wypłaty obliczone"],
-                ["pitZusNoted", "PIT / ZUS zapisane w notes"],
-              ] as const
-            ).map(([key, label]) => (
-              <li key={key}>
-                <label className="flex cursor-pointer items-center gap-2 rounded-app border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-luster/40">
-                  <input
-                    type="checkbox"
-                    checked={checklist[key]}
-                    onChange={() => toggleCheck(key)}
-                    disabled={!canClose && !isMonthClosed}
-                  />
-                  <span className="font-medium">{label}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleCloseMonth}
-              disabled={pendingClose || !canClose || !checklistComplete}
-              className="rounded-full bg-[#000C4A] px-4 py-2 text-xs font-bold text-lime disabled:opacity-50"
-            >
-              {pendingClose ? "Zamykanie…" : isMonthClosed ? "Ponów zamknięcie" : "Zamknij miesiąc"}
-            </button>
-            {closeFeedback ? (
-              <p
-                className={`text-sm font-medium ${
-                  closeFeedback.includes("zamknięty") || closeFeedback.includes("zamknięta")
-                    ? "text-green-800"
-                    : "text-red-700"
+            <ul className="mt-4 space-y-2">
+              <li
+                className={`flex items-center gap-2 rounded-ledger border px-3 py-2 text-sm ${
+                  lessonsReady ? "border-moss/30 bg-moss/5 text-moss" : "border-claret/25 bg-claret/5 text-claret"
                 }`}
               >
-                {closeFeedback}
-              </p>
-            ) : null}
-          </div>
-        </section>
+                <span className="dash-mono text-xs font-bold">{lessonsReady ? "✓" : "✗"}</span>
+                <span className="font-medium">
+                  Warunek 1 — wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji)
+                </span>
+              </li>
+              <li
+                className={`flex items-center gap-2 rounded-ledger border px-3 py-2 text-sm ${
+                  payoutsReady ? "border-moss/30 bg-moss/5 text-moss" : "border-claret/25 bg-claret/5 text-claret"
+                }`}
+              >
+                <span className="dash-mono text-xs font-bold">{payoutsReady ? "✓" : "✗"}</span>
+                <span className="font-medium">Warunek 2 — wszystkie wypłaty tutorów mają status PAID</span>
+              </li>
+              <li>
+                <label className="flex cursor-pointer items-center gap-2 rounded-ledger border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-luster/40">
+                  <input
+                    type="checkbox"
+                    checked={bankReconciled}
+                    onChange={() => setBankReconciled((v) => !v)}
+                    disabled={!canClose}
+                  />
+                  <span className="font-medium">Warunek 3 — potwierdzam zgodność salda z kontem bankowym</span>
+                </label>
+              </li>
+            </ul>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmCloseOpen(true)}
+                disabled={!canClose || !checklistComplete}
+                className="btn-block bg-[#000C4A] px-5 py-2.5 text-xs text-lime disabled:opacity-50"
+              >
+                Zamknij miesiąc
+              </button>
+            </div>
+          </section>
+        )
       ) : (
         <section className="rounded-app border border-panel-frame/40 bg-white p-4 sm:p-5">
-          <h2 className="text-depths text-base font-semibold tracking-tight">Zamknięcia w roku {selectedYear}</h2>
+          <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Zamknięcia w roku {selectedYear}</h2>
           <p className="text-muted mt-1 text-xs">
             Zamknięcie dotyczy zawsze konkretnego miesiąca — tu widzisz statusy. Przełącz na widok miesięczny, aby
             zamknąć wybrany miesiąc.
@@ -1331,7 +1361,7 @@ export function KsiegowoscClient({
               >
                 <span className="text-depths text-xs font-medium capitalize">{row.label}</span>
                 {row.closed ? (
-                  <span className="text-[0.65rem] font-bold uppercase text-green-800">Zamknięty</span>
+                  <span className="text-[0.65rem] font-bold uppercase text-moss">Zamknięty</span>
                 ) : (
                   <span className="text-[0.65rem] font-bold uppercase text-muted">Otwarty</span>
                 )}
@@ -1340,6 +1370,40 @@ export function KsiegowoscClient({
           </ul>
         </section>
       )}
+
+      <ConfirmDialog
+        open={confirmCloseOpen}
+        tone="positive"
+        title={`Zamknąć ${periodLabel}?`}
+        description="Miesiąc zostanie oznaczony jako zamknięty — dodawanie/usuwanie kosztów oraz edycja lekcji, wypłat i wydatków za ten miesiąc będzie zablokowana. Tej operacji nie można cofnąć z UI."
+        confirmLabel="Zamknij miesiąc"
+        successMessage="Miesiąc został zamknięty."
+        onConfirm={handleCloseMonth}
+        onCancel={() => setConfirmCloseOpen(false)}
+      />
+    </div>
+  );
+}
+
+/** Pozycja w statycznym, archiwalnym podsumowaniu zamkniętego miesiąca — bez interakcji. */
+function ClosedFigure({
+  label,
+  value,
+  tone = "depths",
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  tone?: "depths" | "moss" | "claret";
+  emphasis?: boolean;
+}) {
+  const toneClass = tone === "moss" ? "text-moss" : tone === "claret" ? "text-claret" : "text-depths";
+  return (
+    <div>
+      <p className="text-muted text-[0.62rem] font-semibold uppercase tracking-wide">{label}</p>
+      <p className={`dash-mono mt-1 ${emphasis ? "text-lg font-black" : "text-sm font-bold"} ${toneClass}`}>
+        {value}
+      </p>
     </div>
   );
 }

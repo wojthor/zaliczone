@@ -16,10 +16,43 @@
   --color-jodhpur: color-mix(in srgb, #ebeffe 82%, #ffffff 18%);
   --color-sage: #c8cedd;
   --color-panel-frame: #889acc;
+
+  /* Inki statusów liczbowych (panel finansowy admina) — ciemne, czytelne na snow/luster */
+  --color-claret: #8a1f2f; /* ujemne / nieopłacone */
+  --color-moss: #1f5c3e; /* dodatnie / zatwierdzone / marża */
+  --color-toffee: #8a6a1f; /* uwaga / koszty / do zatwierdzenia — pod ton butter */
 }
 
 @utility rounded-app {
   border-radius: 1.125rem;
+}
+
+/* Ledger/dane finansowe: rogi ostre — kontrast wobec miękkiego chrome (sidebar, karty). */
+@utility rounded-ledger {
+  border-radius: 0.375rem;
+}
+
+/* Blokowy przycisk główny — ostry, wysoki kontrast, koniec z uniwersalnym rounded-full. */
+@utility btn-block {
+  border-radius: 0.375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/*
+ * Typografia „ledger” panelu finansowego admina (na razie: /admin dashboard).
+ * Celowo NIE zmienia fontu na <body> — dotyczy tylko elementów opatrzonych
+ * klasami .dash-sans / .dash-mono (patrz lib/dashboard-fonts.ts).
+ */
+.dash-sans {
+  font-family: var(--font-dash-sans), system-ui, sans-serif;
+}
+
+.dash-mono {
+  font-family: var(--font-dash-mono), ui-monospace, "SFMono-Regular", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 /* Animacja „przeskoku” pozycji z oczekujących do opłaconych (panel rozliczeń admina) */
@@ -56,6 +89,99 @@
 
 .add-tutor-success-pop {
   animation: addTutorSuccessPop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Pulz potwierdzenia wiersza (Rozliczenia) — odpala się na kliknięciu, przed hop-to-paid */
+@keyframes rowConfirmPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 55%, transparent);
+    transform: scale(1);
+  }
+  40% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-lime) 45%, transparent);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 0%, transparent);
+    transform: scale(1);
+  }
+}
+
+.row-confirm-pulse {
+  animation: rowConfirmPulse 0.32s ease-out;
+}
+
+/* Wejście ConfirmDialog */
+@keyframes confirmDialogIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(0.5rem);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.confirm-dialog-in {
+  animation: confirmDialogIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Wejście ConfirmDialog na mobile — bottom sheet zamiast wyśrodkowanej karty. */
+@keyframes confirmSheetIn {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 639px) {
+  .confirm-dialog-in {
+    animation: confirmSheetIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/*
+ * Pas statusu rekordu (tabele/karty admina) — sygnaturowy element nowego kierunku wizualnego.
+ * Gruby, kolorowy lewy pas zamiast dyskretnej plakietki — status widoczny bez czytania tekstu.
+ */
+.status-rail {
+  border-left-width: 6px;
+  border-left-style: solid;
+}
+.status-rail-verified {
+  border-left-color: var(--color-lime);
+}
+.status-rail-pending {
+  border-left-color: var(--color-butter);
+}
+.status-rail-unpaid {
+  border-left-color: var(--color-claret);
+}
+.status-rail-neutral {
+  border-left-color: var(--color-panel-frame);
+}
+
+/* Tooltip CSS-only dla zwiniętego sidebara admina — pokazuje się na hover rodzica .group */
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 0.5rem);
+  top: 50%;
+  z-index: 60;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-0.25rem);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.group:hover .sidebar-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 /* Ukryty pasek przewijania (treść nadal przewijalna) */

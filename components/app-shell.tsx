@@ -5,9 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  IconBell,
   IconCalendar,
   IconDashboard,
+  IconGuide,
   IconLogout,
   IconMenu,
   IconUser,
@@ -21,7 +21,7 @@ const nav = [
   { href: "/", label: "Dashboard", Icon: IconDashboard },
   { href: "/terminarz", label: "Terminarz", Icon: IconCalendar },
   { href: "/uczniowie", label: "Uczniowie", Icon: IconUsers },
-  { href: "/powiadomienia", label: "Powiadomienia", Icon: IconBell },
+  { href: "/przewodnik", label: "Przewodnik", Icon: IconGuide },
   { href: "/finanse", label: "Finanse", Icon: IconWallet },
   { href: "/profil", label: "Profil", Icon: IconUser },
 ] as const;

@@ -13,6 +13,7 @@ import {
   getPendingVerificationLines,
   getUnpaidFinanceLines,
 } from "@/lib/data/queries";
+import type { FinanceLineUi } from "@/lib/types/database";
 
 function formatTodayPl(d = new Date()): string {
   return new Intl.DateTimeFormat("pl-PL", {
@@ -58,6 +59,26 @@ function isoFromYmd(year: number, month1Based: number, day: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Suma wynagrodzeń tutorów (lekcje + premia) dla podanego zbioru linii VERIFIED. */
+function computeTutorCostForLines(lines: FinanceLineUi[]): number {
+  const tutorCostById = new Map<string, { hours: number; lessonsPln: number }>();
+  for (const line of lines) {
+    const prev = tutorCostById.get(line.tutorId) ?? { hours: 0, lessonsPln: 0 };
+    const match = line.label.match(/(\d+)\s*min/);
+    const minutes = match ? Number(match[1]) : 60;
+    prev.hours += minutes / 60;
+    prev.lessonsPln += Math.round(line.amountPln * TUTOR_SHARE * 100) / 100;
+    tutorCostById.set(line.tutorId, prev);
+  }
+  let total = 0;
+  for (const row of tutorCostById.values()) {
+    const hours = Math.round(row.hours * 10) / 10;
+    const bonus = bonusProgress(hours);
+    total += row.lessonsPln + (bonus.achieved ? bonus.bonusPln : 0);
+  }
+  return Math.round(total * 100) / 100;
+}
+
 export default async function AdminHomePage() {
   const today = new Date();
   const monthKey = currentMonthKey(today);
@@ -84,23 +105,7 @@ export default async function AdminHomePage() {
   const verifiedMonthSumPln = verifiedThisMonth.reduce((s, l) => s + l.amountPln, 0);
   const unpaidMonthSumPln = unpaidThisMonth.reduce((s, l) => s + l.amountPln, 0);
 
-  const tutorCostById = new Map<string, { hours: number; lessonsPln: number }>();
-  for (const line of verifiedThisMonth) {
-    const prev = tutorCostById.get(line.tutorId) ?? { hours: 0, lessonsPln: 0 };
-    const match = line.label.match(/(\d+)\s*min/);
-    const minutes = match ? Number(match[1]) : 60;
-    prev.hours += minutes / 60;
-    prev.lessonsPln += Math.round(line.amountPln * TUTOR_SHARE * 100) / 100;
-    tutorCostById.set(line.tutorId, prev);
-  }
-
-  let tutorCostPln = 0;
-  for (const row of tutorCostById.values()) {
-    const hours = Math.round(row.hours * 10) / 10;
-    const bonus = bonusProgress(hours);
-    tutorCostPln += row.lessonsPln + (bonus.achieved ? bonus.bonusPln : 0);
-  }
-  tutorCostPln = Math.round(tutorCostPln * 100) / 100;
+  const tutorCostPln = computeTutorCostForLines(verifiedThisMonth);
   const otherOperatingCostPln =
     Math.round(
       operatingExpenses
@@ -128,7 +133,7 @@ export default async function AdminHomePage() {
       label: `Ewidencja godzin · ${formatMonthLongPl(prevKey)}`,
       dateLabel: formatDayPl(ewidencjaPrevIso),
       daysLeft: daysUntilIso(ewidencjaPrevIso, today),
-      href: "/admin/powiadomienia",
+      href: "/admin/wyplaty",
     },
     {
       id: "payout",
@@ -149,7 +154,7 @@ export default async function AdminHomePage() {
       label: `Ewidencja godzin · ${formatMonthLongPl(monthKey)}`,
       dateLabel: formatDayPl(ewidencjaIso),
       daysLeft: daysUntilIso(ewidencjaIso, today),
-      href: "/admin/powiadomienia",
+      href: "/admin/wyplaty",
     },
   ];
 

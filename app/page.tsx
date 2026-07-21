@@ -3,7 +3,6 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import {
   getCurrentUserProfile,
   getTutorCompletedFinanceLines,
-  getTutorInboxMessages,
   getTutorLessons,
   getTutorStudents,
 } from "@/lib/data/queries";
@@ -17,11 +16,10 @@ export default async function Home() {
   if (!profile) redirect("/login");
   if (profile.role === "ADMIN") redirect("/admin");
 
-  const [lessons, students, financeLines, inboxMessages] = await Promise.all([
+  const [lessons, students, financeLines] = await Promise.all([
     getTutorLessons(profile.id),
     getTutorStudents(profile.id),
     getTutorCompletedFinanceLines(profile.id),
-    getTutorInboxMessages(),
   ]);
 
   const monthKey = currentMonthKey();
@@ -56,7 +54,6 @@ export default async function Home() {
       tutorName={profile.full_name ?? "Korepetytor"}
       totalPayout={totalPayout}
       totalHours={totalHours}
-      inboxMessages={inboxMessages}
       verifiedHoursThisMonth={verifiedHoursThisMonth}
     />
   );

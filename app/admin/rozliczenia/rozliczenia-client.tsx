@@ -6,8 +6,15 @@ import { adminRejectLessonPayment, adminVerifyLesson } from "@/lib/actions/admin
 import { formatDateDdMm } from "@/lib/data/mappers";
 import type { FinanceLineUi } from "@/lib/types/database";
 import { isIsoDateInWeek, dateLabelToIsoKey } from "@/lib/date/week-utils";
+import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { WeekNavigator, useWeekMondayIso } from "@/components/week-navigator";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner, useToast } from "@/components/ui/toast";
+
+/** Czas pulzu potwierdzenia (lime), zanim wiersz zacznie się przesuwać. */
+const PULSE_MS = 320;
+/** Czas trwania hop-to-paid — wiersz zostaje widoczny w starej liście, żeby animacja miała czas dograć. */
+const HOP_MS = 520;
 
 function todayIso(): string {
   const d = new Date();
@@ -37,8 +44,17 @@ export function RozliczeniaClient({
   const [unpaid, setUnpaid] = useState<FinanceLineUi[]>(() => unpaidLines.map(ensureDateIso));
   const [query, setQuery] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [pulseId, setPulseId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(-1);
   const [paymentDates, setPaymentDates] = useState<Record<string, string>>({});
+  const [verifyTarget, setVerifyTarget] = useState<{
+    id: string;
+    studentName: string;
+    amountPln: number;
+    source: "pending" | "unpaid";
+  } | null>(null);
+  const [verifyMethod, setVerifyMethod] = useState("");
 
   useEffect(() => {
     setPending(pendingLines.map(ensureDateIso));
@@ -96,34 +112,59 @@ export function RozliczeniaClient({
     return paymentDates[id] ?? todayIso();
   }
 
-  function applyVerifiedPayment(row: FinanceLineUi, paidIso: string): FinanceLineUi {
+  function applyVerifiedPayment(row: FinanceLineUi, paidIso: string, paymentMethod: string): FinanceLineUi {
     return {
       ...row,
       status: "VERIFIED",
       paymentReceivedAt: formatDateDdMm(paidIso),
       paymentReceivedAtIso: paidIso,
+      paymentMethod,
     };
   }
 
-  async function markVerified(id: string) {
-    if (movingId) return;
+  /**
+   * Odtwarza dwuetapowy, satysfakcjonujący feedback po udanej akcji:
+   * krótki pulz limonki („potwierdzone!”), potem hop-to-paid („…i już się przenosi”),
+   * a dopiero na końcu commit lokalnego stanu + router.refresh() — żeby refresh
+   * nie „przeciął” animacji w połowie.
+   */
+  function animateAndCommit(id: string, commit: () => void) {
+    setPulseId(id);
+    window.setTimeout(() => {
+      setPulseId(null);
+      setLeavingId(id);
+      window.setTimeout(() => {
+        commit();
+        setLeavingId(null);
+        setMovingId(null);
+      }, HOP_MS);
+    }, PULSE_MS);
+  }
+
+  function openVerifyModal(id: string, source: "pending" | "unpaid") {
+    const row = (source === "pending" ? pending : unpaid).find((x) => x.id === id);
+    if (!row) return;
+    setVerifyMethod("");
+    setVerifyTarget({ id, studentName: row.studentName, amountPln: row.amountPln, source });
+  }
+
+  async function handleConfirmVerify() {
+    if (!verifyTarget) return;
+    if (!verifyMethod) throw new Error("Wybierz metodę płatności.");
+    const { id, source } = verifyTarget;
     const paidIso = paymentIsoFor(id);
-    setMovingId(id);
-    try {
-      await adminVerifyLesson(id, paidIso);
-      const row = pending.find((x) => x.id === id);
+    await adminVerifyLesson(id, paidIso, verifyMethod);
+    toast.success("Zatwierdzono", `Wpłata z datą ${formatDateDdMm(paidIso)} · ${verifyMethod}.`);
+    animateAndCommit(id, () => {
+      const sourceList = source === "pending" ? pending : unpaid;
+      const setSourceList = source === "pending" ? setPending : setUnpaid;
+      const row = sourceList.find((x) => x.id === id);
       if (row) {
-        setPending((prev) => prev.filter((x) => x.id !== id));
-        setVerified((prev) => [applyVerifiedPayment(row, paidIso), ...prev]);
+        setSourceList((prev) => prev.filter((x) => x.id !== id));
+        setVerified((prev) => [applyVerifiedPayment(row, paidIso, verifyMethod), ...prev]);
       }
-      toast.success("Zatwierdzono", `Wpłata z datą ${formatDateDdMm(paidIso)}.`);
       router.refresh();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Nie udało się zatwierdzić lekcji.";
-      toast.error("Błąd zatwierdzenia", msg);
-    } finally {
-      setMovingId(null);
-    }
+    });
   }
 
   async function markUnpaid(id: string) {
@@ -131,41 +172,21 @@ export function RozliczeniaClient({
     setMovingId(id);
     try {
       await adminRejectLessonPayment(id);
-      const row = pending.find((x) => x.id === id);
-      if (row) {
-        setPending((prev) => prev.filter((x) => x.id !== id));
-        setUnpaid((prev) => [
-          { ...row, status: "UNPAID", paymentReceivedAt: null, paymentReceivedAtIso: null },
-          ...prev,
-        ]);
-      }
       toast.success("Oznaczono jako nieopłacone", "Lekcja przeniesiona do listy nieopłaconych.");
-      router.refresh();
+      animateAndCommit(id, () => {
+        const row = pending.find((x) => x.id === id);
+        if (row) {
+          setPending((prev) => prev.filter((x) => x.id !== id));
+          setUnpaid((prev) => [
+            { ...row, status: "UNPAID", paymentReceivedAt: null, paymentReceivedAtIso: null },
+            ...prev,
+          ]);
+        }
+        router.refresh();
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Nie udało się oznaczyć jako nieopłacone.";
       toast.error("Błąd", msg);
-    } finally {
-      setMovingId(null);
-    }
-  }
-
-  async function markVerifiedFromUnpaid(id: string) {
-    if (movingId) return;
-    const paidIso = paymentIsoFor(id);
-    setMovingId(id);
-    try {
-      await adminVerifyLesson(id, paidIso);
-      const row = unpaid.find((x) => x.id === id);
-      if (row) {
-        setUnpaid((prev) => prev.filter((x) => x.id !== id));
-        setVerified((prev) => [applyVerifiedPayment(row, paidIso), ...prev]);
-      }
-      toast.success("Zatwierdzono ponownie", `Wpłata z datą ${formatDateDdMm(paidIso)}.`);
-      router.refresh();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Nie udało się zatwierdzić lekcji.";
-      toast.error("Błąd zatwierdzenia", msg);
-    } finally {
       setMovingId(null);
     }
   }
@@ -173,8 +194,8 @@ export function RozliczeniaClient({
   return (
     <div className="flex h-auto min-h-0 min-w-0 flex-col gap-3 overflow-visible sm:gap-4 lg:h-full lg:overflow-hidden">
       <div className="min-w-0 shrink-0 space-y-2">
-        <h1 className="text-depths text-lg font-semibold tracking-tight sm:text-xl">Rozliczenia</h1>
-        <p className="text-muted text-[0.7rem] leading-snug sm:text-xs">
+        <h1 className="dash-sans text-depths text-lg font-bold tracking-tight sm:text-xl">Rozliczenia</h1>
+        <p className="dash-sans text-muted text-[0.7rem] leading-snug sm:text-xs">
           Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
           zmienić.
         </p>
@@ -195,7 +216,7 @@ export function RozliczeniaClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Szukaj…"
-            className="w-full shrink-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:w-56"
+            className="dash-sans w-full shrink-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:w-56"
           />
         </div>
       </div>
@@ -209,9 +230,11 @@ export function RozliczeniaClient({
           variant="pending"
           count={pendingInWeek.length}
           movingId={movingId}
+          pulseId={pulseId}
+          leavingId={leavingId}
           paymentDates={paymentDates}
           onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-          onVerify={markVerified}
+          onVerify={(id) => openVerifyModal(id, "pending")}
           onReject={markUnpaid}
         />
 
@@ -223,6 +246,8 @@ export function RozliczeniaClient({
           variant="verified"
           count={verifiedInWeek.length}
           movingId={movingId}
+          pulseId={pulseId}
+          leavingId={leavingId}
           paymentDates={paymentDates}
           onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
         />
@@ -235,11 +260,64 @@ export function RozliczeniaClient({
           variant="unpaid"
           count={unpaidInWeek.length}
           movingId={movingId}
+          pulseId={pulseId}
+          leavingId={leavingId}
           paymentDates={paymentDates}
           onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-          onVerify={markVerifiedFromUnpaid}
+          onVerify={(id) => openVerifyModal(id, "unpaid")}
         />
       </div>
+
+      <ConfirmDialog
+        open={verifyTarget !== null}
+        tone="positive"
+        title={verifyTarget ? `Zatwierdź wpłatę — ${verifyTarget.studentName}` : ""}
+        description={
+          verifyTarget
+            ? `Kwota ${verifyTarget.amountPln} zł. Po zatwierdzeniu daty wpływu nie da się jej zmienić.`
+            : undefined
+        }
+        confirmLabel="Zatwierdź"
+        successMessage="Zatwierdzono."
+        onConfirm={handleConfirmVerify}
+        onSuccess={() => router.refresh()}
+        onCancel={() => setVerifyTarget(null)}
+      >
+        {verifyTarget ? (
+          <div className="space-y-3">
+            <label className="block text-left">
+              <span className="dash-sans text-muted mb-0.5 block text-[0.65rem] font-semibold uppercase tracking-wide">
+                Data wpływu
+              </span>
+              <input
+                type="date"
+                value={paymentIsoFor(verifyTarget.id)}
+                onChange={(e) => setPaymentDates((prev) => ({ ...prev, [verifyTarget.id]: e.target.value }))}
+                className="dash-mono text-depths w-full rounded-app border border-panel-frame/40 bg-white px-2.5 py-2 text-sm"
+                aria-label="Data wpływu"
+              />
+            </label>
+            <label className="block text-left">
+              <span className="dash-sans text-muted mb-0.5 block text-[0.65rem] font-semibold uppercase tracking-wide">
+                Metoda płatności
+              </span>
+              <select
+                value={verifyMethod}
+                onChange={(e) => setVerifyMethod(e.target.value)}
+                className="dash-sans text-depths w-full rounded-app border border-panel-frame/40 bg-white px-2.5 py-2 text-sm"
+                aria-label="Metoda płatności"
+              >
+                <option value="">— wybierz metodę —</option>
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }
@@ -265,13 +343,13 @@ function WeekVerificationBar({
     total === 0
       ? "conic-gradient(#e8edf5 0deg 360deg)"
       : `conic-gradient(
-          #15803d 0deg ${verifiedDeg}deg,
-          #dc2626 ${verifiedDeg}deg ${verifiedDeg + unpaidDeg}deg,
-          #f59e0b ${verifiedDeg + unpaidDeg}deg ${verifiedDeg + unpaidDeg + pendingDeg}deg
+          #1f5c3e 0deg ${verifiedDeg}deg,
+          #8a1f2f ${verifiedDeg}deg ${verifiedDeg + unpaidDeg}deg,
+          #8a6a1f ${verifiedDeg + unpaidDeg}deg ${verifiedDeg + unpaidDeg + pendingDeg}deg
         )`;
 
   return (
-    <div className="flex w-[14rem] shrink-0 items-center gap-2 sm:w-[16rem]">
+    <div className="flex w-56 shrink-0 items-center gap-2 sm:w-64">
       <div className="min-w-0 flex-1 space-y-0.5">
         <div
           className="h-1 w-full overflow-hidden rounded-full bg-luster"
@@ -286,7 +364,7 @@ function WeekVerificationBar({
             style={{ width: `${donePct}%` }}
           />
         </div>
-        <p className="text-muted text-[0.55rem] tabular-nums leading-none">
+        <p className="dash-mono text-muted text-[0.55rem] leading-none">
           {total === 0 ? "Brak lekcji" : `${done}/${total} zweryfikowane`}
         </p>
       </div>
@@ -297,8 +375,8 @@ function WeekVerificationBar({
         title={`Zatwierdzone ${verified} · Nieopłacone ${unpaid} · Niezweryfikowane ${pending}`}
         aria-label={`Zatwierdzone ${verified}, nieopłacone ${unpaid}, niezweryfikowane ${pending} z ${total}`}
       >
-        <div className="absolute inset-[3px] rounded-full bg-snow" />
-        <span className="text-depths absolute inset-0 flex items-center justify-center text-[0.5rem] font-bold tabular-nums">
+        <div className="absolute inset-0.75 rounded-full bg-snow" />
+        <span className="dash-mono text-depths absolute inset-0 flex items-center justify-center text-[0.5rem] font-bold">
           {total}
         </span>
       </div>
@@ -314,6 +392,8 @@ function PaymentsPanel({
   variant,
   count,
   movingId,
+  pulseId,
+  leavingId,
   paymentDates,
   onPaymentDateChange,
   onVerify,
@@ -326,6 +406,8 @@ function PaymentsPanel({
   variant: "pending" | "verified" | "unpaid";
   count: number;
   movingId: string | null;
+  pulseId: string | null;
+  leavingId: string | null;
   paymentDates: Record<string, string>;
   onPaymentDateChange: (id: string, iso: string) => void;
   onVerify?: (id: string) => void;
@@ -333,10 +415,10 @@ function PaymentsPanel({
 }) {
   const accent =
     variant === "pending"
-      ? "border-aster/40"
+      ? "border-panel-frame/40"
       : variant === "verified"
-        ? "border-green-600/30"
-        : "border-red-400/40";
+        ? "border-moss/30"
+        : "border-claret/40";
 
   return (
     <section
@@ -344,21 +426,21 @@ function PaymentsPanel({
     >
       <div className="mb-2 flex shrink-0 items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-depths text-sm font-semibold sm:text-base">{title}</h2>
-          <p className="text-muted mt-0.5 text-[0.65rem] leading-tight sm:text-xs">{subtitle}</p>
+          <h2 className="dash-sans text-depths text-sm font-semibold sm:text-base">{title}</h2>
+          <p className="dash-sans text-muted mt-0.5 text-[0.65rem] leading-tight sm:text-xs">{subtitle}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-[#000C4A] px-2 py-0.5 text-[0.65rem] font-bold tabular-nums text-lime">
+        <span className="dash-mono shrink-0 rounded-full bg-[#000C4A] px-2 py-0.5 text-[0.65rem] font-bold text-lime">
           {count}
         </span>
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-muted py-6 text-center text-xs">{empty}</p>
+        <p className="dash-sans text-muted py-6 text-center text-xs">{empty}</p>
       ) : (
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-panel pr-0.5">
           {groups.map(([dayLabelText, dayRows]) => (
             <div key={dayLabelText} className="min-w-0">
-              <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-muted">{dayLabelText}</p>
+              <p className="dash-sans mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-muted">{dayLabelText}</p>
               <ul className="space-y-1.5">
                 {dayRows.map((r) => (
                   <LessonRow
@@ -367,6 +449,8 @@ function PaymentsPanel({
                     variant={variant}
                     busy={movingId === r.id}
                     disabled={movingId !== null}
+                    pulsing={pulseId === r.id}
+                    leaving={leavingId === r.id}
                     paymentDate={paymentDates[r.id] ?? todayIso()}
                     onPaymentDateChange={(iso) => onPaymentDateChange(r.id, iso)}
                     onVerify={onVerify ? () => onVerify(r.id) : undefined}
@@ -387,6 +471,8 @@ function LessonRow({
   variant,
   busy,
   disabled,
+  pulsing,
+  leaving,
   paymentDate,
   onPaymentDateChange,
   onVerify,
@@ -396,35 +482,40 @@ function LessonRow({
   variant: "pending" | "verified" | "unpaid";
   busy: boolean;
   disabled: boolean;
+  pulsing: boolean;
+  leaving: boolean;
   paymentDate: string;
   onPaymentDateChange: (iso: string) => void;
   onVerify?: () => void;
   onReject?: () => void;
 }) {
-  const amountClass =
-    variant === "verified" ? "text-green-700" : variant === "unpaid" ? "text-red-700" : "text-aster";
+  const amountClass = variant === "verified" ? "text-moss" : variant === "unpaid" ? "text-claret" : "text-depths";
+  const rail =
+    variant === "verified" ? "status-rail-verified" : variant === "unpaid" ? "status-rail-unpaid" : "status-rail-pending";
 
   return (
     <li
-      className={`rounded-app border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
-        variant === "unpaid" ? "border-red-300/40 bg-red-50/60" : ""
-      } ${busy ? "opacity-80" : ""}`}
+      className={`status-rail ${rail} rounded-ledger border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
+        variant === "unpaid" ? "bg-claret/5" : ""
+      } ${busy ? "opacity-80" : ""} ${pulsing ? "row-confirm-pulse" : ""} ${leaving ? "hop-to-paid" : ""}`}
     >
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <div className="min-w-0 flex-1">
-          <p className="text-depths truncate text-xs font-semibold sm:text-sm">{row.studentName}</p>
-          <p className="text-muted mt-0.5 truncate text-[0.65rem] sm:text-xs">
-            {row.tutorName} · {row.subject} · <span className="tabular-nums">{row.date}</span>
+          <p className="dash-sans text-depths truncate text-xs font-semibold sm:text-sm">{row.studentName}</p>
+          <p className="dash-sans text-muted mt-0.5 truncate text-[0.65rem] sm:text-xs">
+            {row.tutorName} · {row.subject} · <span className="dash-mono">{row.date}</span>
           </p>
         </div>
-        <p className={`shrink-0 text-xs font-bold tabular-nums sm:text-sm ${amountClass}`}>{row.amountPln} zł</p>
+        <p className={`dash-mono shrink-0 text-xs font-bold sm:text-sm ${amountClass}`}>{row.amountPln} zł</p>
       </div>
 
       <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <label className="min-w-0 flex-1">
-          <span className="text-muted mb-0.5 block text-[0.55rem] font-bold uppercase tracking-wide">Data wpływu</span>
+          <span className="dash-sans text-muted mb-0.5 block text-[0.55rem] font-bold uppercase tracking-wide">
+            Data wpływu
+          </span>
           {variant === "verified" ? (
-            <span className="text-depths inline-block text-xs font-semibold tabular-nums">
+            <span className="dash-mono text-depths inline-block text-xs font-semibold">
               {row.paymentReceivedAt ?? "—"}
             </span>
           ) : (
@@ -433,7 +524,7 @@ function LessonRow({
               value={paymentDate}
               onChange={(e) => onPaymentDateChange(e.target.value)}
               disabled={disabled}
-              className="text-depths w-full min-w-0 max-w-[11rem] rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-xs tabular-nums disabled:opacity-60"
+              className="dash-mono text-depths w-full min-w-0 max-w-44 rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-xs disabled:opacity-60"
               aria-label={`Data wpływu — ${row.studentName}`}
             />
           )}
@@ -445,7 +536,7 @@ function LessonRow({
               type="button"
               onClick={onVerify}
               disabled={disabled}
-              className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-app bg-green-700 px-2 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+              className="btn-block dash-sans inline-flex min-w-22 items-center justify-center gap-1 bg-moss px-2 py-1.5 text-[0.65rem] text-snow disabled:opacity-60 sm:text-xs"
             >
               {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
               Zatwierdź
@@ -454,7 +545,7 @@ function LessonRow({
               type="button"
               onClick={onReject}
               disabled={disabled}
-              className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-app bg-red-700 px-2 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+              className="btn-block dash-sans inline-flex min-w-22 items-center justify-center gap-1 bg-claret px-2 py-1.5 text-[0.65rem] text-snow disabled:opacity-60 sm:text-xs"
             >
               {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
               Brak wpłaty
@@ -467,7 +558,7 @@ function LessonRow({
             type="button"
             onClick={onVerify}
             disabled={disabled}
-            className="inline-flex shrink-0 items-center justify-center gap-1 rounded-app bg-green-700 px-2.5 py-1.5 text-[0.65rem] font-bold text-white disabled:opacity-60 sm:text-xs"
+            className="btn-block dash-sans inline-flex shrink-0 items-center justify-center gap-1 bg-moss px-2.5 py-1.5 text-[0.65rem] text-snow disabled:opacity-60 sm:text-xs"
           >
             {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
             Zatwierdź ponownie

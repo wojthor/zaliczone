@@ -16,7 +16,7 @@ import {
   toMondayIso,
 } from "@/lib/date/week-utils";
 import { isLessonLocked } from "@/lib/data/mappers";
-import { tutorToggleLessonVerification } from "@/lib/data/mutations";
+import { tutorToggleLessonVerification } from "@/lib/actions/lessons";
 
 function IconCheck(props: { className?: string }) {
   return (

@@ -40,6 +40,7 @@ export type DbLesson = {
   subject: string;
   status: LessonStatus;
   payment_received_at?: string | null;
+  payment_method?: string | null;
   created_at: string;
 };
 
@@ -111,6 +112,8 @@ export type FinanceLineUi = {
   paymentReceivedAt: string | null;
   /** YYYY-MM-DD — do pól date w UI */
   paymentReceivedAtIso: string | null;
+  /** Metoda płatności — ustawiana przy zatwierdzeniu (zob. lib/payment-methods.ts) */
+  paymentMethod: string | null;
 };
 
 export type AdminTutorSummary = {
@@ -132,18 +135,6 @@ export type AdminTutorSummary = {
   payoutStatusForMonth: PayoutStatus | null;
 };
 
-export type RozliczenieRow = FinanceLineUi & {
-  paymentMethod?: "Przelew" | "BLIK";
-};
-
-export type TutorDocumentMonth = {
-  monthKey: string;
-  monthLabel: string;
-  verifiedLessonCount: number;
-  ewidencjaUnlocked: boolean;
-  payoutStatus: PayoutStatus | null;
-};
-
 /** Wydatek operacyjny (faktura / rachunek) w księgowości miesięcznej */
 export type OperatingExpense = {
   id: string;
@@ -159,20 +150,6 @@ export type OperatingExpense = {
   attachment_path?: string | null;
   attachment_mime?: string | null;
   attachment_size_bytes?: number | null;
-};
-
-export type TutorDocumentTree = {
-  tutorId: string;
-  tutorName: string;
-  months: TutorDocumentMonth[];
-};
-
-export type CompanyDocumentTemplate = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  fileName: string;
 };
 
 export type DocumentFolder = {

@@ -2,9 +2,9 @@ import {
   getAdminTutorSummaries,
   getAllVerifiedFinanceLines,
   getPendingVerificationLines,
+  getTutorStudentsForAdmin,
   getUnpaidFinanceLines,
 } from "@/lib/data/queries";
-import { getTutorStudentsForAdmin } from "@/lib/actions/messages";
 import { ensureTutorRootFolder } from "@/lib/actions/documents";
 import type { AdminStudentRow } from "@/lib/types/messages";
 import { NauczycielProfilClient } from "./nauczyciel-profil-client";

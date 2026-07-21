@@ -2,9 +2,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { markPayoutPaid } from "@/lib/actions/admin";
+import { markPayoutPaid, requestEwidencjaForMonth } from "@/lib/actions/admin";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
+import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const TUTOR_SHARE_OF_CLIENT_PAYMENT = TUTOR_SHARE;
 
@@ -87,7 +89,10 @@ export function WyplatyClient({
   bankAccounts: Record<string, string | null>;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [confirmRow, setConfirmRow] = useState<TutorRollup | null>(null);
+  const [manualAmount, setManualAmount] = useState("");
+  const [pendingEwidencja, startEwidencja] = useTransition();
+  const [ewidencjaFeedback, setEwidencjaFeedback] = useState("");
   const nowKey = useMemo(() => currentMonthKey(), []);
   const monthOptions = useMemo(() => {
     const keys = [...new Set(financeLines.map((l) => l.monthKey))];
@@ -130,19 +135,32 @@ export function WyplatyClient({
 
   const paidCount = rollups.filter((r) => r.payoutStatus === "PAID").length;
 
-  const handleMarkPaid = (row: TutorRollup) => {
-    startTransition(async () => {
-      await markPayoutPaid(row.tutorId, selectedMonthKey, row.tutorPayoutPln, {
-        lessonCount: row.lessonCount,
-        lessonsAmount: row.lessonsPayoutPln,
-        bonusAmount: row.bonusPln,
-      });
-      router.refresh();
+  async function handleConfirmPaid() {
+    if (!confirmRow) return;
+    const parsed = Number(manualAmount.replace(",", "."));
+    const finalAmount = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) / 100 : confirmRow.tutorPayoutPln;
+    await markPayoutPaid(confirmRow.tutorId, selectedMonthKey, finalAmount, {
+      lessonCount: confirmRow.lessonCount,
+      lessonsAmount: confirmRow.lessonsPayoutPln,
+      bonusAmount: confirmRow.bonusPln,
     });
-  };
+  }
+
+  function handleRequestEwidencja() {
+    setEwidencjaFeedback("");
+    startEwidencja(async () => {
+      try {
+        const { count } = await requestEwidencjaForMonth(selectedMonthKey);
+        setEwidencjaFeedback(`Wysłano prośbę mailem do ${count} nauczycieli i odblokowano miesiąc.`);
+        router.refresh();
+      } catch (err) {
+        setEwidencjaFeedback(err instanceof Error ? err.message : "Nie udało się wysłać prośby.");
+      }
+    });
+  }
 
   const th =
-    "sticky top-0 z-[1] border-b border-panel-frame/40 bg-jodhpur/95 px-2 py-2 text-left text-[0.65rem] font-bold uppercase leading-tight text-depths shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)] sm:px-2.5 sm:py-2 sm:text-[0.7rem]";
+    "dash-sans sticky top-0 z-[1] border-b border-panel-frame/40 bg-jodhpur/95 px-2 py-2 text-left text-[0.65rem] font-bold uppercase leading-tight text-depths shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)] sm:px-2.5 sm:py-2 sm:text-[0.7rem]";
   const td =
     "border-b border-panel-frame/15 px-2 py-2 align-middle text-[0.8rem] sm:px-2.5 sm:py-2.5 sm:text-sm";
 
@@ -150,61 +168,75 @@ export function WyplatyClient({
     <div className="min-w-0 space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-depths text-xl font-semibold tracking-tight sm:text-2xl">Wypłaty i Bilans</h1>
-          <p className="text-muted mt-1 max-w-2xl text-xs leading-relaxed sm:text-sm">
+          <h1 className="dash-sans text-depths text-xl font-bold tracking-tight sm:text-2xl">Wypłaty i Bilans</h1>
+          <p className="dash-sans text-muted mt-1 max-w-2xl text-xs leading-relaxed sm:text-sm">
             Wyłącznie lekcje VERIFIED · model marżowy 70% tutor / 30% agencja.
           </p>
         </div>
-        <label className="grid gap-1">
-          <span className="text-depths/80 text-[0.65rem] font-semibold sm:text-xs">Miesiąc</span>
-          <select
-            className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
-            value={selectedMonthKey}
-            onChange={(e) => setSelectedMonthKey(e.target.value)}
-            aria-label="Wybierz miesiąc"
+        <div className="flex flex-wrap items-end gap-2 sm:gap-3">
+          <label className="grid gap-1">
+            <span className="dash-sans text-depths/80 text-[0.65rem] font-semibold sm:text-xs">Miesiąc</span>
+            <select
+              className="dash-sans text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+              value={selectedMonthKey}
+              onChange={(e) => setSelectedMonthKey(e.target.value)}
+              aria-label="Wybierz miesiąc"
+            >
+              {monthOptions.map((key) => (
+                <option key={key} value={key}>
+                  {formatMonthLongPl(key)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={handleRequestEwidencja}
+            disabled={pendingEwidencja}
+            className="btn-block bg-[#000C4A] px-4 py-2.5 text-xs text-lime disabled:opacity-60"
           >
-            {monthOptions.map((key) => (
-              <option key={key} value={key}>
-                {formatMonthLongPl(key)}
-              </option>
-            ))}
-          </select>
-        </label>
+            {pendingEwidencja ? "Wysyłanie…" : `Poproś o ewidencję · ${monthLabel}`}
+          </button>
+        </div>
       </div>
+      {ewidencjaFeedback ? (
+        <p
+          className={`dash-sans text-xs font-semibold ${
+            ewidencjaFeedback.includes("Wysłano") ? "text-moss" : "text-claret"
+          }`}
+        >
+          {ewidencjaFeedback}
+        </p>
+      ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">Przychód</p>
-          <p className="text-depths mt-1 text-2xl font-black tabular-nums">{formatMoney(totals.przychod)}</p>
-        </article>
-        <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
-            Do wypłaty/Wypłacone
-          </p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-amber-900">
-            {formatMoney(totals.doWyplaty)}
-            <span className="text-amber-900/50"> / </span>
-            {formatMoney(totals.wyplacone)}
-          </p>
-        </article>
-        <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-green-900/80">Marża agencji</p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-green-800">{formatMoney(totals.zysk)}</p>
-        </article>
-      </section>
+      <LedgerBand columns={3}>
+        <LedgerStat label="Przychód" tick="neutral" ink="depths">
+          {formatMoney(totals.przychod)}
+        </LedgerStat>
+        <LedgerStat label="Do wypłaty / Wypłacone" tick="butter" ink="toffee">
+          {formatMoney(totals.doWyplaty)}
+          <span className="text-toffee/50"> / </span>
+          {formatMoney(totals.wyplacone)}
+        </LedgerStat>
+        <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+          {formatMoney(totals.zysk)}
+        </LedgerStat>
+      </LedgerBand>
 
       <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
+          <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
           <PayoutProgressStat total={rollups.length} paid={paidCount} />
         </div>
-        <p className="text-muted mt-1 text-xs capitalize">{monthLabel}</p>
+        <p className="dash-sans text-muted mt-1 text-xs capitalize">{monthLabel}</p>
 
         {rollups.length === 0 ? (
-          <p className="text-muted mt-6 py-6 text-center text-sm font-medium">Brak zatwierdzonych lekcji w tym miesiącu.</p>
+          <p className="dash-sans text-muted mt-6 py-6 text-center text-sm font-medium">
+            Brak zatwierdzonych lekcji w tym miesiącu.
+          </p>
         ) : (
           <div className="mt-4 max-h-[min(28rem,55vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-            <table className="table-fixed min-w-[44rem] w-full border-collapse">
+            <table className="table-fixed min-w-176 w-full border-collapse">
               <thead>
                 <tr>
                   <th scope="col" className={`${th} w-[18%]`}>Nauczyciel</th>
@@ -219,34 +251,37 @@ export function WyplatyClient({
                 {rollups.map((row, i) => {
                   const isPaid = row.payoutStatus === "PAID";
                   const account = row.bankAccount?.trim() || null;
+                  const rail = isPaid ? "status-rail-verified" : "status-rail-pending";
                   return (
                     <tr key={row.tutorId} className={`${i % 2 === 1 ? "bg-luster/35" : "bg-snow"} hover:bg-luster/50`}>
-                      <td className={`${td} font-semibold text-depths`}>{row.tutorName}</td>
-                      <td className={`${td} font-bold tabular-nums text-depths`}>{row.hours}</td>
-                      <td className={`${td} font-bold tabular-nums ${row.bonusPln > 0 ? "text-green-800" : "text-muted"}`}>
+                      <td className={`${td} status-rail ${rail} dash-sans font-semibold text-depths`}>{row.tutorName}</td>
+                      <td className={`${td} dash-mono font-bold text-depths`}>{row.hours}</td>
+                      <td className={`${td} dash-mono font-bold ${row.bonusPln > 0 ? "text-moss" : "text-muted"}`}>
                         {row.bonusPln > 0 ? `+${formatMoney(row.bonusPln)}` : "—"}
                       </td>
-                      <td className={`${td} font-bold tabular-nums text-depths`}>{formatMoney(row.tutorPayoutPln)}</td>
+                      <td className={`${td} dash-mono font-bold text-depths`}>{formatMoney(row.tutorPayoutPln)}</td>
                       <td className={td}>
                         {account ? (
-                          <span className="text-depths break-all text-[0.75rem] font-medium tabular-nums leading-snug sm:text-[0.8rem]">
+                          <span className="dash-mono text-depths break-all text-[0.75rem] font-medium leading-snug sm:text-[0.8rem]">
                             {account}
                           </span>
                         ) : (
-                          <span className="text-[0.7rem] font-semibold text-red-700">brak rachunku</span>
+                          <span className="dash-sans text-[0.7rem] font-semibold text-claret">brak rachunku</span>
                         )}
                       </td>
                       <td className={td}>
                         {isPaid ? (
-                          <span className="inline-flex items-center rounded-full bg-green-700/15 px-2.5 py-1 text-[0.7rem] font-bold text-green-800">
+                          <span className="dash-sans inline-flex items-center rounded-full bg-moss/15 px-2.5 py-1 text-[0.7rem] font-bold text-moss">
                             Wypłacone
                           </span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleMarkPaid(row)}
-                            disabled={pending}
-                            className="rounded-full bg-[#000C4A] px-3 py-1.5 text-[0.7rem] font-bold text-lime transition-opacity hover:opacity-90 disabled:opacity-60"
+                            onClick={() => {
+                              setConfirmRow(row);
+                              setManualAmount(row.tutorPayoutPln.toFixed(2));
+                            }}
+                            className="btn-block dash-sans bg-[#000C4A] px-3 py-1.5 text-[0.7rem] text-lime transition-opacity hover:opacity-90"
                           >
                             Wypłacone
                           </button>
@@ -260,6 +295,41 @@ export function WyplatyClient({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={confirmRow !== null}
+        tone="positive"
+        title={confirmRow ? `Zatwierdź przelew dla ${confirmRow.tutorName}` : ""}
+        description={
+          confirmRow
+            ? `Za ${monthLabel}. Wyliczona kwota to ${formatMoney(confirmRow.tutorPayoutPln)} — możesz ją skorygować poniżej. Upewnij się, że przelew już wyszedł z banku — w systemie nie da się tego odznaczyć.`
+            : undefined
+        }
+        confirmLabel="Zatwierdź przelew"
+        successMessage="Wypłata oznaczona jako wykonana."
+        onConfirm={handleConfirmPaid}
+        onSuccess={() => router.refresh()}
+        onCancel={() => setConfirmRow(null)}
+      >
+        <label className="block text-left">
+          <span className="dash-sans text-muted text-[0.65rem] font-semibold uppercase tracking-wide">
+            Kwota do wypłaty (można skorygować)
+          </span>
+          <div className="mt-1 flex items-center gap-2 rounded-app border border-panel-frame/40 bg-white px-3 py-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={manualAmount}
+              onChange={(e) => setManualAmount(e.target.value)}
+              className="dash-mono text-depths w-full bg-transparent text-base font-bold outline-none"
+              aria-label="Kwota do wypłaty"
+            />
+            <span className="dash-sans text-muted text-sm font-semibold">zł</span>
+          </div>
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -274,7 +344,7 @@ function PayoutProgressStat({
   const donePct = total > 0 ? (paid / total) * 100 : 0;
 
   return (
-    <div className="w-full max-w-[14rem] shrink-0 space-y-0.5 sm:w-[14rem]">
+    <div className="w-full max-w-56 shrink-0 space-y-0.5 sm:w-56">
       <div
         className="h-1 w-full overflow-hidden rounded-full bg-luster"
         role="progressbar"
@@ -288,7 +358,7 @@ function PayoutProgressStat({
           style={{ width: `${donePct}%` }}
         />
       </div>
-      <p className="text-muted text-[0.55rem] tabular-nums leading-none">
+      <p className="dash-mono text-muted text-[0.55rem] leading-none">
         {total === 0 ? "Brak pozycji" : `${paid}/${total} wypłacone`}
       </p>
     </div>

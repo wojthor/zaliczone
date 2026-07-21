@@ -204,25 +204,28 @@ export function EwidencjaSprzedazyPrintView({
       <table className="mt-5 w-full border-collapse text-[0.8rem]">
         <thead>
           <tr>
-            <th className="w-[5%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
+            <th className="w-[4%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
               Lp.
             </th>
-            <th className="w-[11%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
-              Data wykon.
+            <th className="w-[10%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
+              Data sprzedaży
+            </th>
+            <th className="w-[10%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
+              Data wpływu
             </th>
             <th className="w-[11%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
-              Data zapłaty
+              Metoda płatności
             </th>
-            <th className="w-[26%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
+            <th className="w-[20%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
               Nazwa usługi
             </th>
-            <th className="w-[19%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
+            <th className="w-[15%] border border-black bg-neutral-100 px-1.5 py-2 text-left font-bold">
               Nabywca
             </th>
             <th className="w-[12%] border border-black bg-neutral-100 px-1.5 py-2 text-right font-bold">
               Brutto
             </th>
-            <th className="w-[16%] border border-black bg-neutral-100 px-1.5 py-2 text-right font-bold">
+            <th className="w-[18%] border border-black bg-neutral-100 px-1.5 py-2 text-right font-bold">
               Kwota narastająco
             </th>
           </tr>
@@ -230,7 +233,7 @@ export function EwidencjaSprzedazyPrintView({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={7} className="border border-black px-2 py-6 text-center text-neutral-500">
+              <td colSpan={8} className="border border-black px-2 py-6 text-center text-neutral-500">
                 Brak pozycji VERIFIED w tym miesiącu.
               </td>
             </tr>
@@ -246,6 +249,7 @@ export function EwidencjaSprzedazyPrintView({
                     <td className="border border-black px-1.5 py-1.5 tabular-nums">
                       {line.paymentReceivedAt ?? line.date}
                     </td>
+                    <td className="border border-black px-1.5 py-1.5">{line.paymentMethod ?? "—"}</td>
                     <td className="border border-black px-1.5 py-1.5">{serviceName(line)}</td>
                     <td className="border border-black px-1.5 py-1.5">{line.studentName}</td>
                     <td className="border border-black px-1.5 py-1.5 text-right font-semibold tabular-nums">
@@ -262,7 +266,7 @@ export function EwidencjaSprzedazyPrintView({
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} className="border border-black px-1.5 py-2.5 text-right font-bold">
+            <td colSpan={6} className="border border-black px-1.5 py-2.5 text-right font-bold">
               Suma przychodów w okresie
             </td>
             <td className="border border-black px-1.5 py-2.5 text-right font-bold tabular-nums">

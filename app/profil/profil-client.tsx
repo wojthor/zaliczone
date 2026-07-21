@@ -6,15 +6,8 @@ import { PageShell } from "@/components/page-shell";
 import { getSignedDownloadUrl } from "@/lib/actions/documents";
 import { insertSubjectRequest } from "@/lib/data/mutations";
 import { Spinner, useToast } from "@/components/ui/toast";
+import { SUBJECTS } from "@/lib/subjects";
 import type { DocumentTreeResult, Profile, SubjectRequest } from "@/lib/types/database";
-
-const SUBJECT_SUGGESTIONS = [
-  "Informatyka",
-  "Geografia",
-  "Hiszpański",
-  "WOS",
-  "Chemia organiczna",
-] as const;
 
 function formatBytes(n: number | null): string {
   if (n == null || n <= 0) return "—";
@@ -53,7 +46,7 @@ export function ProfilClient({
 
   const availableSuggestions = useMemo(
     () =>
-      SUBJECT_SUGGESTIONS.filter(
+      SUBJECTS.filter(
         (subject) => !activeSubjects.includes(subject) && !pendingSubjects.includes(subject),
       ),
     [activeSubjects, pendingSubjects],

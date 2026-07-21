@@ -122,6 +122,7 @@ export function dbLessonToFinanceLine(row: DbLessonWithRelations): FinanceLineUi
     subject: row.subject,
     paymentReceivedAt: row.payment_received_at ? formatDateDdMm(row.payment_received_at) : null,
     paymentReceivedAtIso: row.payment_received_at ?? null,
+    paymentMethod: row.payment_method ?? null,
   };
 }
 

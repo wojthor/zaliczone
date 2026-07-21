@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
 
 type ChecklistItem = { id: string; label: string };
 
@@ -12,7 +14,7 @@ const NEW_EMPLOYEE_ITEMS: ChecklistItem[] = [
 ];
 
 const PAYOUT_ITEMS: ChecklistItem[] = [
-  { id: "po-1", label: "Wyślij prośbę o ewidencję w Powiadomieniach" },
+  { id: "po-1", label: "Wyślij prośbę o ewidencję (przycisk na Wypłatach)" },
   { id: "po-2", label: "Odbierz podpisany skan PDF od tutora" },
   { id: "po-3", label: "Wykonaj przelew wychodzący w banku" },
   { id: "po-4", label: "Odznacz jako „WYPŁACONE” w systemie" },
@@ -68,20 +70,19 @@ function ChecklistCard({
   subtitle: string;
   items: ChecklistItem[];
   storageKey: string;
-  accent: "lime" | "amber";
+  accent: "lime" | "butter";
 }) {
   const { checked, toggle, doneCount, progress } = usePersistedChecklist(storageKey, items);
-  const ring = accent === "lime" ? "border-[#000C4A]/20" : "border-amber-500/25";
-  const bar = accent === "lime" ? "bg-lime" : "bg-amber-500";
+  const bar = accent === "lime" ? "bg-lime" : "bg-butter";
 
   return (
-    <article className={`rounded-app border ${ring} bg-snow p-4 sm:p-5`}>
+    <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-depths text-sm font-semibold">{title}</h3>
-          <p className="text-muted mt-1 text-xs leading-relaxed">{subtitle}</p>
+          <h3 className="dash-sans text-depths text-base font-bold tracking-tight">{title}</h3>
+          <p className="dash-sans text-muted mt-1 text-xs leading-relaxed">{subtitle}</p>
         </div>
-        <span className="text-muted shrink-0 rounded-full bg-luster px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide">
+        <span className="dash-mono text-muted shrink-0 rounded-full bg-luster px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide">
           {doneCount}/{items.length}
         </span>
       </div>
@@ -100,7 +101,7 @@ function ChecklistCard({
                   onChange={() => toggle(item.id)}
                   className="mt-0.5 size-4 shrink-0 accent-[#000C4A]"
                 />
-                <span className={`text-sm leading-snug ${isDone ? "text-muted line-through" : "text-depths"}`}>
+                <span className={`dash-sans text-sm leading-snug ${isDone ? "text-muted line-through" : "text-depths"}`}>
                   {item.label}
                 </span>
               </label>
@@ -113,7 +114,7 @@ function ChecklistCard({
 }
 
 function formatPln(n: number): string {
-  return `${n.toLocaleString("pl-PL", { maximumFractionDigits: 0 })} zł`;
+  return `${n.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
 }
 
 function daysLeftLabel(days: number): string {
@@ -157,91 +158,61 @@ export function AdminDashboardClient({
     <div className="space-y-7">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-depths text-2xl font-semibold tracking-tight sm:text-3xl">Główna</h1>
+          <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight sm:text-3xl">Główna</h1>
+          <p className="dash-sans text-muted mt-1 text-sm capitalize">{todayLabel}</p>
         </div>
-        <div className="text-right">
-          <p className="text-muted text-sm capitalize">{todayLabel}</p>
-          <p className="text-muted mt-1 text-xs font-semibold uppercase tracking-wide">
-            Miesiąc: <span className="text-depths capitalize">{monthLabel}</span>
-          </p>
+        <div className="dash-sans rounded-full border border-panel-frame/40 bg-snow px-3.5 py-1.5 text-xs font-semibold text-muted">
+          Miesiąc <span className="text-depths ml-1 font-bold capitalize">{monthLabel}</span>
         </div>
       </header>
 
       <section>
-        <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Finanse miesiąca</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
-              Przychód
-            </p>
-            <p className="text-depths mt-1 text-2xl font-black tabular-nums">
-              {formatPln(verifiedMonthSumPln)}
-            </p>
-          </article>
-
-          <article className="rounded-app border border-amber-500/40 bg-amber-50/80 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
-              Koszty wypłaty/wszystkie
-            </p>
-            <p className="mt-1 text-2xl font-black tabular-nums text-amber-900">
-              {formatPln(payoutCostPln)}
-              <span className="text-amber-900/50"> / </span>
-              {formatPln(totalCostPln)}
-            </p>
-          </article>
-
-          <article className="rounded-app border border-green-700/35 bg-green-700/[0.07] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-green-900/80">
-              Marża agencji
-            </p>
-            <p className="mt-1 text-2xl font-black tabular-nums text-green-800">
-              {formatPln(agencyProfitPln)}
-            </p>
-          </article>
-
-          <article className="rounded-app border border-red-400/50 bg-red-50/80 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-red-900/80">Nieopłacone</p>
-            <p className="mt-1 text-2xl font-black tabular-nums text-red-700">
-              −{formatPln(unpaidMonthSumPln)}
-            </p>
-          </article>
-        </div>
+        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Finanse miesiąca</h2>
+        <LedgerBand columns={4}>
+          <LedgerStat label="Przychód" tick="neutral" ink="depths">
+            {formatPln(verifiedMonthSumPln)}
+          </LedgerStat>
+          <LedgerStat label="Koszty · wypłaty / wszystkie" tick="butter" ink="toffee">
+            {formatPln(payoutCostPln)}
+            <span className="text-luster/40"> / </span>
+            {formatPln(totalCostPln)}
+          </LedgerStat>
+          <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+            {formatPln(agencyProfitPln)}
+          </LedgerStat>
+          <LedgerStat label="Nieopłacone" tick={unpaidMonthSumPln > 0 ? "claret" : "neutral"} ink="claret">
+            −{formatPln(unpaidMonthSumPln)}
+          </LedgerStat>
+        </LedgerBand>
       </section>
 
       <section>
-        <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Zespół i lekcje</h2>
+        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Zespół i lekcje</h2>
         <div className="grid gap-3 lg:grid-cols-3">
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
-              Nauczyciele{" "}
-              <span className="font-medium normal-case tracking-normal">· aktywnych w systemie</span>
-            </p>
-            <p className="text-depths mt-1 text-2xl font-black tabular-nums">{tutorCount}</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Nauczyciele</p>
+            <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{tutorCount}</p>
           </article>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
-              Uczniowie <span className="font-medium normal-case tracking-normal">· w bazie</span>
-            </p>
-            <p className="text-depths mt-1 text-2xl font-black tabular-nums">{studentCount}</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Uczniowie</p>
+            <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{studentCount}</p>
           </article>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-3">
-            <p className="text-muted text-[10px] font-semibold uppercase tracking-wide">
-              Lekcje · {monthLabel}
-            </p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Do zatwierdz.</p>
-                <p className="mt-0.5 text-xl font-black tabular-nums text-amber-900">{pendingMonthCount}</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Lekcje · {monthLabel}</p>
+            <div className="mt-2.5 grid grid-cols-3 gap-2">
+              <div className="status-rail status-rail-pending pl-2.5">
+                <p className="dash-sans text-toffee text-[10px] font-bold uppercase tracking-wide">Do zatw.</p>
+                <p className="dash-mono text-toffee mt-0.5 text-lg font-bold tabular-nums">{pendingMonthCount}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-green-800">Zatwierdzone</p>
-                <p className="mt-0.5 text-xl font-black tabular-nums text-green-800">{verifiedMonthCount}</p>
+              <div className="status-rail status-rail-verified pl-2.5">
+                <p className="dash-sans text-moss text-[10px] font-bold uppercase tracking-wide">Zatw.</p>
+                <p className="dash-mono text-moss mt-0.5 text-lg font-bold tabular-nums">{verifiedMonthCount}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-red-800">Nieopłacone</p>
-                <p className="mt-0.5 text-xl font-black tabular-nums text-red-700">{unpaidMonthCount}</p>
+              <div className="status-rail status-rail-unpaid pl-2.5">
+                <p className="dash-sans text-claret text-[10px] font-bold uppercase tracking-wide">Nieopł.</p>
+                <p className="dash-mono text-claret mt-0.5 text-lg font-bold tabular-nums">{unpaidMonthCount}</p>
               </div>
             </div>
           </article>
@@ -249,35 +220,30 @@ export function AdminDashboardClient({
       </section>
 
       <section>
-        <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Najważniejsze daty</h2>
+        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Najważniejsze daty</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {deadlines.map((d) => {
             const overdue = d.daysLeft < 0;
             const soon = d.daysLeft >= 0 && d.daysLeft <= 3;
-            const tone = overdue
-              ? "border-red-400/40 bg-red-50/70 text-red-900"
-              : soon
-                ? "border-amber-500/40 bg-amber-50/80 text-amber-950"
-                : "border-panel-frame/35 bg-snow text-depths";
+            const rail = overdue ? "status-rail-unpaid" : soon ? "status-rail-pending" : "status-rail-neutral";
+            const daysTone = overdue ? "text-claret" : soon ? "text-toffee" : "text-muted";
             return (
-              <article key={d.id} className={`rounded-app border p-4 ${tone}`}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{d.label}</p>
-                <p className="mt-1.5 text-sm font-bold capitalize">{d.dateLabel}</p>
-                <p
-                  className={`mt-2 text-xs font-bold ${
-                    overdue ? "text-red-700" : soon ? "text-amber-800" : "text-muted"
-                  }`}
-                >
-                  {daysLeftLabel(d.daysLeft)}
-                </p>
-              </article>
+              <Link
+                key={d.id}
+                href={d.href}
+                className={`status-rail ${rail} rounded-app border border-panel-frame/35 bg-snow p-4 transition hover:bg-luster/60`}
+              >
+                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">{d.label}</p>
+                <p className="dash-sans text-depths mt-1.5 text-sm font-bold capitalize">{d.dateLabel}</p>
+                <p className={`dash-mono mt-2 text-xs font-bold ${daysTone}`}>{daysLeftLabel(d.daysLeft)}</p>
+              </Link>
             );
           })}
         </div>
       </section>
 
       <section>
-        <h2 className="text-depths mb-3 text-sm font-semibold uppercase tracking-wide">Checklisty</h2>
+        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Checklisty</h2>
         <div className="grid gap-4 lg:grid-cols-2">
           <ChecklistCard
             title="Nowy pracownik"
@@ -291,7 +257,7 @@ export function AdminDashboardClient({
             subtitle="Cykl na koniec miesiąca — od ewidencji po przelew."
             items={PAYOUT_ITEMS}
             storageKey="zaliczone-admin-checklist-payouts"
-            accent="amber"
+            accent="butter"
           />
         </div>
       </section>

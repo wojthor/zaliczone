@@ -9,20 +9,17 @@ import {
   getSignedDownloadUrl,
   uploadDocumentFile,
 } from "@/lib/actions/documents";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner, useToast } from "@/components/ui/toast";
+import { FolderRow } from "@/components/admin/documents/folder-row";
+import { FileRow } from "@/components/admin/documents/file-row";
+import { IconBuilding, IconUpload, IconUsers } from "@/components/icons";
 import type { DocumentFile, DocumentFolder, DocumentTreeResult } from "@/lib/types/database";
 
 type TabId = "company" | "employees";
 type DiskMode = "company" | "employees";
 type FilterKind = "all" | "folders" | "files";
 type SortMode = "name-asc" | "name-desc" | "date-desc" | "date-asc";
-
-function formatBytes(n: number | null): string {
-  if (n == null || n <= 0) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function matchesNameQuery(name: string, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -59,27 +56,28 @@ export function DokumentyClient({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-depths text-2xl font-semibold tracking-tight">Dokumenty</h1>
-        <p className="text-muted mt-1 text-sm">
+        <h1 className="dash-sans text-depths text-2xl font-black tracking-tight sm:text-3xl">Dokumenty</h1>
+        <p className="dash-sans text-muted mt-1 text-sm">
           Dysk firmowy oraz foldery pracowników — przeciągnij pliki, aby je wgrać.
         </p>
       </div>
 
-      <div className="flex flex-col gap-1 rounded-app border border-panel-frame/35 bg-luster/50 p-1 sm:flex-row">
+      <div className="grid grid-cols-2 gap-1.5 rounded-ledger border border-panel-frame/35 bg-luster/50 p-1.5">
         {(
           [
-            ["employees", "Pracownicy"],
-            ["company", "Dysk firmowy"],
+            ["employees", "Pracownicy", IconUsers],
+            ["company", "Dysk firmowy", IconBuilding],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-              tab === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+            className={`dash-sans flex items-center justify-center gap-2 rounded-ledger px-3 py-2.5 text-xs font-bold transition sm:text-sm ${
+              tab === id ? "bg-[#000C4A] text-lime" : "text-muted hover:bg-white/60 hover:text-depths"
             }`}
           >
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
           </button>
         ))}
@@ -144,19 +142,15 @@ function DiskBrowser({
       : null;
   const [uploadTargetFolderId, setUploadTargetFolderId] = useState<string | null>(initialFolderId);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(initialFolderId);
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    for (const f of folders) {
-      if (f.parent_id == null) initial[f.id] = true;
-    }
-    return initial;
-  });
   const [newFolderName, setNewFolderName] = useState("");
   const [filterQuery, setFilterQuery] = useState("");
   const [filterKind, setFilterKind] = useState<FilterKind>("all");
   const [sortMode, setSortMode] = useState<SortMode>("name-asc");
   const [dragActive, setDragActive] = useState(false);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "file"; id: string; name: string } | { kind: "folder"; id: string; name: string } | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
 
@@ -282,26 +276,9 @@ function DiskBrowser({
     return crumbs;
   }, [folderById, rootLabel, selectedFolderId]);
 
-  function toggleExpanded(folderId: string) {
-    setExpandedIds((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
-  }
-
   function openFolder(folderId: string | null) {
     setSelectedFolderId(folderId);
     setUploadTargetFolderId(folderId);
-    if (folderId) {
-      setExpandedIds((prev) => {
-        const next = { ...prev, [folderId]: true };
-        let cursor: string | null = folderId;
-        while (cursor) {
-          const folder = folderById.get(cursor);
-          if (!folder?.parent_id) break;
-          next[folder.parent_id] = true;
-          cursor = folder.parent_id;
-        }
-        return next;
-      });
-    }
   }
 
   function run(action: () => Promise<void>, okMsg: string) {
@@ -335,9 +312,6 @@ function DiskBrowser({
         tutorId: scope === "TUTOR" ? tutorId : null,
       });
       setNewFolderName("");
-      if (uploadTargetFolderId) {
-        setExpandedIds((prev) => ({ ...prev, [uploadTargetFolderId]: true }));
-      }
     }, "Folder utworzony");
   }
 
@@ -381,7 +355,6 @@ function DiskBrowser({
         ok === 1 ? items[0]?.name : undefined,
       );
       if (folderId) {
-        setExpandedIds((prev) => ({ ...prev, [folderId]: true }));
         openFolder(folderId);
       }
       router.refresh();
@@ -394,6 +367,15 @@ function DiskBrowser({
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    if (pendingDelete.kind === "file") {
+      await deleteDocumentFile(pendingDelete.id);
+    } else {
+      await deleteFolder(pendingDelete.id);
     }
   }
 
@@ -441,9 +423,9 @@ function DiskBrowser({
 
   if (!available) {
     return (
-      <section className="rounded-app border border-amber-500/40 bg-amber-50 p-4">
-        <h2 className="text-depths text-sm font-semibold">{title}</h2>
-        <p className="text-muted mt-2 text-sm">{errorMessage ?? "Dysk dokumentów niedostępny."}</p>
+      <section className="rounded-app border border-toffee/40 bg-toffee/10 p-4">
+        <h2 className="dash-sans text-depths text-sm font-semibold">{title}</h2>
+        <p className="dash-sans text-muted mt-2 text-sm">{errorMessage ?? "Dysk dokumentów niedostępny."}</p>
       </section>
     );
   }
@@ -456,25 +438,34 @@ function DiskBrowser({
       onDragOver={onDragOver}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-depths text-sm font-semibold">{title}</h2>
-          <p className="text-muted mt-1 text-xs">{description}</p>
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ledger ${
+              mode === "company" ? "bg-butter/50 text-toffee" : "bg-luster text-[#000C4A]"
+            }`}
+          >
+            {mode === "company" ? <IconBuilding className="h-4 w-4" /> : <IconUsers className="h-4 w-4" />}
+          </span>
+          <div>
+            <h2 className="dash-sans text-depths text-sm font-bold">{title}</h2>
+            <p className="dash-sans text-muted mt-0.5 text-xs">{description}</p>
+          </div>
         </div>
         {(pending || uploading) && (
-          <span className="text-muted inline-flex items-center gap-2 text-xs">
+          <span className="dash-sans text-muted inline-flex items-center gap-2 text-xs">
             <Spinner /> {uploading ? "Wgrywanie…" : "Zapisywanie…"}
           </span>
         )}
       </div>
 
-      <nav className="mt-3 flex flex-wrap items-center gap-1 text-xs" aria-label="Ścieżka">
+      <nav className="dash-sans mt-3 flex flex-wrap items-center gap-1.5 text-xs" aria-label="Ścieżka">
         {breadcrumbs.map((crumb, i) => (
-          <span key={`${crumb.id ?? "root"}-${i}`} className="inline-flex items-center gap-1">
-            {i > 0 ? <span className="text-muted">›</span> : null}
+          <span key={`${crumb.id ?? "root"}-${i}`} className="inline-flex items-center gap-1.5">
+            {i > 0 ? <span className="text-muted" aria-hidden>›</span> : null}
             <button
               type="button"
               onClick={() => openFolder(crumb.id)}
-              className={`font-semibold ${
+              className={`font-bold ${
                 crumb.id === selectedFolderId ? "text-depths" : "text-[#000C4A] hover:underline"
               }`}
             >
@@ -489,9 +480,9 @@ function DiskBrowser({
           value={filterQuery}
           onChange={(e) => setFilterQuery(e.target.value)}
           placeholder={mode === "employees" && !selectedFolderId ? "Szukaj pracownika…" : "Szukaj…"}
-          className="w-full min-w-0 flex-1 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:max-w-xs"
+          className="dash-sans w-full min-w-0 flex-1 rounded-ledger border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:max-w-xs"
         />
-        <div className="flex rounded-app border border-panel-frame/35 bg-luster/40 p-0.5">
+        <div className="flex rounded-ledger border border-panel-frame/35 bg-luster/40 p-0.5">
           {(
             [
               ["all", "Wszystko"],
@@ -503,7 +494,7 @@ function DiskBrowser({
               key={id}
               type="button"
               onClick={() => setFilterKind(id)}
-              className={`rounded-app px-2.5 py-1.5 text-[10px] font-bold transition sm:text-xs ${
+              className={`dash-sans rounded-ledger px-2.5 py-1.5 text-[10px] font-bold transition sm:text-xs ${
                 filterKind === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
               }`}
             >
@@ -512,11 +503,11 @@ function DiskBrowser({
           ))}
         </div>
         <label className="inline-flex items-center gap-1.5">
-          <span className="text-muted text-[10px] font-semibold uppercase">Sortuj</span>
+          <span className="dash-sans text-muted text-[10px] font-semibold uppercase">Sortuj</span>
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="rounded-app border border-panel-frame/40 bg-white px-2 py-1.5 text-xs text-depths"
+            className="dash-sans rounded-ledger border border-panel-frame/40 bg-white px-2 py-1.5 text-xs text-depths"
           >
             <option value="name-asc">Nazwa A–Z</option>
             <option value="name-desc">Nazwa Z–A</option>
@@ -532,7 +523,7 @@ function DiskBrowser({
               setFilterKind("all");
               setSortMode("name-asc");
             }}
-            className="text-muted text-[10px] font-semibold hover:text-depths sm:text-xs"
+            className="dash-sans text-muted text-[10px] font-semibold hover:text-depths sm:text-xs"
           >
             Wyczyść
           </button>
@@ -540,14 +531,14 @@ function DiskBrowser({
       </div>
 
       {uploadAllowed ? (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-app border border-panel-frame/25 bg-luster/30 p-3">
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-ledger border border-panel-frame/25 bg-luster/30 p-3">
           {mode === "company" ? (
             <>
               <button
                 type="button"
                 disabled={uploading || pending}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-xs font-bold text-lime disabled:opacity-50"
+                className="dash-sans btn-block inline-flex items-center gap-2 bg-[#000C4A] px-4 py-2 text-xs text-lime disabled:opacity-50"
               >
                 {uploading ? <Spinner /> : null}
                 + Plik
@@ -562,13 +553,13 @@ function DiskBrowser({
             </>
           ) : null}
           <label className="grid min-w-44 flex-1 gap-1">
-            <span className="text-muted text-[10px] font-semibold uppercase">Podfolder</span>
+            <span className="dash-sans text-muted text-[10px] font-semibold uppercase">Podfolder</span>
             <input
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder={`W: ${currentPath}`}
-              className="text-depths rounded-app border border-panel-frame/30 bg-snow px-3 py-2 text-sm"
+              className="dash-sans text-depths rounded-ledger border border-panel-frame/30 bg-snow px-3 py-2 text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateFolder();
               }}
@@ -578,23 +569,15 @@ function DiskBrowser({
             type="button"
             disabled={pending}
             onClick={handleCreateFolder}
-            className="rounded-full border border-panel-frame/40 bg-jodhpur px-4 py-2 text-xs font-bold text-depths disabled:opacity-50"
+            className="dash-sans btn-block border border-panel-frame/40 bg-jodhpur px-4 py-2 text-xs text-depths disabled:opacity-50"
           >
             + Folder
           </button>
         </div>
       ) : null}
 
-      <p className="text-muted mt-2 text-[10px]">
-        {uploadAllowed
-          ? `Przeciągnij pliki tutaj lub na folder · ${currentPath}`
-          : mode === "employees"
-            ? "Wybierz folder pracownika, aby wgrać pliki"
-            : `Przeciągnij pliki tutaj · ${currentPath}`}
-      </p>
-
       <div
-        className={`relative mt-4 min-h-48 rounded-app border-2 border-dashed transition-colors ${
+        className={`relative mt-4 min-h-56 rounded-ledger border-2 border-dashed transition-colors ${
           dragActive
             ? "border-[#000C4A] bg-lime/10"
             : "border-panel-frame/30 bg-luster/20"
@@ -603,10 +586,25 @@ function DiskBrowser({
         onDragOver={onDragOver}
       >
         {dragActive && uploadAllowed ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-app bg-lime/15">
-            <p className="text-depths text-sm font-bold">Upuść pliki tutaj</p>
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-ledger bg-lime/15">
+            <div className="flex flex-col items-center gap-2">
+              <IconUpload className="h-7 w-7 text-[#000C4A]" />
+              <p className="dash-sans text-depths text-sm font-bold">Upuść pliki tutaj</p>
+            </div>
           </div>
         ) : null}
+
+        <div className="flex items-center justify-between gap-2 border-b border-dashed border-panel-frame/25 px-3 py-2.5">
+          <p className="dash-sans text-muted flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
+            <IconUpload className="h-3.5 w-3.5 shrink-0" />
+            {uploadAllowed
+              ? `Przeciągnij pliki tutaj lub na folder`
+              : mode === "employees"
+                ? "Wybierz folder pracownika, aby wgrać pliki"
+                : `Przeciągnij pliki tutaj`}
+          </p>
+          <p className="dash-mono text-muted shrink-0 truncate text-[10px]">{currentPath}</p>
+        </div>
 
         <div className="space-y-1.5 p-3">
           {!selectedFolderId ? (
@@ -616,14 +614,14 @@ function DiskBrowser({
               visibleRootFiles.length === 0 &&
               !filterQuery &&
               filterKind === "all" ? (
-                <p className="text-muted py-8 text-center text-sm">
+                <p className="dash-sans text-muted py-8 text-center text-sm">
                   Brak nauczycieli — dodaj konto nauczyciela, a folder utworzy się automatycznie.
                 </p>
               ) : null}
               {visibleRootFolders.length === 0 &&
               visibleRootFiles.length === 0 &&
               (filterQuery || filterKind !== "all") ? (
-                <p className="text-muted py-8 text-center text-sm">Brak wyników dla wybranego filtra.</p>
+                <p className="dash-sans text-muted py-8 text-center text-sm">Brak wyników dla wybranego filtra.</p>
               ) : null}
               {visibleRootFiles.map((file) => (
                 <FileRow
@@ -631,10 +629,7 @@ function DiskBrowser({
                   file={file}
                   pending={pending}
                   onOpen={() => void openSignedInNewTab(file)}
-                  onDelete={() => {
-                    if (!confirm(`Usunąć plik „${file.name}”?`)) return;
-                    run(() => deleteDocumentFile(file.id), "Plik usunięty");
-                  }}
+                  onDelete={() => setPendingDelete({ kind: "file", id: file.id, name: file.name })}
                 />
               ))}
               {visibleRootFolders.map((folder) => (
@@ -648,12 +643,7 @@ function DiskBrowser({
                   fileCount={(filesByFolder.get(folder.id) ?? []).length}
                   subfolderCount={(childrenByParent.get(folder.id) ?? []).length}
                   onOpen={() => openFolder(folder.id)}
-                  onToggleExpand={() => toggleExpanded(folder.id)}
-                  expanded={Boolean(expandedIds[folder.id])}
-                  onDelete={() => {
-                    if (!confirm(`Usunąć folder „${folder.name}” wraz z zawartością?`)) return;
-                    run(() => deleteFolder(folder.id), "Folder usunięty");
-                  }}
+                  onDelete={() => setPendingDelete({ kind: "folder", id: folder.id, name: folder.name })}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -680,12 +670,7 @@ function DiskBrowser({
                   fileCount={(filesByFolder.get(folder.id) ?? []).length}
                   subfolderCount={(childrenByParent.get(folder.id) ?? []).length}
                   onOpen={() => openFolder(folder.id)}
-                  onToggleExpand={() => toggleExpanded(folder.id)}
-                  expanded={Boolean(expandedIds[folder.id])}
-                  onDelete={() => {
-                    if (!confirm(`Usunąć folder „${folder.name}”?`)) return;
-                    run(() => deleteFolder(folder.id), "Folder usunięty");
-                  }}
+                  onDelete={() => setPendingDelete({ kind: "folder", id: folder.id, name: folder.name })}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -699,7 +684,7 @@ function DiskBrowser({
                 />
               ))}
               {currentFolderFiles.length === 0 && currentChildFolders.length === 0 ? (
-                <p className="text-muted py-8 text-center text-sm">
+                <p className="dash-sans text-muted py-8 text-center text-sm">
                   {filterQuery || filterKind !== "all"
                     ? "Brak wyników dla wybranego filtra."
                     : "Folder pusty — przeciągnij pliki tutaj."}
@@ -711,138 +696,29 @@ function DiskBrowser({
                   file={file}
                   pending={pending}
                   onOpen={() => void openSignedInNewTab(file)}
-                  onDelete={() => {
-                    if (!confirm(`Usunąć plik „${file.name}”?`)) return;
-                    run(() => deleteDocumentFile(file.id), "Plik usunięty");
-                  }}
+                  onDelete={() => setPendingDelete({ kind: "file", id: file.id, name: file.name })}
                 />
               ))}
             </>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        tone="danger"
+        title={
+          pendingDelete
+            ? `Usunąć ${pendingDelete.kind === "file" ? "plik" : "folder wraz z zawartością"} „${pendingDelete.name}”?`
+            : ""
+        }
+        description="Tej operacji nie można cofnąć."
+        confirmLabel="Usuń"
+        successMessage="Usunięto."
+        onConfirm={handleConfirmDelete}
+        onSuccess={() => router.refresh()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </section>
-  );
-}
-
-function FolderRow({
-  folder,
-  selected,
-  dropHighlight,
-  pending,
-  allowDelete,
-  fileCount,
-  subfolderCount,
-  expanded,
-  onOpen,
-  onToggleExpand,
-  onDelete,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-}: {
-  folder: DocumentFolder;
-  selected: boolean;
-  dropHighlight: boolean;
-  pending: boolean;
-  allowDelete: boolean;
-  fileCount: number;
-  subfolderCount: number;
-  expanded: boolean;
-  onOpen: () => void;
-  onToggleExpand: () => void;
-  onDelete: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-}) {
-  const total = fileCount + subfolderCount;
-  return (
-    <div
-      className={`flex items-center justify-between gap-2 rounded-app border px-3 py-2.5 transition ${
-        dropHighlight
-          ? "border-[#000C4A] bg-lime/20 ring-2 ring-lime/40"
-          : selected
-            ? "border-[#000C4A]/50 bg-luster/60"
-            : "border-panel-frame/25 bg-snow hover:bg-luster/40"
-      }`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className="text-muted shrink-0 text-xs font-bold"
-          aria-label={expanded ? "Zwiń" : "Rozwiń"}
-        >
-          {expanded ? "▾" : "▸"}
-        </button>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="min-w-0 truncate text-left text-sm font-semibold text-depths hover:underline"
-        >
-          📁 {folder.name}
-        </button>
-        {total > 0 ? (
-          <span className="text-muted shrink-0 text-[10px] tabular-nums">
-            {fileCount} pl. · {subfolderCount} fol.
-          </span>
-        ) : null}
-      </div>
-      {allowDelete ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onDelete}
-          className="shrink-0 text-[10px] font-bold text-red-700 hover:underline disabled:opacity-50"
-        >
-          Usuń
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function FileRow({
-  file,
-  pending,
-  onOpen,
-  onDelete,
-}: {
-  file: DocumentFile;
-  pending: boolean;
-  onOpen: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-app border border-panel-frame/20 bg-snow px-3 py-2">
-      <div className="min-w-0">
-        <p className="text-depths truncate text-xs font-semibold">📄 {file.name}</p>
-        <p className="text-muted text-[10px]">
-          {formatBytes(file.size_bytes)}
-          {file.mime_type ? ` · ${file.mime_type}` : ""}
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="text-[10px] font-bold text-[#000C4A] hover:underline"
-        >
-          Podgląd
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onDelete}
-          className="text-[10px] font-bold text-red-700 hover:underline disabled:opacity-50"
-        >
-          Usuń
-        </button>
-      </div>
-    </div>
   );
 }

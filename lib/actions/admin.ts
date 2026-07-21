@@ -9,9 +9,8 @@ import {
   sendPayoutConfirmationEmail,
   sendTutorWelcomeEmail,
 } from "@/lib/emails/send";
-import { createInAppMessages } from "@/lib/actions/messages";
 import { ensureTutorRootFolder } from "@/lib/actions/documents";
-import { MESSAGE_TEMPLATES } from "@/lib/message-templates";
+import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { TUTOR_SHARE, bonusProgress, canCloseMonth } from "@/lib/dates";
 
 export async function createTutorAccount(input: {
@@ -46,7 +45,7 @@ export async function createTutorAccount(input: {
 
   await ensureTutorRootFolder(data.user.id, input.fullName);
 
-  await sendTutorWelcomeEmail(input.email, input.tempPassword);
+  await sendTutorWelcomeEmail(input.email, input.fullName);
 
   revalidatePath("/admin/nauczyciele");
   revalidatePath("/admin/dokumenty");
@@ -182,12 +181,7 @@ export async function rejectSubjectRequest(requestId: string) {
 export async function requestEwidencjaForMonth(month: string) {
   const supabase = createServiceClient();
   const tutors = await supabase.from("profiles").select("id, full_name").eq("role", "TUTOR");
-  const monthLabel = new Intl.DateTimeFormat("pl-PL", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(Number(month.split("-")[0]), Number(month.split("-")[1]) - 1, 15));
 
-  const tutorIds: string[] = [];
   const emails: string[] = [];
   for (const tutor of tutors.data ?? []) {
     await supabase
@@ -195,7 +189,6 @@ export async function requestEwidencjaForMonth(month: string) {
       .update({ ewidencja_unlocked_for_month: month })
       .eq("id", tutor.id);
 
-    tutorIds.push(tutor.id);
     const { data: user } = await supabase.auth.admin.getUserById(tutor.id);
     if (user.user?.email) {
       emails.push(user.user.email);
@@ -203,27 +196,42 @@ export async function requestEwidencjaForMonth(month: string) {
     }
   }
 
-  await createInAppMessages({
-    title: `${MESSAGE_TEMPLATES.EWIDENCJA.title} — ${monthLabel}`,
-    body: MESSAGE_TEMPLATES.EWIDENCJA.body,
-    category: MESSAGE_TEMPLATES.EWIDENCJA.category,
-    template: MESSAGE_TEMPLATES.EWIDENCJA.template,
-    recipientIds: tutorIds,
-  });
-
   revalidatePath("/admin/wyplaty");
   revalidatePath("/finanse");
   return { count: emails.length };
 }
 
-export type MonthCloseChecklist = {
-  ewidencjaGenerated: boolean;
-  pendingCleared: boolean;
-  payoutsCalculated: boolean;
-  pitZusNoted: boolean;
-};
+/**
+ * Rewalidacja warunków zamknięcia miesiąca po stronie serwera — nie ufa checkboxom z UI.
+ * Warunek 1: żadna lekcja w miesiącu nie ma statusu PLANNED/PENDING_VERIFICATION.
+ * Warunek 2: wszystkie payouts za dany miesiąc mają status PAID.
+ */
+async function assertMonthCloseable(monthKey: string, supabase: ReturnType<typeof createServiceClient>) {
+  const nextMonth = nextMonthStartIso(monthKey);
 
-export async function closeMonth(monthKey: string, checklist: MonthCloseChecklist) {
+  const lessonsCheck = await supabase
+    .from("lessons")
+    .select("id", { count: "exact", head: true })
+    .gte("date", `${monthKey}-01`)
+    .lt("date", nextMonth)
+    .in("status", ["PLANNED", "PENDING_VERIFICATION"]);
+  if (lessonsCheck.error) throw new Error(lessonsCheck.error.message);
+  if ((lessonsCheck.count ?? 0) > 0) {
+    throw new Error("Warunek 1 nie jest spełniony — są lekcje ze statusem PLANNED lub PENDING_VERIFICATION.");
+  }
+
+  const payoutsCheck = await supabase
+    .from("payouts")
+    .select("id", { count: "exact", head: true })
+    .eq("month", monthKey)
+    .neq("status", "PAID");
+  if (payoutsCheck.error) throw new Error(payoutsCheck.error.message);
+  if ((payoutsCheck.count ?? 0) > 0) {
+    throw new Error("Warunek 2 nie jest spełniony — są wypłaty, które nie mają statusu PAID.");
+  }
+}
+
+export async function closeMonth(monthKey: string) {
   const adminId = await requireAdminUserId();
 
   if (!/^\d{4}-\d{2}$/.test(monthKey)) {
@@ -234,21 +242,14 @@ export async function closeMonth(monthKey: string, checklist: MonthCloseChecklis
       "Za wcześnie na zamknięcie tego miesiąca — sprawdź DATES.monthClose.earliestDayOfNextMonth.",
     );
   }
-  if (
-    !checklist.ewidencjaGenerated ||
-    !checklist.pendingCleared ||
-    !checklist.payoutsCalculated ||
-    !checklist.pitZusNoted
-  ) {
-    throw new Error("Uzupełnij całą checklistę przed zamknięciem miesiąca.");
-  }
 
   const supabase = createServiceClient();
+  await assertMonthCloseable(monthKey, supabase);
+
   const { error } = await supabase.from("closed_months").upsert(
     {
       month: monthKey,
       closed_by: adminId,
-      checklist,
       closed_at: new Date().toISOString(),
     },
     { onConflict: "month" },
@@ -280,6 +281,7 @@ export async function markPayoutPaid(
   amount: number,
   meta?: { lessonCount?: number; lessonsAmount?: number; bonusAmount?: number },
 ) {
+  await assertMonthOpen(month);
   const supabase = createServiceClient();
 
   let lessonCount = meta?.lessonCount;
@@ -354,14 +356,6 @@ export async function markPayoutPaid(
     await sendPayoutConfirmationEmail(user.user.email, month, amount);
   }
 
-  await createInAppMessages({
-    title: `${MESSAGE_TEMPLATES.PAYOUT.title} — ${month}`,
-    body: `${MESSAGE_TEMPLATES.PAYOUT.body}\n\nKwota: ${amount.toLocaleString("pl-PL")} zł`,
-    category: MESSAGE_TEMPLATES.PAYOUT.category,
-    template: MESSAGE_TEMPLATES.PAYOUT.template,
-    recipientIds: [tutorId],
-  });
-
   revalidatePath("/admin/wyplaty");
 }
 
@@ -387,17 +381,39 @@ async function requireAdminUserId(): Promise<string> {
   return user.id;
 }
 
-export async function adminVerifyLesson(lessonId: string, paymentReceivedAt: string) {
+export async function adminVerifyLesson(
+  lessonId: string,
+  paymentReceivedAt: string,
+  paymentMethod?: string,
+) {
   await requireAdminUserId();
   // Service role — omija edge-case RLS (update 0 wierszy bez błędu)
   const supabase = createServiceClient();
 
+  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
+  if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
+
   let { data, error } = await supabase
     .from("lessons")
-    .update({ status: "VERIFIED", payment_received_at: paymentReceivedAt })
+    .update({
+      status: "VERIFIED",
+      payment_received_at: paymentReceivedAt,
+      payment_method: paymentMethod ?? null,
+    })
     .eq("id", lessonId)
     .select("id")
     .maybeSingle();
+
+  if (error?.message?.includes("payment_method") || error?.code === "PGRST204") {
+    const fallback = await supabase
+      .from("lessons")
+      .update({ status: "VERIFIED", payment_received_at: paymentReceivedAt })
+      .eq("id", lessonId)
+      .select("id")
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error?.message?.includes("payment_received_at") || error?.code === "PGRST204") {
     const fallback = await supabase
@@ -423,6 +439,9 @@ export async function adminVerifyLesson(lessonId: string, paymentReceivedAt: str
 export async function adminRejectLessonPayment(lessonId: string) {
   await requireAdminUserId();
   const supabase = createServiceClient();
+
+  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
+  if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
 
   let { data, error } = await supabase
     .from("lessons")
@@ -452,7 +471,6 @@ export async function adminRejectLessonPayment(lessonId: string) {
 export async function notifyCennikUpdate() {
   const supabase = createServiceClient();
   const { data: tutors } = await supabase.from("profiles").select("id").eq("role", "TUTOR");
-  const tutorIds = (tutors ?? []).map((t) => t.id);
   const emails: string[] = [];
 
   for (const t of tutors ?? []) {
@@ -461,14 +479,6 @@ export async function notifyCennikUpdate() {
   }
 
   if (emails.length > 0) await sendCennikUpdateEmail(emails);
-
-  await createInAppMessages({
-    title: MESSAGE_TEMPLATES.CENNIK.title,
-    body: MESSAGE_TEMPLATES.CENNIK.body,
-    category: MESSAGE_TEMPLATES.CENNIK.category,
-    template: MESSAGE_TEMPLATES.CENNIK.template,
-    recipientIds: tutorIds,
-  });
 
   return { count: emails.length };
 }
@@ -514,6 +524,7 @@ export async function createOperatingExpense(formData: FormData) {
   if (!(amountPln >= 0) || Number.isNaN(amountPln)) {
     throw new Error("Nieprawidłowa kwota.");
   }
+  await assertMonthOpen(month);
 
   const file = formData.get("file");
   let attachmentName: string | null = null;
@@ -605,9 +616,11 @@ export async function deleteOperatingExpense(id: string) {
   const supabase = createServiceClient();
   const { data: row } = await supabase
     .from("operating_expenses")
-    .select("attachment_path")
+    .select("attachment_path, month")
     .eq("id", id)
     .maybeSingle();
+
+  if (row?.month) await assertMonthOpen(row.month);
 
   const { error } = await supabase.from("operating_expenses").delete().eq("id", id);
 

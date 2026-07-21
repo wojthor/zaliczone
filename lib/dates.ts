@@ -81,6 +81,50 @@ export function canCloseMonth(monthKey: string, today = new Date()): boolean {
   return today >= earliest;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function monthKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+export function formatMonthLongPl(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(
+    new Date(y!, (m ?? 1) - 1, 15),
+  );
+}
+
+function formatDayLongPl(y: number, monthIndex0: number, day: number): string {
+  return new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "long", year: "numeric" }).format(
+    new Date(y, monthIndex0, day, 12),
+  );
+}
+
+/**
+ * Terminy „do kiedy" dla bieżącego cyklu — używane w zakładce Przewodnik i jej skrócie
+ * na dashboardzie tutora. Jedno miejsce liczenia, żeby oba widoki zawsze się zgadzały.
+ */
+export function guideDeadlines(now = new Date()): {
+  previousMonthLabel: string;
+  ewidencjaDeadlineLabel: string;
+  ewidencjaOverdue: boolean;
+  payoutAvailableLabel: string;
+} {
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  const previousMonthKey = monthKeyOf(previousMonthDate);
+  const ewidencjaDeadlineLabel = formatEwidencjaDeadlinePl(previousMonthKey);
+  const ewidencjaOverdue = now > new Date(`${ewidencjaDeadlineIso(previousMonthKey)}T23:59:59`);
+  const payoutAvailableLabel = formatDayLongPl(now.getFullYear(), now.getMonth(), DATES.payout.availableFromDay);
+  return {
+    previousMonthLabel: formatMonthLongPl(previousMonthKey),
+    ewidencjaDeadlineLabel,
+    ewidencjaOverdue,
+    payoutAvailableLabel,
+  };
+}
+
 /** Postęp do premii: hoursDone / threshold (godziny VERIFIED), clamped 0–1. */
 export function bonusProgress(hoursDone: number): {
   done: number;

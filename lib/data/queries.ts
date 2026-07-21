@@ -21,9 +21,8 @@ import type {
   Profile,
   StudentUi,
   SubjectRequest,
-  TutorDocumentTree,
 } from "@/lib/types/database";
-import type { CompanySalesMonth, InboxMessage, PriceTier } from "@/lib/types/messages";
+import type { CompanySalesMonth, PriceTier } from "@/lib/types/messages";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 
 export async function getCurrentUserProfile(): Promise<Profile | null> {
@@ -119,6 +118,11 @@ export async function getUnpaidFinanceLines(): Promise<FinanceLineUi[]> {
 
 export async function getPendingAndUnpaidLines(): Promise<FinanceLineUi[]> {
   return getLessonsByStatus(["PENDING_VERIFICATION", "UNPAID"]);
+}
+
+/** Wszystkie lekcje niezależnie od statusu — używane do walidacji zamknięcia miesiąca. */
+export async function getAllLessonLines(): Promise<FinanceLineUi[]> {
+  return getLessonsByStatus(["PLANNED", "PENDING_VERIFICATION", "VERIFIED", "UNPAID"]);
 }
 
 async function getTutorEmailMap(): Promise<Map<string, string>> {
@@ -290,6 +294,11 @@ export async function getTutorPayouts(tutorId: string): Promise<Payout[]> {
   return (data ?? []) as Payout[];
 }
 
+export async function isMonthClosed(monthKey: string): Promise<boolean> {
+  const closed = await getClosedMonths();
+  return closed.includes(monthKey);
+}
+
 export async function getClosedMonths(): Promise<string[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("closed_months").select("month").order("month", {
@@ -342,41 +351,6 @@ export async function getTutorVerifiedLessonsForMonth(
   return lines.filter((l) => l.monthKey === monthKey);
 }
 
-export async function getTutorDocumentTrees(): Promise<TutorDocumentTree[]> {
-  const supabase = await createClient();
-  const tutors = await getAllTutorProfiles();
-  const verifiedLines = await getAllVerifiedFinanceLines();
-  const { data: payouts } = await supabase.from("payouts").select("*");
-
-  const payoutByTutorMonth = new Map<string, Payout>();
-  for (const p of (payouts ?? []) as Payout[]) {
-    payoutByTutorMonth.set(`${p.tutor_id}:${p.month}`, p);
-  }
-
-  return tutors.map((tutor) => {
-    const tutorLines = verifiedLines.filter((l) => l.tutorId === tutor.id);
-    const monthKeys = [...new Set(tutorLines.map((l) => l.monthKey))].sort().reverse();
-
-    const months = monthKeys.map((monthKey) => {
-      const count = tutorLines.filter((l) => l.monthKey === monthKey).length;
-      const payout = payoutByTutorMonth.get(`${tutor.id}:${monthKey}`);
-      return {
-        monthKey,
-        monthLabel: formatMonthLongPl(monthKey),
-        verifiedLessonCount: count,
-        ewidencjaUnlocked: tutor.ewidencja_unlocked_for_month === monthKey,
-        payoutStatus: payout?.status ?? null,
-      };
-    });
-
-    return {
-      tutorId: tutor.id,
-      tutorName: tutor.full_name ?? "Nieznany",
-      months,
-    };
-  });
-}
-
 export async function getPriceTiers(): Promise<PriceTier[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -407,42 +381,17 @@ export async function getCompanySalesMonths(): Promise<CompanySalesMonth[]> {
     }));
 }
 
-export async function getTutorInboxMessages(): Promise<InboxMessage[]> {
+/** Uczniowie danego tutora — widok admina (profil nauczyciela). */
+export async function getTutorStudentsForAdmin(tutorId: string) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
-
   const { data, error } = await supabase
-    .from("message_recipients")
-    .select("id, message_id, read_at, created_at, admin_messages(title, body, category, template, created_at)")
-    .eq("recipient_id", user.id)
-    .order("created_at", { ascending: false });
+    .from("students")
+    .select("id, name, class_level, subjects, rate_pln")
+    .eq("tutor_id", tutorId)
+    .order("name");
 
   if (error) throw error;
-
-  return (data ?? []).map((row) => {
-    const raw = row.admin_messages;
-    const msg = (Array.isArray(raw) ? raw[0] : raw) as {
-      title: string;
-      body: string;
-      category: InboxMessage["category"];
-      template: InboxMessage["template"];
-      created_at: string;
-    } | null;
-    return {
-      id: row.id,
-      recipientId: user.id,
-      messageId: row.message_id,
-      title: msg?.title ?? "Wiadomość",
-      body: msg?.body ?? "",
-      category: msg?.category ?? "employer",
-      template: msg?.template ?? "CUSTOM",
-      createdAt: msg?.created_at ?? row.created_at,
-      readAt: row.read_at,
-    };
-  });
+  return data ?? [];
 }
 
 const DOCS_MIGRATION_HINT =

@@ -2,13 +2,12 @@
 
 import { FinanceProfilePanel } from "@/components/dashboard/finance-profile-panel";
 import { MonthlyCalendar } from "@/components/dashboard/monthly-calendar";
-import { NotificationsPanel } from "@/components/dashboard/notifications-panel";
+import { GuideShortcutPanel } from "@/components/dashboard/guide-shortcut-panel";
 import { StudentsPanel } from "@/components/students-panel";
 import { WeeklySchedule } from "@/components/dashboard/weekly-schedule";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 import type { StudentUi } from "@/lib/types/database";
-import type { InboxMessage } from "@/lib/types/messages";
 
 type DashboardLayoutProps = {
   lessons: Lesson[];
@@ -16,7 +15,6 @@ type DashboardLayoutProps = {
   tutorName: string;
   totalPayout: number;
   totalHours: number;
-  inboxMessages: InboxMessage[];
   verifiedHoursThisMonth: number;
 };
 
@@ -26,7 +24,6 @@ export function DashboardLayout({
   tutorName,
   totalPayout,
   totalHours,
-  inboxMessages,
   verifiedHoursThisMonth,
 }: DashboardLayoutProps) {
   return (
@@ -43,7 +40,7 @@ export function DashboardLayout({
           <StudentsPanel students={students} />
         </div>
         <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
-          <NotificationsPanel messages={inboxMessages} />
+          <GuideShortcutPanel />
         </div>
         <div className="min-h-[min(220px,36svh)] min-w-0 overflow-hidden max-lg:min-h-52 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <FinanceProfilePanel
