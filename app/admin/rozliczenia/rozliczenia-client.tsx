@@ -194,7 +194,7 @@ export function RozliczeniaClient({
   return (
     <div className="flex h-auto min-h-0 min-w-0 flex-col gap-3 overflow-visible sm:gap-4 lg:h-full lg:overflow-hidden">
       <div className="min-w-0 shrink-0 space-y-2">
-        <h1 className="dash-sans text-depths text-lg font-bold tracking-tight sm:text-xl">Rozliczenia</h1>
+        <h1 className="dash-sans text-depths text-lg font-bold tracking-tight sm:text-xl">Lekcje</h1>
         <p className="dash-sans text-muted text-[0.7rem] leading-snug sm:text-xs">
           Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
           zmienić.

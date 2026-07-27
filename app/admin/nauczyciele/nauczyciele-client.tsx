@@ -88,16 +88,38 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
 
       <ul className="space-y-2">
         {tutors.length === 0 ? (
-          <li className="dash-sans text-muted rounded-app border border-panel-frame/35 bg-snow p-4 text-sm">
+          <li className="dash-sans text-muted card-quiet p-4 text-sm">
             Brak nauczycieli. Dodaj pierwszego lub uruchom{" "}
             <code className="dash-mono text-xs">pnpm seed:battle</code>.
           </li>
         ) : (
-          tutors.map((t) => (
-            <li key={t.id} className="rounded-app border border-panel-frame/35 bg-snow p-3.5 sm:p-4">
+          tutors.map((t) => {
+            const initials = t.name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((p) => p[0]?.toUpperCase() ?? "")
+              .join("");
+            return (
+            <li key={t.id} className="rounded-app bg-snow p-3.5 sm:p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                <div className="min-w-0 sm:w-[38%] sm:max-w-md sm:flex-none">
+                <div className="flex min-w-0 items-start gap-3 sm:w-[38%] sm:max-w-md sm:flex-none">
+                  <span className="avatar-initials mt-0.5 h-10 w-10 shrink-0 text-xs" aria-hidden>
+                    {initials || "?"}
+                  </span>
+                  <div className="min-w-0">
                   <p className="dash-sans text-depths text-sm font-bold tracking-tight">{t.name}</p>
+                  <p className="mt-1.5">
+                    <span
+                      className={
+                        t.acceptingStudents
+                          ? "badge-action"
+                          : "rounded-ledger bg-mist px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-steel"
+                      }
+                    >
+                      {t.acceptingStudents ? "Przyjmuje uczniów" : "Bez nowych uczniów"}
+                    </span>
+                  </p>
                   <p className="dash-sans text-muted mt-1 truncate text-xs">
                     <span>{t.phone ?? "brak tel."}</span>
                     <span className="mx-1.5 opacity-40">·</span>
@@ -112,6 +134,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                       t.subjects.join(" · ")
                     )}
                   </p>
+                  </div>
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-4 sm:gap-5">
@@ -125,7 +148,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
 
                 <Link
                   href={`/admin/nauczyciele/${t.id}`}
-                  className="dash-sans inline-flex shrink-0 items-center gap-1.5 self-start rounded-app border border-panel-frame/50 bg-transparent px-2.5 py-1.5 text-[0.7rem] font-semibold text-depths transition hover:border-[#000C4A]/40 hover:bg-luster/40 sm:self-center"
+                  className="dash-sans inline-flex shrink-0 items-center gap-1.5 self-start rounded-app border border-mist bg-transparent px-2.5 py-1.5 text-[0.7rem] font-semibold text-depths transition hover:border-depths/40 hover:bg-paper sm:self-center"
                 >
                   Wejdź w profil
                   <span aria-hidden className="text-sm leading-none">
@@ -134,7 +157,8 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                 </Link>
               </div>
             </li>
-          ))
+            );
+          })
         )}
       </ul>
 
@@ -142,18 +166,18 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-[#000C4A]/50"
+            className="absolute inset-0 bg-depths/50"
             aria-label="Zamknij"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-app border border-panel-frame/70 bg-snow p-6 shadow-lg">
+          <div className="relative z-10 w-full max-w-md rounded-app border border-mist bg-snow p-6">
             {creds ? (
               <div className="add-tutor-success-pop">
                 <h2 className="dash-sans text-depths text-lg font-bold">Konto utworzone</h2>
                 <p className="dash-sans text-muted mt-1 text-xs">
                   E-mail powitalny został wysłany (jeśli skonfigurowano Resend).
                 </p>
-                <div className="mt-4 space-y-2 rounded-app bg-luster p-4 text-sm">
+                <div className="card-quiet mt-4 space-y-2 p-4 text-sm">
                   <p className="dash-sans">
                     <span className="text-muted">E-mail:</span> <strong className="dash-mono">{creds.email}</strong>
                   </p>
@@ -231,7 +255,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="min-w-11">
       <p className="dash-mono text-depths text-base font-black leading-none">{value}</p>
-      <p className="dash-sans text-muted mt-0.5 text-[9px] font-semibold uppercase tracking-wide">{label}</p>
+      <p className="section-label !text-muted mt-0.5">{label}</p>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { markPayoutPaid, requestEwidencjaForMonth } from "@/lib/actions/admin";
+import { markPayoutPaid, unmarkPayoutPaid } from "@/lib/actions/admin";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
-import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
+import { FinanceTile, FinanceTilesRow } from "@/components/admin/finance-tile";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { listaPlacTitles, previousMonthKey } from "./lista-plac/lista-plac-shared";
 
 const TUTOR_SHARE_OF_CLIENT_PAYMENT = TUTOR_SHARE;
 
@@ -20,6 +21,12 @@ function formatMonthLongPl(monthKey: string): string {
   const [ys, ms] = monthKey.split("-");
   const d = new Date(Number(ys), Number(ms) - 1, 15);
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
+}
+
+function nextMonthKey(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const d = new Date(y!, m!, 15);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 type TutorRollup = {
@@ -72,7 +79,12 @@ function buildRollups(
     row.bonusPln = b.achieved ? b.bonusPln : 0;
     row.tutorPayoutPln = Math.round((row.lessonsPayoutPln + row.bonusPln) * 100) / 100;
   }
-  return [...map.values()].sort((a, b) => a.tutorName.localeCompare(b.tutorName, "pl"));
+  return [...map.values()].sort((a, b) => {
+    const aPaid = a.payoutStatus === "PAID" ? 1 : 0;
+    const bPaid = b.payoutStatus === "PAID" ? 1 : 0;
+    if (aPaid !== bPaid) return aPaid - bPaid;
+    return a.tutorName.localeCompare(b.tutorName, "pl");
+  });
 }
 
 function formatMoney(pln: number): string {
@@ -90,27 +102,32 @@ export function WyplatyClient({
 }) {
   const router = useRouter();
   const [confirmRow, setConfirmRow] = useState<TutorRollup | null>(null);
+  const [unmarkRow, setUnmarkRow] = useState<TutorRollup | null>(null);
   const [manualAmount, setManualAmount] = useState("");
-  const [pendingEwidencja, startEwidencja] = useTransition();
-  const [ewidencjaFeedback, setEwidencjaFeedback] = useState("");
   const nowKey = useMemo(() => currentMonthKey(), []);
   const monthOptions = useMemo(() => {
-    const keys = [...new Set(financeLines.map((l) => l.monthKey))];
-    keys.sort();
-    if (!keys.includes(nowKey)) keys.push(nowKey);
-    return keys.slice().reverse();
+    const keys = new Set<string>();
+    for (const l of financeLines) {
+      keys.add(l.monthKey);
+      keys.add(nextMonthKey(l.monthKey));
+    }
+    keys.add(nowKey);
+    return [...keys].sort().reverse();
   }, [financeLines, nowKey]);
 
   const [selectedMonthKey, setSelectedMonthKey] = useState(nowKey);
 
+  /** Miesiąc wypłaty (wybór w UI) → lista dotyczy poprzedniego miesiąca lekcji. */
+  const workMonthKey = useMemo(() => previousMonthKey(selectedMonthKey), [selectedMonthKey]);
+
   const linesForMonth = useMemo(
-    () => financeLines.filter((l) => l.monthKey === selectedMonthKey),
-    [financeLines, selectedMonthKey],
+    () => financeLines.filter((l) => l.monthKey === workMonthKey),
+    [financeLines, workMonthKey],
   );
 
   const payoutsForMonth = useMemo(
-    () => payouts.filter((p) => p.month === selectedMonthKey),
-    [payouts, selectedMonthKey],
+    () => payouts.filter((p) => p.month === workMonthKey),
+    [payouts, workMonthKey],
   );
 
   const { rollups, totals } = useMemo(() => {
@@ -131,7 +148,8 @@ export function WyplatyClient({
     return { rollups: r, totals: { przychod, koszty, doWyplaty, wyplacone, zysk } };
   }, [linesForMonth, payoutsForMonth, bankAccounts]);
 
-  const monthLabel = formatMonthLongPl(selectedMonthKey);
+  const monthLabel = formatMonthLongPl(workMonthKey);
+  const payrollTitles = useMemo(() => listaPlacTitles(selectedMonthKey), [selectedMonthKey]);
 
   const paidCount = rollups.filter((r) => r.payoutStatus === "PAID").length;
 
@@ -139,30 +157,22 @@ export function WyplatyClient({
     if (!confirmRow) return;
     const parsed = Number(manualAmount.replace(",", "."));
     const finalAmount = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) / 100 : confirmRow.tutorPayoutPln;
-    await markPayoutPaid(confirmRow.tutorId, selectedMonthKey, finalAmount, {
+    await markPayoutPaid(confirmRow.tutorId, workMonthKey, finalAmount, {
       lessonCount: confirmRow.lessonCount,
       lessonsAmount: confirmRow.lessonsPayoutPln,
       bonusAmount: confirmRow.bonusPln,
     });
   }
 
-  function handleRequestEwidencja() {
-    setEwidencjaFeedback("");
-    startEwidencja(async () => {
-      try {
-        const { count } = await requestEwidencjaForMonth(selectedMonthKey);
-        setEwidencjaFeedback(`Wysłano prośbę mailem do ${count} nauczycieli i odblokowano miesiąc.`);
-        router.refresh();
-      } catch (err) {
-        setEwidencjaFeedback(err instanceof Error ? err.message : "Nie udało się wysłać prośby.");
-      }
-    });
+  async function handleUnmarkPaid() {
+    if (!unmarkRow) return;
+    await unmarkPayoutPaid(unmarkRow.tutorId, workMonthKey);
   }
 
   const th =
-    "dash-sans sticky top-0 z-[1] border-b border-panel-frame/40 bg-jodhpur/95 px-2 py-2 text-left text-[0.65rem] font-bold uppercase leading-tight text-depths shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)] sm:px-2.5 sm:py-2 sm:text-[0.7rem]";
+    "dash-sans sticky top-0 z-[1] border-b-2 border-paper bg-paper px-2 py-2 text-left text-[0.65rem] font-bold uppercase leading-tight text-depths sm:px-2.5 sm:py-2 sm:text-[0.7rem]";
   const td =
-    "border-b border-panel-frame/15 px-2 py-2 align-middle text-[0.8rem] sm:px-2.5 sm:py-2.5 sm:text-sm";
+    "border-b-2 border-paper px-2 py-2 align-middle text-[0.8rem] sm:px-2.5 sm:py-2.5 sm:text-sm";
 
   return (
     <div className="min-w-0 space-y-4 sm:space-y-5">
@@ -175,12 +185,14 @@ export function WyplatyClient({
         </div>
         <div className="flex flex-wrap items-end gap-2 sm:gap-3">
           <label className="grid gap-1">
-            <span className="dash-sans text-depths/80 text-[0.65rem] font-semibold sm:text-xs">Miesiąc</span>
+            <span className="section-label !text-muted">
+              Miesiąc wypłaty
+            </span>
             <select
-              className="dash-sans text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+              className="dash-sans text-depths rounded-app border border-mist bg-snow px-3 py-2 text-sm font-medium"
               value={selectedMonthKey}
               onChange={(e) => setSelectedMonthKey(e.target.value)}
-              aria-label="Wybierz miesiąc"
+              aria-label="Wybierz miesiąc wypłaty"
             >
               {monthOptions.map((key) => (
                 <option key={key} value={key}>
@@ -189,62 +201,62 @@ export function WyplatyClient({
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            onClick={handleRequestEwidencja}
-            disabled={pendingEwidencja}
-            className="btn-block bg-[#000C4A] px-4 py-2.5 text-xs text-lime disabled:opacity-60"
-          >
-            {pendingEwidencja ? "Wysyłanie…" : `Poproś o ewidencję · ${monthLabel}`}
-          </button>
         </div>
       </div>
-      {ewidencjaFeedback ? (
-        <p
-          className={`dash-sans text-xs font-semibold ${
-            ewidencjaFeedback.includes("Wysłano") ? "text-moss" : "text-claret"
-          }`}
-        >
-          {ewidencjaFeedback}
-        </p>
-      ) : null}
 
-      <LedgerBand columns={3}>
-        <LedgerStat label="Przychód" tick="neutral" ink="depths">
-          {formatMoney(totals.przychod)}
-        </LedgerStat>
-        <LedgerStat label="Do wypłaty / Wypłacone" tick="butter" ink="toffee">
+      <FinanceTilesRow columns={3}>
+        <FinanceTile label="Przychód" tone="navy">
+          <span className="mark-highlight-on-dark">{formatMoney(totals.przychod)}</span>
+        </FinanceTile>
+        <FinanceTile label="Do wypłaty / Wypłacone" tone="orange">
           {formatMoney(totals.doWyplaty)}
-          <span className="text-toffee/50"> / </span>
+          <span className="opacity-40"> / </span>
           {formatMoney(totals.wyplacone)}
-        </LedgerStat>
-        <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+        </FinanceTile>
+        <FinanceTile label="Marża agencji" tone="green">
           {formatMoney(totals.zysk)}
-        </LedgerStat>
-      </LedgerBand>
+        </FinanceTile>
+      </FinanceTilesRow>
 
-      <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Lista do wypłaty</h2>
-          <PayoutProgressStat total={rollups.length} paid={paidCount} />
+      <section className="rounded-app bg-snow p-3 sm:p-4">
+        <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="section-label leading-snug">
+              {payrollTitles.title}
+            </h2>
+            <p className="dash-sans text-muted mt-1 text-xs leading-snug">{payrollTitles.subtitle}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PayoutProgressStat total={rollups.length} paid={paidCount} />
+            <a
+              href={`/admin/wyplaty/lista-plac?month=${selectedMonthKey}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-[#000C4A] px-2.5 py-1 text-[0.65rem] font-bold text-lime sm:px-3 sm:py-1.5 sm:text-xs"
+            >
+              Wygeneruj listę płac PDF
+            </a>
+          </div>
         </div>
-        <p className="dash-sans text-muted mt-1 text-xs capitalize">{monthLabel}</p>
 
         {rollups.length === 0 ? (
           <p className="dash-sans text-muted mt-6 py-6 text-center text-sm font-medium">
-            Brak zatwierdzonych lekcji w tym miesiącu.
+            Brak zatwierdzonych lekcji za okres {monthLabel}.
           </p>
         ) : (
-          <div className="mt-4 max-h-[min(28rem,55vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
-            <table className="table-fixed min-w-176 w-full border-collapse">
+          <div className="mt-4 max-h-[min(28rem,55vh)] overflow-auto rounded-app bg-paper/40 scrollbar-panel">
+            <table className="table-fixed min-w-200 w-full border-collapse">
               <thead>
                 <tr>
-                  <th scope="col" className={`${th} w-[18%]`}>Nauczyciel</th>
-                  <th scope="col" className={`${th} w-[10%]`}>Godziny</th>
-                  <th scope="col" className={`${th} w-[12%]`}>Premia</th>
-                  <th scope="col" className={`${th} w-[16%]`}>Do wypłaty</th>
-                  <th scope="col" className={`${th} w-[26%]`}>Nr rachunku</th>
-                  <th scope="col" className={`${th} w-[18%]`}>Status</th>
+                  <th scope="col" className={`${th} w-[4%]`}>Lp.</th>
+                  <th scope="col" className={`${th} w-[16%]`}>Nauczyciel</th>
+                  <th scope="col" className={`${th} w-[18%]`}>Nr konta</th>
+                  <th scope="col" className={`${th} w-[7%] text-right`}>Lekcje</th>
+                  <th scope="col" className={`${th} w-[8%] text-right`}>Godziny</th>
+                  <th scope="col" className={`${th} w-[12%] text-right`}>Wynagrodzenie</th>
+                  <th scope="col" className={`${th} w-[10%] text-right`}>Premia</th>
+                  <th scope="col" className={`${th} w-[11%] text-right`}>Razem</th>
+                  <th scope="col" className={`${th} w-[14%] text-center`}>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -253,13 +265,20 @@ export function WyplatyClient({
                   const account = row.bankAccount?.trim() || null;
                   const rail = isPaid ? "status-rail-verified" : "status-rail-pending";
                   return (
-                    <tr key={row.tutorId} className={`${i % 2 === 1 ? "bg-luster/35" : "bg-snow"} hover:bg-luster/50`}>
-                      <td className={`${td} status-rail ${rail} dash-sans font-semibold text-depths`}>{row.tutorName}</td>
-                      <td className={`${td} dash-mono font-bold text-depths`}>{row.hours}</td>
-                      <td className={`${td} dash-mono font-bold ${row.bonusPln > 0 ? "text-moss" : "text-muted"}`}>
-                        {row.bonusPln > 0 ? `+${formatMoney(row.bonusPln)}` : "—"}
+                    <tr
+                      key={row.tutorId}
+                      className={`${
+                        isPaid
+                          ? "bg-mist/60 hover:bg-mist"
+                          : i % 2 === 1
+                            ? "bg-paper/80 hover:bg-paper"
+                            : "bg-snow hover:bg-paper"
+                      }`}
+                    >
+                      <td className={`${td} dash-mono text-muted text-center tabular-nums`}>{i + 1}</td>
+                      <td className={`${td} status-rail ${rail} dash-sans font-semibold text-depths`}>
+                        {row.tutorName}
                       </td>
-                      <td className={`${td} dash-mono font-bold text-depths`}>{formatMoney(row.tutorPayoutPln)}</td>
                       <td className={td}>
                         {account ? (
                           <span className="dash-mono text-depths break-all text-[0.75rem] font-medium leading-snug sm:text-[0.8rem]">
@@ -269,11 +288,35 @@ export function WyplatyClient({
                           <span className="dash-sans text-[0.7rem] font-semibold text-claret">brak rachunku</span>
                         )}
                       </td>
-                      <td className={td}>
+                      <td className={`${td} dash-mono text-right font-bold tabular-nums text-depths`}>
+                        {row.lessonCount}
+                      </td>
+                      <td className={`${td} dash-mono text-right font-bold tabular-nums text-depths`}>
+                        {row.hours}
+                      </td>
+                      <td className={`${td} dash-mono text-right font-bold tabular-nums text-depths`}>
+                        {formatMoney(row.lessonsPayoutPln)}
+                      </td>
+                      <td
+                        className={`${td} dash-mono text-right font-bold tabular-nums ${
+                          row.bonusPln > 0 ? "text-moss" : "text-muted"
+                        }`}
+                      >
+                        {row.bonusPln > 0 ? formatMoney(row.bonusPln) : "—"}
+                      </td>
+                      <td className={`${td} dash-mono text-right font-bold tabular-nums text-depths`}>
+                        {formatMoney(row.tutorPayoutPln)}
+                      </td>
+                      <td className={`${td} text-center`}>
                         {isPaid ? (
-                          <span className="dash-sans inline-flex items-center rounded-full bg-moss/15 px-2.5 py-1 text-[0.7rem] font-bold text-moss">
+                          <button
+                            type="button"
+                            onClick={() => setUnmarkRow(row)}
+                            className="badge-done transition hover:opacity-90"
+                            title="Kliknij, aby odznaczyć"
+                          >
                             Wypłacone
-                          </span>
+                          </button>
                         ) : (
                           <button
                             type="button"
@@ -281,9 +324,9 @@ export function WyplatyClient({
                               setConfirmRow(row);
                               setManualAmount(row.tutorPayoutPln.toFixed(2));
                             }}
-                            className="btn-block dash-sans bg-[#000C4A] px-3 py-1.5 text-[0.7rem] text-lime transition-opacity hover:opacity-90"
+                            className="btn-block dash-sans bg-[#000C4A] px-2.5 py-1.5 text-[0.65rem] text-lime transition-opacity hover:opacity-90"
                           >
-                            Wypłacone
+                            Oznacz jako wypłacone
                           </button>
                         )}
                       </td>
@@ -302,7 +345,7 @@ export function WyplatyClient({
         title={confirmRow ? `Zatwierdź przelew dla ${confirmRow.tutorName}` : ""}
         description={
           confirmRow
-            ? `Za ${monthLabel}. Wyliczona kwota to ${formatMoney(confirmRow.tutorPayoutPln)} — możesz ją skorygować poniżej. Upewnij się, że przelew już wyszedł z banku — w systemie nie da się tego odznaczyć.`
+            ? `Za ${monthLabel}. Wyliczona kwota to ${formatMoney(confirmRow.tutorPayoutPln)} — możesz ją skorygować poniżej. Upewnij się, że przelew już wyszedł z banku.`
             : undefined
         }
         confirmLabel="Zatwierdź przelew"
@@ -330,6 +373,22 @@ export function WyplatyClient({
           </div>
         </label>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={unmarkRow !== null}
+        tone="danger"
+        title={unmarkRow ? `Odznacz wypłatę: ${unmarkRow.tutorName}` : ""}
+        description={
+          unmarkRow
+            ? `Za ${monthLabel}. Status wróci do „do wypłaty”. Używaj tylko gdy oznaczenie było pomyłką.`
+            : undefined
+        }
+        confirmLabel="Odznacz"
+        successMessage="Wypłata odznaczona."
+        onConfirm={handleUnmarkPaid}
+        onSuccess={() => router.refresh()}
+        onCancel={() => setUnmarkRow(null)}
+      />
     </div>
   );
 }
@@ -346,7 +405,7 @@ function PayoutProgressStat({
   return (
     <div className="w-full max-w-56 shrink-0 space-y-0.5 sm:w-56">
       <div
-        className="h-1 w-full overflow-hidden rounded-full bg-luster"
+        className="h-1 w-full overflow-hidden rounded-full bg-mist"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={total || 100}

@@ -1,11 +1,20 @@
 import { redirect } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import {
+  financeLinesHours,
+  lessonDurationMinutes,
+  sumTutorPayoutFromCennik,
+} from "@/lib/data/mappers";
+import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
+import {
   getCurrentUserProfile,
-  getTutorCompletedFinanceLines,
+  getPriceTiers,
+  getTutorVerifiedFinanceLines,
   getTutorLessons,
   getTutorStudents,
 } from "@/lib/data/queries";
+
+export const dynamic = "force-dynamic";
 
 function currentMonthKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -16,36 +25,32 @@ export default async function Home() {
   if (!profile) redirect("/login");
   if (profile.role === "ADMIN") redirect("/admin");
 
-  const [lessons, students, financeLines] = await Promise.all([
+  const [lessons, students, financeLines, priceTiers] = await Promise.all([
     getTutorLessons(profile.id),
     getTutorStudents(profile.id),
-    getTutorCompletedFinanceLines(profile.id),
+    getTutorVerifiedFinanceLines(profile.id),
+    getPriceTiers(),
   ]);
 
   const monthKey = currentMonthKey();
-  const verifiedThisMonth = financeLines.filter(
-    (line) => line.monthKey === monthKey && line.status === "VERIFIED",
-  );
-  const verifiedHoursThisMonth =
-    Math.round(
-      (verifiedThisMonth.reduce((sum, line) => {
-        const match = line.label.match(/(\d+)\s*min/);
-        return sum + (match ? Number(match[1]) : 60);
-      }, 0) /
-        60) *
-        10,
-    ) / 10;
+  const verifiedThisMonth = financeLines.filter((line) => line.monthKey === monthKey);
+  const monthHours = financeLinesHours(verifiedThisMonth);
+  const lessonsPayout = sumTutorPayoutFromCennik(verifiedThisMonth, priceTiers, TUTOR_SHARE);
+  const bonus = bonusProgress(monthHours);
+  const totalPayout =
+    Math.round((lessonsPayout + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100;
 
-  const totalPayout = financeLines.reduce((sum, line) => sum + line.amountPln, 0);
-  const totalHours =
-    Math.round(
-      (financeLines.reduce((sum, line) => {
-        const match = line.label.match(/(\d+)\s*min/);
-        return sum + (match ? Number(match[1]) : 60);
-      }, 0) /
-        60) *
-        10,
-    ) / 10;
+  const totalMinutes = lessons.reduce(
+    (sum, lesson) => sum + lessonDurationMinutes(lesson.start, lesson.end),
+    0,
+  );
+  const lessonStats = {
+    total: lessons.length,
+    pending: lessons.filter((l) => l.status === "PENDING_VERIFICATION").length,
+    verified: lessons.filter((l) => l.status === "VERIFIED").length,
+    unpaid: lessons.filter((l) => l.status === "UNPAID").length,
+    totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+  };
 
   return (
     <DashboardLayout
@@ -53,8 +58,8 @@ export default async function Home() {
       students={students}
       tutorName={profile.full_name ?? "Korepetytor"}
       totalPayout={totalPayout}
-      totalHours={totalHours}
-      verifiedHoursThisMonth={verifiedHoursThisMonth}
+      lessonStats={lessonStats}
+      verifiedHoursThisMonth={monthHours}
     />
   );
 }

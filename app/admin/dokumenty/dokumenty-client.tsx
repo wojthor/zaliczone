@@ -62,7 +62,7 @@ export function DokumentyClient({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 rounded-ledger border border-panel-frame/35 bg-luster/50 p-1.5">
+      <div className="grid grid-cols-2 gap-1.5 rounded-ledger bg-paper p-1.5">
         {(
           [
             ["employees", "Pracownicy", IconUsers],
@@ -74,7 +74,7 @@ export function DokumentyClient({
             type="button"
             onClick={() => setTab(id)}
             className={`dash-sans flex items-center justify-center gap-2 rounded-ledger px-3 py-2.5 text-xs font-bold transition sm:text-sm ${
-              tab === id ? "bg-[#000C4A] text-lime" : "text-muted hover:bg-white/60 hover:text-depths"
+              tab === id ? "nav-active" : "text-muted hover:bg-snow hover:text-depths"
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
@@ -423,8 +423,8 @@ function DiskBrowser({
 
   if (!available) {
     return (
-      <section className="rounded-app border border-toffee/40 bg-toffee/10 p-4">
-        <h2 className="dash-sans text-depths text-sm font-semibold">{title}</h2>
+      <section className="card-quiet p-4">
+        <h2 className="section-label">{title}</h2>
         <p className="dash-sans text-muted mt-2 text-sm">{errorMessage ?? "Dysk dokumentów niedostępny."}</p>
       </section>
     );
@@ -432,22 +432,18 @@ function DiskBrowser({
 
   return (
     <section
-      className="rounded-app border border-panel-frame/35 bg-snow p-4"
+      className="rounded-app bg-snow p-4"
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-2.5">
-          <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ledger ${
-              mode === "company" ? "bg-butter/50 text-toffee" : "bg-luster text-[#000C4A]"
-            }`}
-          >
+          <span className="avatar-initials h-8 w-8 shrink-0 text-xs">
             {mode === "company" ? <IconBuilding className="h-4 w-4" /> : <IconUsers className="h-4 w-4" />}
           </span>
           <div>
-            <h2 className="dash-sans text-depths text-sm font-bold">{title}</h2>
+            <h2 className="section-label">{title}</h2>
             <p className="dash-sans text-muted mt-0.5 text-xs">{description}</p>
           </div>
         </div>
@@ -482,7 +478,7 @@ function DiskBrowser({
           placeholder={mode === "employees" && !selectedFolderId ? "Szukaj pracownika…" : "Szukaj…"}
           className="dash-sans w-full min-w-0 flex-1 rounded-ledger border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths placeholder:text-muted sm:max-w-xs"
         />
-        <div className="flex rounded-ledger border border-panel-frame/35 bg-luster/40 p-0.5">
+        <div className="flex rounded-ledger bg-paper p-0.5">
           {(
             [
               ["all", "Wszystko"],
@@ -495,7 +491,7 @@ function DiskBrowser({
               type="button"
               onClick={() => setFilterKind(id)}
               className={`dash-sans rounded-ledger px-2.5 py-1.5 text-[10px] font-bold transition sm:text-xs ${
-                filterKind === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+                filterKind === id ? "nav-active" : "text-muted hover:text-depths"
               }`}
             >
               {label}
@@ -503,7 +499,7 @@ function DiskBrowser({
           ))}
         </div>
         <label className="inline-flex items-center gap-1.5">
-          <span className="dash-sans text-muted text-[10px] font-semibold uppercase">Sortuj</span>
+          <span className="section-label !text-muted">Sortuj</span>
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
@@ -531,14 +527,14 @@ function DiskBrowser({
       </div>
 
       {uploadAllowed ? (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-ledger border border-panel-frame/25 bg-luster/30 p-3">
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-ledger bg-paper p-3">
           {mode === "company" ? (
             <>
               <button
                 type="button"
                 disabled={uploading || pending}
                 onClick={() => fileInputRef.current?.click()}
-                className="dash-sans btn-block inline-flex items-center gap-2 bg-[#000C4A] px-4 py-2 text-xs text-lime disabled:opacity-50"
+                className="dash-sans btn-block inline-flex items-center gap-2 bg-depths px-4 py-2 text-xs text-lime disabled:opacity-50"
               >
                 {uploading ? <Spinner /> : null}
                 + Plik
@@ -553,13 +549,13 @@ function DiskBrowser({
             </>
           ) : null}
           <label className="grid min-w-44 flex-1 gap-1">
-            <span className="dash-sans text-muted text-[10px] font-semibold uppercase">Podfolder</span>
+            <span className="section-label !text-muted">Podfolder</span>
             <input
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder={`W: ${currentPath}`}
-              className="dash-sans text-depths rounded-ledger border border-panel-frame/30 bg-snow px-3 py-2 text-sm"
+              className="dash-sans text-depths rounded-ledger border border-mist bg-snow px-3 py-2 text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateFolder();
               }}
@@ -569,7 +565,7 @@ function DiskBrowser({
             type="button"
             disabled={pending}
             onClick={handleCreateFolder}
-            className="dash-sans btn-block border border-panel-frame/40 bg-jodhpur px-4 py-2 text-xs text-depths disabled:opacity-50"
+            className="dash-sans btn-block border border-mist bg-snow px-4 py-2 text-xs text-depths disabled:opacity-50"
           >
             + Folder
           </button>
@@ -577,25 +573,25 @@ function DiskBrowser({
       ) : null}
 
       <div
-        className={`relative mt-4 min-h-56 rounded-ledger border-2 border-dashed transition-colors ${
+        className={`relative mt-4 min-h-56 rounded-ledger border border-dashed transition-colors ${
           dragActive
-            ? "border-[#000C4A] bg-lime/10"
-            : "border-panel-frame/30 bg-luster/20"
+            ? "border-depths bg-soft-lime/30"
+            : "border-mist bg-paper/60"
         }`}
         onDrop={(e) => onDropZone(e)}
         onDragOver={onDragOver}
       >
         {dragActive && uploadAllowed ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-ledger bg-lime/15">
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-ledger bg-soft-lime/40">
             <div className="flex flex-col items-center gap-2">
-              <IconUpload className="h-7 w-7 text-[#000C4A]" />
+              <IconUpload className="h-7 w-7 text-depths" />
               <p className="dash-sans text-depths text-sm font-bold">Upuść pliki tutaj</p>
             </div>
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-b border-dashed border-panel-frame/25 px-3 py-2.5">
-          <p className="dash-sans text-muted flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
+        <div className="flex items-center justify-between gap-2 border-b-2 border-paper px-3 py-2.5">
+          <p className="section-label !text-muted flex items-center gap-1.5">
             <IconUpload className="h-3.5 w-3.5 shrink-0" />
             {uploadAllowed
               ? `Przeciągnij pliki tutaj lub na folder`

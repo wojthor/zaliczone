@@ -12,6 +12,8 @@ export type Profile = {
   full_name: string | null;
   active_subjects: string[];
   ewidencja_unlocked_for_month: string | null;
+  /** Czy nauczyciel chce przyjmować dodatkowych uczniów */
+  accepting_students?: boolean;
   phone?: string | null;
   bank_account?: string | null;
   olx_url?: string | null;
@@ -41,6 +43,8 @@ export type DbLesson = {
   status: LessonStatus;
   payment_received_at?: string | null;
   payment_method?: string | null;
+  /** Wspólne ID dla lekcji z jednego cyklicznego dodania */
+  series_id?: string | null;
   created_at: string;
 };
 
@@ -133,6 +137,8 @@ export type AdminTutorSummary = {
   subjects: string[];
   ewidencjaUnlockedForMonth: string | null;
   payoutStatusForMonth: PayoutStatus | null;
+  /** Czy przyjmuje dodatkowych uczniów */
+  acceptingStudents: boolean;
 };
 
 /** Wydatek operacyjny (faktura / rachunek) w księgowości miesięcznej */

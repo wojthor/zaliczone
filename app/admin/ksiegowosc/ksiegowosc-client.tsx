@@ -7,7 +7,7 @@ import { getSignedDownloadUrl } from "@/lib/actions/documents";
 import { IconLock } from "@/components/icons";
 import { ADMIN_PIT_RATE, canCloseMonth } from "@/lib/dates";
 import type { FinanceLineUi, OperatingExpense, Payout } from "@/lib/types/database";
-import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
+import { FinanceTile, FinanceTilesRow } from "@/components/admin/finance-tile";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const PIT_RATE = ADMIN_PIT_RATE;
@@ -558,10 +558,10 @@ export function KsiegowoscClient({
   }
 
   const th =
-    "dash-sans border-b border-panel-frame/40 bg-jodhpur/90 px-1 py-1 text-left text-[0.55rem] font-bold uppercase leading-tight text-depths sm:px-1.5 sm:py-1.5 sm:text-[0.6rem]";
+    "section-label border-b-2 border-paper bg-paper px-1 py-1 text-left leading-tight sm:px-1.5 sm:py-1.5";
   const td =
-    "border-b border-panel-frame/15 px-1 py-1 align-top text-[0.62rem] leading-tight break-words sm:px-1.5 sm:py-1.5 sm:text-[0.7rem]";
-  const rowZebra = "bg-snow even:bg-luster/40 hover:bg-luster/60";
+    "border-b-2 border-paper px-1 py-1 align-top text-[0.62rem] leading-tight break-words sm:px-1.5 sm:py-1.5 sm:text-[0.7rem]";
+  const rowZebra = "bg-snow even:bg-paper/80 hover:bg-paper";
 
   return (
     <div className="min-w-0 space-y-4 sm:space-y-5">
@@ -570,7 +570,7 @@ export function KsiegowoscClient({
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="dash-sans text-depths text-lg font-semibold tracking-tight sm:text-xl">Księgowość</h1>
             {isMonthClosed ? (
-              <span className="rounded-full bg-moss/15 px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-moss">
+              <span className="badge-done">
                 Miesiąc zamknięty
               </span>
             ) : null}
@@ -624,7 +624,7 @@ export function KsiegowoscClient({
       </div>
 
       {!isMonthClosed ? (
-        <div className="flex flex-col gap-1 rounded-app border border-panel-frame/35 bg-luster/50 p-1 sm:flex-row">
+        <div className="flex flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row">
           {(
             [
               ["month", "Księgowość miesięczna"],
@@ -636,7 +636,7 @@ export function KsiegowoscClient({
               type="button"
               onClick={() => setViewMode(id)}
               className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-                viewMode === id ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+                viewMode === id ? "nav-active" : "text-muted hover:text-depths"
               }`}
             >
               {label}
@@ -645,26 +645,26 @@ export function KsiegowoscClient({
         </div>
       ) : null}
 
-      <LedgerBand columns={4}>
-        <LedgerStat label="Przychód" tick="neutral" ink="depths">
-          {formatPln(totals.gross)}
-        </LedgerStat>
-        <LedgerStat label="Koszty wypłaty / wszystkie" tick="butter" ink="toffee">
+      <FinanceTilesRow columns={4}>
+        <FinanceTile label="Przychód" tone="navy">
+          <span className="mark-highlight-on-dark">{formatPln(totals.gross)}</span>
+        </FinanceTile>
+        <FinanceTile label="Koszty wypłaty / wszystkie" tone="orange">
           {formatPln(totals.tutorShare)}
-          <span className="text-toffee/50"> / </span>
+          <span className="opacity-40"> / </span>
           {formatPln(totals.allCosts)}
-        </LedgerStat>
-        <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+        </FinanceTile>
+        <FinanceTile label="Marża agencji" tone="green">
           {formatPln(totals.agencyShare)}
-        </LedgerStat>
-        <LedgerStat label="Lekcje VERIFIED" tick="neutral" ink="depths">
+        </FinanceTile>
+        <FinanceTile label="Lekcje VERIFIED" tone="navy">
           {totals.lessonCount}
-        </LedgerStat>
-      </LedgerBand>
+        </FinanceTile>
+      </FinanceTilesRow>
 
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="dash-sans text-depths text-sm font-semibold">
+          <h2 className="section-label">
             {viewMode === "year" ? `Ewidencja roczna · ${selectedYear}` : "Ewidencja sprzedaży"}
           </h2>
           <a href={ewidencjaHref} target="_blank" rel="noreferrer" className={pdfBtnClass}>
@@ -675,9 +675,9 @@ export function KsiegowoscClient({
           monthBreakdown.filter((r) => r.lessonCount > 0 || r.gross > 0).length === 0 ? (
             <p className="text-muted py-4 text-xs">Brak pozycji VERIFIED w tym roku.</p>
           ) : (
-            <div className="max-h-[min(20rem,42vh)] overflow-y-auto overflow-x-hidden rounded-lg border border-panel-frame/35 scrollbar-panel sm:max-h-[min(24rem,50vh)] sm:rounded-app">
+            <div className="max-h-[min(20rem,42vh)] overflow-y-auto overflow-x-hidden rounded-lg bg-snow scrollbar-panel sm:max-h-[min(24rem,50vh)] sm:rounded-app">
               <table className="w-full min-w-0 border-collapse">
-                <thead className="sticky top-0 z-1 bg-jodhpur/95 shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)]">
+                <thead className="sticky top-0 z-1 bg-paper">
                   <tr>
                     <th scope="col" className={`${th} w-[34%]`}>
                       Miesiąc
@@ -717,9 +717,9 @@ export function KsiegowoscClient({
         ) : ledgerRows.length === 0 ? (
           <p className="text-muted py-4 text-xs">Brak pozycji VERIFIED w tym miesiącu.</p>
         ) : (
-          <div className="max-h-[min(20rem,42vh)] overflow-y-auto overflow-x-hidden rounded-lg border border-panel-frame/35 scrollbar-panel sm:max-h-[min(24rem,50vh)] sm:rounded-app">
+          <div className="max-h-[min(20rem,42vh)] overflow-y-auto overflow-x-hidden rounded-lg bg-snow scrollbar-panel sm:max-h-[min(24rem,50vh)] sm:rounded-app">
             <table className="table-fixed w-full min-w-0 border-collapse">
-              <thead className="sticky top-0 z-1 bg-jodhpur/95 shadow-[inset_0_-1px_0_0_rgb(136_154_204/0.35)]">
+              <thead className="sticky top-0 z-1 bg-paper">
                 <tr>
                   <th scope="col" className={`${th} w-[5%]`}>
                     Lp.
@@ -764,7 +764,7 @@ export function KsiegowoscClient({
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="dash-sans text-depths text-sm font-semibold">Zestawienie kosztów</h2>
+          <h2 className="section-label">Zestawienie kosztów</h2>
           <a href={kosztyHref} target="_blank" rel="noreferrer" className={pdfBtnClass}>
             Wygeneruj zestawienie PDF
           </a>
@@ -784,9 +784,9 @@ export function KsiegowoscClient({
                 Miesiąc zamknięty — dodawanie i usuwanie kosztów jest zablokowane.
               </p>
             ) : (
-            <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto rounded-app border border-panel-frame/25 bg-white p-2">
+            <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto rounded-app bg-snow p-2">
               <label className="grid min-w-30 shrink gap-0.5">
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">
+                <span className="section-label !text-muted leading-none">
                   Data rachunku/faktury
                 </span>
                 <input
@@ -797,7 +797,7 @@ export function KsiegowoscClient({
                 />
               </label>
               <label className="grid min-w-22 flex-1 gap-0.5">
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Nr dok.</span>
+                <span className="section-label !text-muted leading-none">Nr dok.</span>
                 <input
                   value={expenseForm.documentNumber}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, documentNumber: ev.target.value }))}
@@ -806,7 +806,7 @@ export function KsiegowoscClient({
                 />
               </label>
               <label className="grid min-w-24 flex-[1.2] gap-0.5">
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Nazwa</span>
+                <span className="section-label !text-muted leading-none">Nazwa</span>
                 <input
                   value={expenseForm.expenseName}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, expenseName: ev.target.value }))}
@@ -815,7 +815,7 @@ export function KsiegowoscClient({
                 />
               </label>
               <label className="grid min-w-24 flex-[1.2] gap-0.5">
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Wystawca</span>
+                <span className="section-label !text-muted leading-none">Wystawca</span>
                 <input
                   value={expenseForm.issuerName}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, issuerName: ev.target.value }))}
@@ -824,7 +824,7 @@ export function KsiegowoscClient({
                 />
               </label>
               <label className="grid min-w-17 shrink gap-0.5">
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Kwota</span>
+                <span className="section-label !text-muted leading-none">Kwota</span>
                 <input
                   value={expenseForm.amountPln}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, amountPln: ev.target.value }))}
@@ -834,8 +834,8 @@ export function KsiegowoscClient({
                 />
               </label>
               <label className="grid min-w-17 shrink gap-0.5" title={expenseFile?.name ?? "Dodaj plik"}>
-                <span className="text-muted text-[0.5rem] font-semibold uppercase leading-none">Plik</span>
-                <span className="relative flex cursor-pointer items-center justify-center rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-depths hover:bg-luster/40">
+                <span className="section-label !text-muted leading-none">Plik</span>
+                <span className="relative flex cursor-pointer items-center justify-center rounded-app border border-mist bg-snow px-1.5 py-1 text-depths hover:bg-paper">
                   <input
                     key={expenseFileKey}
                     type="file"
@@ -886,15 +886,15 @@ export function KsiegowoscClient({
               </p>
             ) : null}
 
-            <h3 className="dash-sans text-depths mt-4 text-xs font-semibold uppercase tracking-wide">
+            <h3 className="section-label mt-4">
               Lista kosztów · według daty
             </h3>
             {expensesForPeriod.length === 0 ? (
               <p className="text-muted py-3 text-xs">Brak kosztów w tym miesiącu — dodaj powyżej.</p>
             ) : (
-              <div className="mt-2 max-h-[min(16rem,36vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
+              <div className="mt-2 max-h-[min(16rem,36vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
                 <table className="w-full min-w-176 border-collapse">
-                  <thead className="sticky top-0 z-1 bg-jodhpur/95">
+                  <thead className="sticky top-0 z-1 bg-paper">
                     <tr>
                       <th className={`${th} w-[5%]`}>Lp.</th>
                       <th className={`${th} w-[11%]`}>Data rachunku/faktury</th>
@@ -958,9 +958,9 @@ export function KsiegowoscClient({
             Brak kosztów w tym roku — pojawią się po wypłatach i kosztach z widoku miesięcznego.
           </p>
         ) : (
-          <div className="max-h-[min(20rem,42vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
+          <div className="max-h-[min(20rem,42vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
             <table className="w-full min-w-xl border-collapse">
-              <thead className="sticky top-0 z-1 bg-jodhpur/95">
+              <thead className="sticky top-0 z-1 bg-paper">
                 <tr>
                   <th className={th}>Miesiąc</th>
                   <th className={`${th} text-right`}>Wypłaty</th>
@@ -983,7 +983,7 @@ export function KsiegowoscClient({
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-jodhpur/70">
+                <tr className="bg-paper">
                   <td className={`${td} font-bold`}>Suma roku</td>
                   <td className={`${td} text-right font-bold dash-mono`}>
                     {formatPln(yearCostTotals.payoutsPln)}
@@ -1005,7 +1005,7 @@ export function KsiegowoscClient({
       </section>
 
       {!isMonthClosed ? (
-      <section className="rounded-app border border-panel-frame/35 bg-snow p-3 sm:p-4">
+      <section className="rounded-app bg-snow p-3 sm:p-4">
         <h2 className="dash-sans text-depths text-sm font-semibold">
           {viewMode === "year"
             ? `Zestawienie roczne z podziałem miesięcznym · ${selectedYear}`
@@ -1021,7 +1021,7 @@ export function KsiegowoscClient({
             {viewMode === "year" ? "Brak danych w tym roku." : "Brak danych w tym miesiącu."}
           </p>
         ) : (
-          <div className="mt-3 max-h-[min(18rem,40vh)] overflow-auto rounded-app border border-panel-frame/25 scrollbar-panel">
+          <div className="mt-3 max-h-[min(18rem,40vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
             <table className="w-full min-w-3xl border-collapse">
               <thead>
                 <tr>
@@ -1070,7 +1070,7 @@ export function KsiegowoscClient({
               </tbody>
               {yearSummaryTotals ? (
                 <tfoot>
-                  <tr className="bg-jodhpur/70">
+                  <tr className="bg-paper">
                     <td className={`${td} font-bold`}>Suma roku</td>
                     <td className={`${td} text-right font-bold dash-mono`}>
                       {formatPln(yearSummaryTotals.gross)}
@@ -1106,7 +1106,7 @@ export function KsiegowoscClient({
       ) : null}
 
       {!isMonthClosed ? (
-      <section className="rounded-app border border-panel-frame/40 bg-white p-4 sm:p-5">
+      <section className="rounded-app bg-snow p-4 sm:p-5">
         <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia — Zrób to sam</h2>
         <p className="text-muted mt-1 text-xs">
           Tylko to, co dotyczy Twojej firmy ·{" "}
@@ -1115,7 +1115,7 @@ export function KsiegowoscClient({
         </p>
 
         <div className="mt-5 space-y-4">
-          <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
+          <article className="card-quiet p-4">
             <h3 className="dash-sans text-depths text-sm font-bold">1. Twój podatek dochodowy (PIT-12)</h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -1158,7 +1158,7 @@ export function KsiegowoscClient({
             </p>
           </article>
 
-          <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
+          <article className="card-quiet p-4">
             <h3 className="dash-sans text-depths text-sm font-bold">2. Składki i podatki za studentów (poniżej 26 lat)</h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -1174,7 +1174,7 @@ export function KsiegowoscClient({
             </ul>
           </article>
 
-          <article className="rounded-app border border-panel-frame/30 bg-snow p-4">
+          <article className="card-quiet p-4">
             <h3 className="dash-sans text-depths text-sm font-bold">3. Twój własny ZUS (właściciel JDG)</h3>
             <label className="mt-3 grid max-w-sm gap-1">
               <span className="text-muted text-xs font-semibold">Wybierz etap</span>
@@ -1201,11 +1201,9 @@ export function KsiegowoscClient({
         </div>
 
         <article
-          className={`mt-5 rounded-app border-2 p-4 ${
-            netProfit < 0 ? "border-claret/40 bg-claret/5" : "border-moss/40 bg-moss/8"
-          }`}
+          className="card-quiet mt-5 p-4"
         >
-          <h3 className={`dash-sans text-sm font-bold ${netProfit < 0 ? "text-claret" : "text-moss"}`}>
+          <h3 className="section-label">
             Podsumowanie — zysk po wszystkich wydatkach
           </h3>
           <ul className="mt-3 space-y-1.5 text-sm">
@@ -1236,11 +1234,7 @@ export function KsiegowoscClient({
               <span className={`text-base font-bold ${netProfit < 0 ? "text-claret" : "text-moss"}`}>
                 {netProfit < 0 ? "Strata na rękę" : "Zostaje zysku na rękę"}
               </span>
-              <span
-                className={`text-xl font-black dash-mono ${
-                  netProfit < 0 ? "text-claret" : "text-moss"
-                }`}
-              >
+              <span className="text-xl font-black dash-mono text-depths">
                 {formatPln(netProfit)}
               </span>
             </li>
@@ -1257,13 +1251,13 @@ export function KsiegowoscClient({
 
       {viewMode === "month" ? (
         isMonthClosed ? (
-          <section className="rounded-ledger border-2 border-moss/25 bg-moss/[0.04] p-4 sm:p-6">
+          <section className="card-quiet p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
                 <IconLock className="h-5 w-5" />
               </span>
               <div>
-                <p className="dash-sans text-depths text-base font-black uppercase tracking-wide">
+                <p className="section-label text-base !tracking-wide">
                   Miesiąc zamknięty — ukończony etap
                 </p>
                 <p className="text-muted mt-0.5 text-xs capitalize">
@@ -1293,9 +1287,9 @@ export function KsiegowoscClient({
             </p>
           </section>
         ) : (
-          <section className="rounded-ledger border-2 border-depths/15 bg-white p-4 sm:p-5">
+          <section className="rounded-app bg-snow p-4 sm:p-5">
             <div>
-              <h2 className="dash-sans text-depths text-base font-bold uppercase tracking-tight">Kreator zamknięcia miesiąca</h2>
+              <h2 className="section-label text-base">Kreator zamknięcia miesiąca</h2>
               <p className="text-muted mt-1 text-xs capitalize">
                 {periodLabel}
                 {!canClose ? " — zamknięcie dostępne od 5. dnia następnego miesiąca." : " — spełnij warunki, aby zamknąć miesiąc."}
@@ -1322,7 +1316,7 @@ export function KsiegowoscClient({
                 <span className="font-medium">Warunek 2 — wszystkie wypłaty tutorów mają status PAID</span>
               </li>
               <li>
-                <label className="flex cursor-pointer items-center gap-2 rounded-ledger border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-luster/40">
+                <label className="flex cursor-pointer items-center gap-2 rounded-ledger border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-paper">
                   <input
                     type="checkbox"
                     checked={bankReconciled}
@@ -1347,7 +1341,7 @@ export function KsiegowoscClient({
           </section>
         )
       ) : (
-        <section className="rounded-app border border-panel-frame/40 bg-white p-4 sm:p-5">
+        <section className="rounded-app bg-snow p-4 sm:p-5">
           <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Zamknięcia w roku {selectedYear}</h2>
           <p className="text-muted mt-1 text-xs">
             Zamknięcie dotyczy zawsze konkretnego miesiąca — tu widzisz statusy. Przełącz na widok miesięczny, aby
@@ -1357,7 +1351,7 @@ export function KsiegowoscClient({
             {monthBreakdown.map((row) => (
               <li
                 key={row.monthKey}
-                className="flex items-center justify-between gap-2 rounded-app border border-panel-frame/25 bg-snow px-3 py-2"
+                className="flex items-center justify-between gap-2 border-b-2 border-paper px-1 py-2 last:border-0"
               >
                 <span className="text-depths text-xs font-medium capitalize">{row.label}</span>
                 {row.closed ? (
@@ -1400,7 +1394,7 @@ function ClosedFigure({
   const toneClass = tone === "moss" ? "text-moss" : tone === "claret" ? "text-claret" : "text-depths";
   return (
     <div>
-      <p className="text-muted text-[0.62rem] font-semibold uppercase tracking-wide">{label}</p>
+      <p className="section-label !text-muted">{label}</p>
       <p className={`dash-mono mt-1 ${emphasis ? "text-lg font-black" : "text-sm font-bold"} ${toneClass}`}>
         {value}
       </p>

@@ -49,30 +49,16 @@ function lessonStatus(lesson: Lesson): LessonStatus {
   return lesson.status ?? (lesson.isCompleted ? "PENDING_VERIFICATION" : "PLANNED");
 }
 
-function tileClasses(status: LessonStatus): string {
-  switch (status) {
-    case "VERIFIED":
-      return "bg-green-800 ring-2 ring-green-600";
-    case "PENDING_VERIFICATION":
-      return "bg-amber-400 ring-2 ring-amber-500";
-    case "UNPAID":
-      return "bg-taupe ring-2 ring-red-600";
-    default:
-      return "bg-taupe";
-  }
+function tileClasses(_status: LessonStatus): string {
+  return "bg-mist";
 }
 
-function textClasses(status: LessonStatus): { primary: string; secondary: string; time: string } {
-  if (status === "VERIFIED") {
-    return { primary: "text-lime", secondary: "text-lime/90", time: "text-lime" };
-  }
-  if (status === "PENDING_VERIFICATION") {
-    return { primary: "text-depths", secondary: "text-depths/80", time: "text-depths" };
-  }
-  if (status === "UNPAID") {
-    return { primary: "text-depths font-bold", secondary: "text-red-800 font-semibold", time: "text-red-800" };
-  }
-  return { primary: "text-depths", secondary: "text-muted", time: "text-muted" };
+function textClasses(_status: LessonStatus): { primary: string; secondary: string; time: string } {
+  return {
+    primary: "text-muted",
+    secondary: "text-steel",
+    time: "text-muted",
+  };
 }
 
 function actionLabel(status: LessonStatus): string {
@@ -170,31 +156,31 @@ export function WeeklySchedule({
         className="mb-2 shrink-0 py-1.5"
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain [align-items:stretch] lg:grid lg:grid-cols-7 lg:grid-rows-1 lg:gap-1 lg:overflow-hidden">
+      <div className="scrollbar-panel flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-y-contain [align-items:stretch] lg:grid lg:grid-cols-7 lg:grid-rows-[auto] lg:items-start lg:gap-1.5">
         {DAY_LABELS_SHORT.map((label, dayIndex) => {
           const dayKey = dateKeyByDayIndex[dayIndex]!;
           const isToday = dayKey === todayKey;
           return (
             <div
               key={dayKey}
-              className={`flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden rounded-app border-2 bg-snow/70 lg:min-h-0 ${
-                isToday ? "border-lime" : "border-transparent"
+              className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-app lg:min-h-0 lg:h-auto ${
+                isToday ? "bg-lime px-0.5" : "card-quiet"
               }`}
             >
               <div className="flex shrink-0 flex-col items-center px-1 py-1.5">
                 <span
-                  className="text-depths text-center text-[0.65rem] font-bold leading-tight"
+                  className={`text-center text-[0.65rem] font-extrabold leading-tight text-depths`}
                   aria-current={isToday ? "date" : undefined}
                 >
                   {label}
                 </span>
-                <span className="text-muted text-center text-[0.6rem] font-semibold tabular-nums">
+                <span className={`text-center text-[0.6rem] font-semibold tabular-nums ${isToday ? "text-depths/70" : "text-muted"}`}>
                   {formatDayDateFromMondayIso(weekMondayIso, dayIndex)}
                 </span>
               </div>
-              <div className="scrollbar-panel flex min-h-0 flex-1 flex-row gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 pb-2 pt-0.5 lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:overscroll-y-contain">
+              <div className="flex flex-row gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 pb-2 pt-0.5 lg:flex-col lg:overflow-visible">
                 {(byDay[dayIndex] ?? []).length === 0 ? (
-                  <p className="text-aster flex min-h-[4.75rem] w-full min-w-0 flex-1 items-center justify-center px-0.5 text-center text-[0.65rem] italic leading-snug lg:min-h-0">
+                  <p className="flex min-h-[4.75rem] w-full min-w-0 flex-1 items-center justify-center px-0.5 text-center text-[0.65rem] italic leading-snug text-[#AAAAAA] lg:min-h-[4rem]">
                     brak zajęć
                   </p>
                 ) : (
@@ -210,13 +196,7 @@ export function WeeklySchedule({
                       >
                         <div className="flex shrink-0 items-start justify-between gap-1">
                           <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold leading-none ${
-                              status === "VERIFIED"
-                                ? "bg-lime text-depths"
-                                : status === "PENDING_VERIFICATION"
-                                  ? "bg-depths text-lime"
-                                  : "bg-[#000C4A] text-luster"
-                            }`}
+                            className="avatar-initials h-8 w-8 shrink-0 text-[0.65rem]"
                             aria-hidden
                           >
                             {lesson.initials}
@@ -235,7 +215,7 @@ export function WeeklySchedule({
                             {lesson.classLabel}
                           </p>
                           {status === "UNPAID" ? (
-                            <p className="mt-0.5 text-center text-[0.5rem] font-black uppercase leading-tight text-red-700">
+                            <p className="mt-0.5 text-center text-[0.5rem] font-extrabold uppercase leading-tight text-steel">
                               Brak wpłaty — interweniuj
                             </p>
                           ) : null}
@@ -254,14 +234,10 @@ export function WeeklySchedule({
                                   ? "Cofnij zaliczenie"
                                   : "Zalicz lekcję"
                           }
-                          className={`mt-auto flex w-full shrink-0 items-center justify-center gap-1 rounded-full py-1 text-[0.6rem] font-bold ${
+                          className={`mt-auto flex w-full shrink-0 items-center justify-center gap-1 rounded-ledger py-1 text-[0.6rem] font-extrabold ${
                             locked
-                              ? "cursor-not-allowed bg-green-900/40 text-lime/80"
-                              : status === "PENDING_VERIFICATION"
-                                ? "bg-depths text-lime"
-                                : status === "UNPAID"
-                                  ? "bg-red-700 text-white"
-                                  : "bg-[#000C4A] text-lime"
+                              ? "cursor-not-allowed bg-depths/50 text-soft-lime/70"
+                              : "bg-depths text-lime"
                           }`}
                         >
                           {status === "VERIFIED" || status === "PENDING_VERIFICATION" ? (
@@ -283,7 +259,7 @@ export function WeeklySchedule({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col rounded-app border-2 border-panel-frame p-2.5 ${className ?? ""}`}
+      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col rounded-app bg-snow p-2.5 ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Terminarz" compact titleHref="/terminarz" />}
       {grid}

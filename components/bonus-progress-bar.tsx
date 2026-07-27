@@ -27,24 +27,14 @@ export function BonusProgressBar({
         title={`Premia: ${doneLabel}/${p.threshold} godz. (zatwierdzone)`}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <span
-            className={`text-[10px] font-bold uppercase tracking-wide ${
-              p.achieved ? "text-green-800" : "text-muted"
-            }`}
-          >
-            Premia
-          </span>
-          <span
-            className={`text-xs font-semibold tabular-nums ${
-              p.achieved ? "text-green-800" : "text-depths"
-            }`}
-          >
+          <span className={`section-label ${p.achieved ? "" : "!text-muted"}`}>Premia</span>
+          <span className="text-xs font-extrabold tabular-nums text-depths">
             {doneLabel}/{p.threshold}h
           </span>
         </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-luster">
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-ledger bg-mist">
           <div
-            className={`h-full rounded-full transition-all ${p.achieved ? "bg-green-700" : "bg-[#000C4A]"}`}
+            className={`h-full rounded-ledger transition-all ${p.achieved ? "bg-lime" : "bg-depths"}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -54,25 +44,26 @@ export function BonusProgressBar({
 
   return (
     <div
-      className={`rounded-app border-2 ${
-        p.achieved ? "border-lime bg-[#000C4A] text-lime" : "border-panel-frame/40 bg-snow text-depths"
+      className={`rounded-app ${
+        p.achieved ? "card-feature px-2.5 text-lime" : "bg-snow text-depths"
       } ${compact ? "p-2.5" : "p-3.5"}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className={`font-bold ${compact ? "text-xs" : "text-sm"}`}>
-          {p.achieved ? "🎉 Premia osiągnięta!" : "Premia miesięczna"}
+        <p className={`font-extrabold ${compact ? "text-xs" : "text-sm"}`}>
+          {p.achieved ? "Premia osiągnięta!" : "Premia miesięczna"}
         </p>
         <p
-          className={`font-semibold tabular-nums ${compact ? "text-[0.65rem]" : "text-xs"} ${
+          className={`font-bold tabular-nums ${compact ? "text-[0.65rem]" : "text-xs"} ${
             p.achieved ? "text-lime" : "text-muted"
           }`}
         >
-          {doneLabel} / {p.threshold} godz. · +{p.bonusPln} zł
+          {doneLabel} / {p.threshold} godz. ·{" "}
+          <span className={p.achieved ? "mark-highlight-on-dark" : undefined}>+{p.bonusPln} zł</span>
         </p>
       </div>
-      <div className={`mt-2 h-2.5 overflow-hidden rounded-full ${p.achieved ? "bg-white/20" : "bg-luster"}`}>
+      <div className={`mt-2 h-2.5 overflow-hidden rounded-ledger ${p.achieved ? "bg-white/20" : "bg-mist"}`}>
         <div
-          className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "bg-[#000C4A]"}`}
+          className={`h-full rounded-ledger transition-all ${p.achieved ? "bg-lime" : "bg-depths"}`}
           style={{ width: `${pct}%` }}
         />
       </div>

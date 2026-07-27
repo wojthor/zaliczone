@@ -13,7 +13,7 @@ type PanelHeaderProps = {
 };
 
 export function PanelHeader({ title, action, compact, titleHref, onDark }: PanelHeaderProps) {
-  const titleClass = `font-semibold tracking-tight ${onDark ? "text-luster" : "text-depths"} ${compact ? "text-xs" : "text-[0.8125rem]"}`;
+  const titleClass = `section-label ${onDark ? "!text-soft-lime" : ""} ${compact ? "" : "text-[0.75rem]"}`;
 
   const titleNode = titleHref ? (
     <h2 className="min-w-0 flex-1">
@@ -23,7 +23,7 @@ export function PanelHeader({ title, action, compact, titleHref, onDark }: Panel
       >
         <span className="truncate">{title}</span>
         <span
-          className={`shrink-0 font-bold ${onDark ? "text-lime" : "text-depths"} ${onDark ? "text-[0.65rem]" : "text-sm"}`}
+          className={`shrink-0 font-bold ${onDark ? "text-lime" : "text-depths"} text-[0.65rem]`}
           aria-hidden
         >
           ↗
@@ -36,7 +36,7 @@ export function PanelHeader({ title, action, compact, titleHref, onDark }: Panel
 
   return (
     <div
-      className={`flex items-center justify-between gap-2 ${compact ? "mb-2 pb-1.5" : "mb-2.5 pb-2"}`}
+      className={`flex items-center justify-between gap-2 border-b-2 border-paper ${compact ? "mb-2 pb-1.5" : "mb-2.5 pb-2"} ${onDark ? "border-white/10" : ""}`}
     >
       {titleNode}
       {action ? <div className="shrink-0">{action}</div> : null}

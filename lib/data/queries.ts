@@ -219,6 +219,7 @@ export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTu
       subjects: [...subjectSet],
       ewidencjaUnlockedForMonth: tutor.ewidencja_unlocked_for_month,
       payoutStatusForMonth: payout?.status ?? null,
+      acceptingStudents: tutor.accepting_students !== false,
     };
   });
 }
@@ -352,7 +353,9 @@ export async function getTutorVerifiedLessonsForMonth(
 }
 
 export async function getPriceTiers(): Promise<PriceTier[]> {
-  const supabase = await createClient();
+  // Cennik jest konfiguracją publiczną dla zalogowanych — service role omija RLS,
+  // które w praktyce blokowało odczyt tutorom (pusta lista → złe wyliczenie wypłaty).
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("price_tiers")
     .select("*")

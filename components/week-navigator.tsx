@@ -89,21 +89,35 @@ export function WeekNavigator({
     input.click();
   }
 
-  const arrowBtnClass = compact
-    ? "inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-panel-frame/40 bg-white text-sm font-bold text-depths hover:bg-jodhpur touch-manipulation"
-    : "inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-panel-frame/40 bg-white text-base font-bold text-depths hover:bg-luster touch-manipulation";
+  const arrowBtnClass =
+    "inline-flex shrink-0 items-center justify-center rounded-full bg-depths font-bold text-lime hover:opacity-90 touch-manipulation " +
+    (compact ? "size-7 text-sm" : "size-8 text-base");
 
   const labelClass = compact
-    ? "text-depths text-center text-[0.7rem] font-semibold tabular-nums"
-    : "text-depths text-center text-xs font-semibold tabular-nums";
+    ? "text-depths w-full text-center text-[0.7rem] font-extrabold tabular-nums tracking-tight whitespace-nowrap"
+    : "text-depths w-full text-center text-xs font-extrabold tabular-nums tracking-tight whitespace-nowrap";
 
+  /** Stała szerokość na najdłuższe zakresy (np. „21 wrz – 27 wrz 2026”) + zapas */
   const dateFrameClass = compact
-    ? "flex items-center gap-1 rounded-app border border-panel-frame/40 bg-white py-1 pl-2 pr-1"
-    : "flex items-center gap-1 rounded-app border border-panel-frame/40 bg-white py-1.5 pl-2.5 pr-1.5";
+    ? "flex w-[12.75rem] shrink-0 items-center gap-1 rounded-app bg-mist py-1 pl-2 pr-1"
+    : "flex w-[14.5rem] shrink-0 items-center gap-1 rounded-app bg-mist py-1.5 pl-2.5 pr-1.5";
+
+  const todayMondayIso = toMondayIso(new Date());
+  const isCurrentWeek = displayIso === todayMondayIso;
+
+  function goToday() {
+    setDisplayIso(todayMondayIso);
+    setPickerValue(todayMondayIso);
+    onWeekMondayIsoChange(todayMondayIso);
+  }
+
+  const todayBtnClass = compact
+    ? "rounded-ledger bg-depths px-2.5 py-1 text-[0.65rem] font-extrabold text-lime"
+    : "rounded-ledger bg-depths px-3 py-1.5 text-xs font-extrabold text-lime";
 
   return (
     <div className={`relative z-10 flex flex-col items-center gap-1 px-1 py-1 ${className ?? ""}`}>
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1">
         <button
           type="button"
           onClick={() => shift(-1)}
@@ -114,11 +128,11 @@ export function WeekNavigator({
           ←
         </button>
         <div className={dateFrameClass}>
-          <p className={labelClass}>{formatWeekRangeFromMondayIso(displayIso)}</p>
+          <p className={`min-w-0 flex-1 ${labelClass}`}>{formatWeekRangeFromMondayIso(displayIso)}</p>
           <button
             type="button"
             onClick={openDatePicker}
-            className="text-depths/70 hover:text-depths rounded-full p-1 transition hover:bg-luster touch-manipulation"
+            className="text-depths/70 hover:text-depths shrink-0 rounded-full p-1 transition hover:bg-luster touch-manipulation"
             aria-label="Wybierz tydzień przez konkretny dzień"
             title="Wybierz dzień — ustawimy cały tydzień"
           >
@@ -145,6 +159,16 @@ export function WeekNavigator({
           title="Następny tydzień"
         >
           →
+        </button>
+        <button
+          type="button"
+          onClick={goToday}
+          disabled={isCurrentWeek}
+          aria-hidden={isCurrentWeek}
+          tabIndex={isCurrentWeek ? -1 : 0}
+          className={`${todayBtnClass} shrink-0 ${isCurrentWeek ? "invisible pointer-events-none" : ""}`}
+        >
+          Dzisiaj
         </button>
       </div>
       {summary}

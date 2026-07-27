@@ -5,12 +5,16 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
+  IconCalendar,
+  IconChecklist,
   IconChevronLeft,
   IconClose,
   IconDashboard,
+  IconDollar,
+  IconFolder,
+  IconGuide,
   IconLogout,
   IconMenu,
-  IconPayroll,
   IconUsers,
   IconWallet,
 } from "@/components/icons";
@@ -25,12 +29,13 @@ const SIDEBAR_COLLAPSED_W = "4.5rem";
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Główna", Icon: IconDashboard },
-  { href: "/admin/rozliczenia", label: "Rozliczenia", Icon: IconWallet },
-  { href: "/admin/wyplaty", label: "Wypłaty", Icon: IconPayroll },
-  { href: "/admin/ksiegowosc", label: "Księgowość", Icon: IconWallet },
+  { href: "/admin/kalendarz", label: "Kalendarz", Icon: IconCalendar },
+  { href: "/admin/rozliczenia", label: "Lekcje", Icon: IconChecklist },
+  { href: "/admin/wyplaty", label: "Wypłaty", Icon: IconWallet },
+  { href: "/admin/ksiegowosc", label: "Księgowość", Icon: IconGuide },
   { href: "/admin/nauczyciele", label: "Nauczyciele", Icon: IconUsers },
-  { href: "/admin/cennik", label: "Cennik i przedmioty", Icon: IconWallet },
-  { href: "/admin/dokumenty", label: "Dokumenty", Icon: IconWallet },
+  { href: "/admin/cennik", label: "Cennik i przedmioty", Icon: IconDollar },
+  { href: "/admin/dokumenty", label: "Dokumenty", Icon: IconFolder },
 ] as const;
 
 function subscribeLg(cb: () => void) {
@@ -68,7 +73,10 @@ export function AdminLayoutClient({
   const [mobileOpen, setMobileOpen] = useState(false);
   const isLg = useLgUp();
   const effectiveCollapsed = isLg && collapsed;
-  const isPrintDoc = pathname.startsWith("/admin/ksiegowosc/ewidencja");
+  const isPrintDoc =
+    pathname.startsWith("/admin/ksiegowosc/ewidencja") ||
+    pathname.startsWith("/admin/ksiegowosc/koszty") ||
+    pathname.startsWith("/admin/wyplaty/lista-plac");
   const isRozliczenia = pathname === "/admin/rozliczenia";
 
   useEffect(() => {
@@ -105,9 +113,9 @@ export function AdminLayoutClient({
             key={href}
             href={href}
             onClick={closeOnClick ? () => setMobileOpen(false) : undefined}
-            className={`group relative flex items-center gap-2 rounded-app py-2 text-sm font-semibold transition-colors ${
+            className={`group relative flex items-center gap-2 rounded-app py-2 text-sm transition-colors ${
               collapsedLook ? "justify-center px-2" : "px-2.5"
-            } ${active ? "bg-lime text-depths" : "text-luster hover:bg-white/10"}`}
+            } ${active ? "nav-active" : "font-semibold text-luster hover:bg-white/10"}`}
           >
             <Icon className="h-4.5 w-4.5 shrink-0" />
             {!collapsedLook ? <span>{label}</span> : null}
@@ -188,7 +196,7 @@ export function AdminLayoutClient({
           ) : null}
         </div>
       </aside>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-app border-2 border-panel-frame bg-snow/90 p-3 sm:p-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-app bg-snow p-3 sm:p-6">
         <div className="mb-3 flex shrink-0 items-center gap-2 lg:hidden">
           <button
             type="button"

@@ -24,14 +24,14 @@ export default async function PrzewodnikPage() {
         Terminy, instrukcje krok po kroku i dane firmowe potrzebne do rozliczeń — wszystko w jednym miejscu.
       </p>
 
-      <section className="mt-6 rounded-app border-2 border-panel-frame bg-luster/50 p-4 sm:p-5">
-        <h2 className="text-depths flex items-center gap-2 text-base font-semibold tracking-tight">
-          <IconCalendar className="h-4.5 w-4.5 text-[#000C4A]" />
+      <section className="card-quiet mt-6 p-4 sm:p-5">
+        <h2 className="section-label flex items-center gap-2">
+          <IconCalendar className="h-4.5 w-4.5 text-depths" />
           Harmonogram — {currentMonthLabel}
         </h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-app bg-snow/95 p-3.5">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Ewidencja za {previousMonthLabel}</p>
+          <div className="rounded-app bg-snow p-3.5">
+            <p className="section-label">Ewidencja za {previousMonthLabel}</p>
             <p className={`mt-1 text-sm font-semibold ${ewidencjaOverdue ? "text-claret" : "text-depths"}`}>
               termin: {ewidencjaDeadlineLabel}
             </p>
@@ -39,15 +39,15 @@ export default async function PrzewodnikPage() {
               Wygeneruj PDF w Finansach, podpisz i odeślij administratorowi — do 3. dnia bieżącego miesiąca.
             </p>
           </div>
-          <div className="rounded-app bg-snow/95 p-3.5">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Wypłata za {previousMonthLabel}</p>
+          <div className="rounded-app bg-snow p-3.5">
+            <p className="section-label">Wypłata za {previousMonthLabel}</p>
             <p className="text-depths mt-1 text-sm font-semibold">dostępna od: {payoutAvailableLabel}</p>
             <p className="text-muted mt-1 text-xs leading-relaxed">
               Po tej dacie administrator księguje wypłatę — status zobaczysz w Finansach.
             </p>
           </div>
-          <div className="rounded-app bg-snow/95 p-3.5 sm:col-span-2">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Premia miesięczna</p>
+          <div className="rounded-app bg-snow p-3.5 sm:col-span-2">
+            <p className="section-label">Premia miesięczna</p>
             <p className="text-depths mt-1 text-sm font-semibold">
               +{DATES.bonus.bonusPln} zł po {DATES.bonus.hoursThreshold}h zatwierdzonych lekcji w miesiącu
             </p>
@@ -58,9 +58,9 @@ export default async function PrzewodnikPage() {
         </div>
       </section>
 
-      <section className="mt-4 rounded-app bg-snow/95 p-4 shadow-sm sm:p-5">
-        <h2 className="text-depths flex items-center gap-2 text-base font-semibold tracking-tight">
-          <IconGuide className="h-4.5 w-4.5 text-[#000C4A]" />
+      <section className="mt-4 rounded-app bg-snow p-4 sm:p-5">
+        <h2 className="section-label flex items-center gap-2">
+          <IconGuide className="h-4.5 w-4.5 text-depths" />
           Krok po kroku
         </h2>
 
@@ -94,22 +94,22 @@ export default async function PrzewodnikPage() {
         </div>
       </section>
 
-      <section className="mt-4 rounded-app border border-panel-frame/40 bg-jodhpur/70 p-4 sm:p-5">
-        <h2 className="text-depths flex items-center gap-2 text-base font-semibold tracking-tight">
-          <IconWallet className="h-4.5 w-4.5 text-[#000C4A]" />
+      <section className="card-quiet mt-4 p-4 sm:p-5">
+        <h2 className="section-label flex items-center gap-2">
+          <IconWallet className="h-4.5 w-4.5 text-depths" />
           Dane firmowe
         </h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted text-xs font-semibold uppercase tracking-wide">Nazwa firmy</dt>
+            <dt className="section-label">Nazwa firmy</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.name}</dd>
           </div>
           <div>
-            <dt className="text-muted text-xs font-semibold uppercase tracking-wide">NIP</dt>
+            <dt className="section-label">NIP</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.nip}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-muted text-xs font-semibold uppercase tracking-wide">Adres</dt>
+            <dt className="section-label">Adres</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.address}</dd>
           </div>
         </dl>

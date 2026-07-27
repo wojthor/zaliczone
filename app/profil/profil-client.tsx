@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { getSignedDownloadUrl } from "@/lib/actions/documents";
+import { setAcceptingStudents } from "@/lib/actions/profile";
 import { insertSubjectRequest } from "@/lib/data/mutations";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { SUBJECTS } from "@/lib/subjects";
@@ -32,6 +33,13 @@ export function ProfilClient({
   const [pending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [acceptingStudents, setAcceptingStudentsLocal] = useState(
+    profile.accepting_students !== false,
+  );
+
+  useEffect(() => {
+    setAcceptingStudentsLocal(profile.accepting_students !== false);
+  }, [profile.accepting_students]);
 
   const activeSubjects = useMemo(() => profile.active_subjects ?? [], [profile.active_subjects]);
   const pendingRequests = useMemo(
@@ -61,6 +69,27 @@ export function ProfilClient({
     });
   }
 
+  function toggleAcceptingStudents() {
+    const next = !acceptingStudents;
+    setAcceptingStudentsLocal(next);
+    startTransition(async () => {
+      try {
+        await setAcceptingStudents(next);
+        toast.success(
+          next ? "Dostępność włączona" : "Dostępność wyłączona",
+          next ? "Admin widzi, że przyjmujesz nowych uczniów." : "Admin widzi, że nie przyjmujesz nowych uczniów.",
+        );
+        router.refresh();
+      } catch (e) {
+        setAcceptingStudentsLocal(!next);
+        toast.error(
+          "Nie udało się zapisać dostępności",
+          e instanceof Error ? e.message : "Nieznany błąd",
+        );
+      }
+    });
+  }
+
   async function openAdminFile(fileId: string, storagePath: string, _preview: boolean) {
     setDownloadingId(fileId);
     try {
@@ -80,19 +109,19 @@ export function ProfilClient({
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-app bg-snow/95 p-4 shadow-sm">
-          <h2 className="text-depths text-base font-semibold tracking-tight">Dane kontaktowe</h2>
+        <section className="card-quiet p-4">
+          <h2 className="section-label">Dane kontaktowe</h2>
           <dl className="text-depths mt-4 space-y-3 text-sm">
             <div>
-              <dt className="text-muted text-xs font-semibold uppercase tracking-wide">Imię i nazwisko</dt>
+              <dt className="section-label !text-muted">Imię i nazwisko</dt>
               <dd className="mt-0.5 font-semibold">{profile.full_name ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted text-xs font-semibold uppercase tracking-wide">E-mail</dt>
+              <dt className="section-label !text-muted">E-mail</dt>
               <dd className="mt-0.5 font-medium">{email}</dd>
             </div>
             <div>
-              <dt className="text-muted text-xs font-semibold uppercase tracking-wide">Telefon</dt>
+              <dt className="section-label !text-muted">Telefon</dt>
               <dd className="mt-0.5 font-medium">
                 {profile.phone ? (
                   <a href={`tel:${profile.phone}`} className="text-depths hover:underline">
@@ -104,7 +133,7 @@ export function ProfilClient({
               </dd>
             </div>
             <div>
-              <dt className="text-muted text-xs font-semibold uppercase tracking-wide">Ogłoszenie OLX</dt>
+              <dt className="section-label !text-muted">Ogłoszenie OLX</dt>
               <dd className="mt-0.5 font-medium">
                 {profile.olx_url ? (
                   <a
@@ -120,17 +149,47 @@ export function ProfilClient({
                 )}
               </dd>
             </div>
+            <div className="border-t-2 border-paper pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="section-label !text-muted">Dostępność</p>
+                  <p className="text-depths mt-0.5 text-sm font-medium">
+                    {acceptingStudents ? "Przyjmuję nowych uczniów" : "Nie przyjmuję nowych uczniów"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={acceptingStudents}
+                  aria-label="Dostępność — przyjmowanie nowych uczniów"
+                  disabled={pending}
+                  onClick={toggleAcceptingStudents}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                    acceptingStudents ? "bg-depths" : "bg-steel"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-snow transition-transform ${
+                      acceptingStudents ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-muted mt-1.5 text-[0.7rem] leading-snug">
+                Widoczne dla administratora na liście nauczycieli.
+              </p>
+            </div>
           </dl>
         </section>
 
-        <section className="rounded-app bg-jodhpur/80 p-4 shadow-sm">
-          <h2 className="text-depths text-base font-semibold tracking-tight">Przedmioty</h2>
+        <section className="rounded-app bg-snow p-4">
+          <h2 className="section-label">Przedmioty</h2>
           <div className="mt-4">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Aktywne</p>
+            <p className="section-label !text-muted">Aktywne</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {activeSubjects.length > 0 ? (
                 activeSubjects.map((subject) => (
-                  <span key={subject} className="rounded-full bg-[#000C4A] px-3 py-1.5 text-xs font-semibold text-lime">
+                  <span key={subject} className="badge-done">
                     {subject}
                   </span>
                 ))
@@ -142,9 +201,9 @@ export function ProfilClient({
 
           <div className="mt-5 grid gap-2">
             <label className="grid gap-1">
-              <span className="text-muted text-xs font-semibold uppercase tracking-wide">Zgłoś nowy przedmiot</span>
+              <span className="section-label !text-muted">Zgłoś nowy przedmiot</span>
               <select
-                className="text-depths w-full rounded-app bg-snow px-3 py-2 text-sm font-medium"
+                className="text-depths w-full rounded-app border border-mist bg-snow px-3 py-2 text-sm font-medium"
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
               >
@@ -160,21 +219,18 @@ export function ProfilClient({
               type="button"
               onClick={submitSubject}
               disabled={!selectedSubject || pending}
-              className="w-fit rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-50"
+              className="btn-block w-fit bg-depths px-4 py-2 text-sm text-lime disabled:opacity-50"
             >
               Zgłoś do akceptacji
             </button>
           </div>
 
           <div className="mt-4">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Oczekujące</p>
+            <p className="section-label !text-muted">Oczekujące</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {pendingRequests.length > 0 ? (
                 pendingRequests.map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded-full border border-amber-400/60 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-950"
-                  >
+                  <span key={r.id} className="badge-action">
                     {r.subject} · oczekuje
                   </span>
                 ))
@@ -185,14 +241,11 @@ export function ProfilClient({
           </div>
 
           <div className="mt-4">
-            <p className="text-muted text-xs font-semibold uppercase tracking-wide">Odrzucone</p>
+            <p className="section-label !text-muted">Odrzucone</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {rejectedRequests.length > 0 ? (
                 rejectedRequests.map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded-full border border-red-400/50 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900"
-                  >
+                  <span key={r.id} className="rounded-ledger bg-mist px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-steel">
                     {r.subject} · odrzucono
                   </span>
                 ))
@@ -204,24 +257,24 @@ export function ProfilClient({
         </section>
       </div>
 
-      <section className="mt-6 rounded-app border-2 border-panel-frame bg-luster/50 p-4">
-        <h2 className="text-depths text-base font-semibold tracking-tight">Dokumenty</h2>
+      <section className="card-quiet mt-6 p-4">
+        <h2 className="section-label">Dokumenty</h2>
         <p className="text-muted mt-1 text-sm">
           Pliki, które administrator wgrał dla Ciebie (np. podpisane ewidencje).
         </p>
 
         {!adminDocuments.available ? (
-          <p className="text-muted mt-3 rounded-app border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs">
+          <p className="mt-3 rounded-app bg-mist px-3 py-2 text-xs text-depths">
             {adminDocuments.errorMessage ?? "Dysk dokumentów niedostępny."}
           </p>
         ) : adminDocuments.files.length === 0 ? (
           <p className="text-muted mt-3 text-sm">Brak dokumentów od administratora.</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-2">
+          <ul className="mt-3 flex flex-col">
             {adminDocuments.files.map((file) => (
               <li
                 key={file.id}
-                className="flex flex-col gap-3 rounded-app border border-panel-frame/30 bg-snow px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 border-b-2 border-paper py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-depths">{file.name}</p>
@@ -237,7 +290,7 @@ export function ProfilClient({
                     type="button"
                     disabled={downloadingId === file.id}
                     onClick={() => void openAdminFile(file.id, file.storage_path, true)}
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-panel-frame/40 bg-jodhpur px-3 py-1.5 text-xs font-bold text-depths disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-ledger border border-mist bg-snow px-3 py-1.5 text-xs font-bold text-depths disabled:opacity-50"
                   >
                     {downloadingId === file.id ? <Spinner className="h-3 w-3" /> : null}
                     Podgląd
@@ -246,7 +299,7 @@ export function ProfilClient({
                     type="button"
                     disabled={downloadingId === file.id}
                     onClick={() => void openAdminFile(file.id, file.storage_path, false)}
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-panel-frame/40 bg-[#000C4A] px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-50"
+                    className="btn-block inline-flex items-center justify-center gap-2 bg-depths px-3 py-1.5 text-xs text-lime disabled:opacity-50"
                   >
                     Pobierz
                   </button>

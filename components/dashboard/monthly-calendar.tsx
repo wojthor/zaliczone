@@ -10,6 +10,19 @@ import {
 
 const WEEKDAYS = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"] as const;
 
+/** Te same kolory co kategorie pod „Do wypłaty” — tylko paleta Zaliczone */
+const LESSON_DOT_COLORS = {
+  PENDING_VERIFICATION: "#D5ED21",
+  VERIFIED: "#000C4A",
+  UNPAID: "#AAAAAA",
+  PLANNED: "#5F5E5A",
+} as const;
+
+function lessonDotColor(lesson: Lesson): string {
+  const status = lesson.status ?? (lesson.isCompleted ? "PENDING_VERIFICATION" : "PLANNED");
+  return LESSON_DOT_COLORS[status] ?? LESSON_DOT_COLORS.PLANNED;
+}
+
 function dayCompletionState(
   day: number,
   year: number,
@@ -23,13 +36,8 @@ function dayCompletionState(
 
   const usesDbCompletion = dayLessons.some((lesson) => lesson.date !== undefined);
   if (usesDbCompletion) {
-    const allSettled = dayLessons.every((lesson) => {
-      const s = lesson.status ?? (lesson.isCompleted ? "PENDING_VERIFICATION" : "PLANNED");
-      return s === "VERIFIED" || s === "PENDING_VERIFICATION";
-    });
     const allVerified = dayLessons.every((lesson) => (lesson.status ?? "PLANNED") === "VERIFIED");
     if (allVerified) return "done";
-    if (allSettled) return "open";
     return "open";
   }
 
@@ -72,19 +80,19 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
   const todayD = today.getDate();
 
   const dayCell =
-    "flex h-[1.85rem] w-[1.85rem] shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold tabular-nums leading-none sm:h-8 sm:w-8";
+    "flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-full text-[0.65rem] font-extrabold tabular-nums leading-none sm:h-8 sm:w-8 sm:text-xs";
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-app border-2 border-panel-frame bg-luster px-2.5 pb-2.5 pt-1 ${className ?? ""}`}
+      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-app bg-snow px-2.5 pb-2.5 pt-1 ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Kalendarz" compact titleHref="/terminarz" />}
       <div className="mb-2.5 flex shrink-0 justify-center px-0.5">
-        <div className="flex items-center gap-0.5 rounded-app border-2 border-panel-frame bg-snow/95 px-0.5 py-0.5">
+        <div className="flex items-center gap-0.5 rounded-app bg-mist px-0.5 py-0.5">
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
-            className="text-depths hover:bg-luster/80 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
+            className="text-depths hover:bg-white/70 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
             aria-label="Poprzedni miesiąc"
           >
             ‹
@@ -95,7 +103,7 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
           <button
             type="button"
             onClick={() => shiftMonth(1)}
-            className="text-depths hover:bg-luster/80 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
+            className="text-depths hover:bg-white/70 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
             aria-label="Następny miesiąc"
           >
             ›
@@ -119,37 +127,46 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
               return <div key={`e-${i}`} className="min-h-0 min-w-0" />;
             }
             const state = dayCompletionState(day, year, month0, isLessonDoneOnDate, lessons);
+            const dayLessons = lessonsOnCalendarDate(year, month0, day, lessons);
+            const lessonCount = dayLessons.length;
             const isToday = year === todayY && month0 === todayM && day === todayD;
+            const showDots = state === "open" && lessonCount > 0;
+
             return (
-              <div key={`${year}-${month0}-${day}`} className="flex min-h-0 min-w-0 items-start justify-center px-0.5 pt-0 pb-0.5">
-                {isToday ? (
-                  <span
-                    className={`${dayCell} border-transparent bg-lime text-depths font-bold`}
-                    aria-current="date"
-                  >
-                    {day}
-                  </span>
-                ) : state === "free" ? (
-                  <span
-                    className={`${dayCell} border-transparent bg-snow/95 text-depths font-semibold`}
-                  >
-                    {day}
-                  </span>
-                ) : state === "done" ? (
-                  <div
-                    className={`${dayCell} border-transparent bg-[#000C4A] text-lime font-bold`}
-                    aria-label={`Dzień ${day}, wszystkie lekcje zaliczone`}
-                  >
-                    {day}
-                  </div>
-                ) : (
-                  <div
-                    className={`${dayCell} border-transparent bg-panel-frame text-snow font-semibold`}
-                    aria-label={`Dzień ${day}, są zaplanowane lekcje`}
-                  >
-                    {day}
-                  </div>
-                )}
+              <div
+                key={`${year}-${month0}-${day}`}
+                className="flex min-h-0 min-w-0 items-start justify-center px-0.5 pt-0 pb-0.5"
+              >
+                <div
+                  className={`${dayCell} ${
+                    isToday
+                      ? "bg-lime font-extrabold text-depths"
+                      : state === "done"
+                        ? "bg-depths font-extrabold text-soft-lime"
+                        : "bg-mist text-depths"
+                  }`}
+                  aria-label={
+                    state === "done"
+                      ? `Dzień ${day}, wszystkie lekcje zatwierdzone`
+                      : showDots
+                        ? `Dzień ${day}, ${lessonCount} lekcji`
+                        : undefined
+                  }
+                  aria-current={isToday ? "date" : undefined}
+                >
+                  <span className={showDots ? "text-[0.6rem] leading-none sm:text-[0.65rem]" : ""}>{day}</span>
+                  {showDots ? (
+                    <div className="mt-px flex max-w-[1.35rem] flex-wrap items-center justify-center gap-px sm:max-w-[1.5rem]" aria-hidden>
+                      {dayLessons.map((lesson) => (
+                        <span
+                          key={lesson.id}
+                          className="size-[3px] shrink-0 rounded-full sm:size-1"
+                          style={{ backgroundColor: lessonDotColor(lesson) }}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             );
           })}

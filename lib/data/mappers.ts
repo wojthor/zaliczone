@@ -45,6 +45,50 @@ export function lessonAmountPln(ratePln: number, startTime: string, endTime: str
   return Math.round((ratePln * minutes) / 60);
 }
 
+/** Wypłata tutora za lekcję wg stawki z cennika (`worker_rate_pln` × godziny). */
+export function tutorPayoutFromCennik(
+  line: Pick<FinanceLineUi, "classLevel" | "durationMinutes" | "label" | "amountPln">,
+  tiers: { label: string; worker_rate_pln: number }[],
+  fallbackShare = 0.7,
+): number {
+  const minutes =
+    line.durationMinutes > 0
+      ? line.durationMinutes
+      : (() => {
+          const match = line.label.match(/(\d+)\s*min/);
+          return match ? Number(match[1]) : 60;
+        })();
+  const hours = minutes / 60;
+  const level = (line.classLevel ?? "").trim().toLowerCase();
+  const tier = level
+    ? tiers.find((t) => t.label.trim().toLowerCase() === level)
+    : undefined;
+  if (tier) {
+    return Math.round(Number(tier.worker_rate_pln) * hours * 100) / 100;
+  }
+  return Math.round(line.amountPln * fallbackShare * 100) / 100;
+}
+
+export function sumTutorPayoutFromCennik(
+  lines: Pick<FinanceLineUi, "classLevel" | "durationMinutes" | "label" | "amountPln">[],
+  tiers: { label: string; worker_rate_pln: number }[],
+  fallbackShare = 0.7,
+): number {
+  return Math.round(lines.reduce((sum, line) => sum + tutorPayoutFromCennik(line, tiers, fallbackShare), 0) * 100) / 100;
+}
+
+/** Godziny z linii finansowych (VERIFIED). */
+export function financeLinesHours(
+  lines: Pick<FinanceLineUi, "durationMinutes" | "label">[],
+): number {
+  const minutes = lines.reduce((sum, line) => {
+    if (line.durationMinutes > 0) return sum + line.durationMinutes;
+    const match = line.label.match(/(\d+)\s*min/);
+    return sum + (match ? Number(match[1]) : 60);
+  }, 0);
+  return Math.round((minutes / 60) * 10) / 10;
+}
+
 export function isLessonLocked(status: LessonStatus): boolean {
   return status === "VERIFIED";
 }
@@ -95,6 +139,7 @@ export function dbLessonToUi(
     studentId: lesson.student_id,
     status: lesson.status,
     isCompleted: lesson.status === "VERIFIED" || lesson.status === "PENDING_VERIFICATION",
+    seriesId: lesson.series_id ?? null,
   };
 }
 

@@ -131,11 +131,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => {
                   if (!isLg) setMobileOpen(false);
                 }}
-                className={`text-luster flex items-center gap-2.5 py-1.5 text-sm font-medium transition-colors duration-200 touch-manipulation ${showNavText ? "justify-start px-0.5" : "justify-center"}`}
+                className={`flex items-center gap-2.5 py-1.5 text-sm touch-manipulation ${
+                  showNavText ? "justify-start px-0.5" : "justify-center"
+                } ${
+                  active
+                    ? "nav-active rounded-app px-1.5 text-depths"
+                    : "text-luster font-medium transition-colors duration-200"
+                }`}
               >
                 <span
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                    active ? "bg-lime text-depths" : "text-luster"
+                    active ? "bg-depths text-lime" : "text-luster"
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
@@ -169,10 +175,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             : "overflow-y-auto"
         }`}
       >
-        <div className="sticky top-0 z-30 mb-1 flex shrink-0 items-center gap-2 bg-luster/95 py-2 pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] pt-[max(0.25rem,env(safe-area-inset-top))] backdrop-blur-md lg:hidden">
+        <div className="sticky top-0 z-30 mb-1 flex shrink-0 items-center gap-2 bg-paper/95 py-2 pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] pt-[max(0.25rem,env(safe-area-inset-top))] lg:hidden">
           <button
             type="button"
-            className="text-depths flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-panel-frame/50 bg-snow/90 touch-manipulation"
+            className="text-depths flex h-10 w-10 shrink-0 items-center justify-center rounded-app bg-snow touch-manipulation"
             aria-label="Otwórz menu"
             aria-expanded={showMobileDrawer}
             onClick={() => setMobileOpen(true)}

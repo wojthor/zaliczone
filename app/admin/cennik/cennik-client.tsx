@@ -108,25 +108,25 @@ export function CennikClient({
         </button>
       </div>
 
-      <section className="rounded-app border-2 border-panel-frame bg-snow px-4 py-4 sm:px-5 sm:py-5">
-        <h2 className="dash-sans text-depths text-base font-semibold tracking-tight sm:text-lg">Aktualny cennik</h2>
+      <section className="rounded-app bg-snow px-4 py-4 sm:px-5 sm:py-5">
+        <h2 className="section-label">Aktualny cennik</h2>
         <div className="mt-4 min-w-0 overflow-x-auto">
           <table className="table-fixed w-full min-w-0 border-collapse text-left">
             <thead>
-              <tr className="border-b border-panel-frame/40">
-                <th className="dash-sans text-muted pb-2.5 text-xs font-medium">Poziom</th>
-                <th className="dash-sans text-muted pb-2.5 text-right text-xs font-medium">Klient</th>
-                <th className="dash-sans text-muted pb-2.5 text-right text-xs font-medium">Pracownik</th>
-                <th className="dash-sans text-muted pb-2.5 text-right text-xs font-medium">Marża</th>
+              <tr className="border-b-2 border-paper">
+                <th className="section-label !text-muted pb-2.5">Poziom</th>
+                <th className="section-label !text-muted pb-2.5 text-right">Klient</th>
+                <th className="section-label !text-muted pb-2.5 text-right">Pracownik</th>
+                <th className="section-label !text-muted pb-2.5 text-right">Marża</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={`${r.label}-${i}`} className={i > 0 ? "border-t border-panel-frame/35" : ""}>
+                <tr key={`${r.label}-${i}`} className="border-b-2 border-paper last:border-0">
                   <th className="dash-sans text-depths py-2.5 text-sm font-bold">{r.label}</th>
                   <td className="dash-mono py-2.5 text-right text-sm font-bold">{r.client} zł</td>
                   <td className="dash-mono py-2.5 text-right text-sm font-bold">{r.worker} zł</td>
-                  <td className="dash-mono py-2.5 text-right text-sm font-bold text-moss">{r.client - r.worker} zł</td>
+                  <td className="dash-mono py-2.5 text-right text-sm font-bold text-depths">{r.client - r.worker} zł</td>
                 </tr>
               ))}
             </tbody>
@@ -134,14 +134,14 @@ export function CennikClient({
         </div>
       </section>
 
-      <section className="rounded-app border border-panel-frame/35 bg-snow p-4">
-        <h2 className="dash-sans text-depths font-semibold">Oczekujące przedmioty</h2>
-        <ul className="mt-2 space-y-2">
+      <section className="card-quiet p-4">
+        <h2 className="section-label">Oczekujące przedmioty</h2>
+        <ul className="mt-2 space-y-0">
           {requests.length === 0 ? (
             <li className="dash-sans text-muted text-sm">Brak oczekujących zgłoszeń.</li>
           ) : (
             requests.map((p) => (
-              <li key={p.id} className="dash-sans rounded-app bg-luster/60 px-3 py-2 text-sm">
+              <li key={p.id} className="dash-sans border-b-2 border-paper py-2.5 text-sm last:border-0">
                 <div className="flex items-center justify-between gap-2">
                   <p>
                     <span className="font-semibold">{p.profiles?.full_name ?? "Korepetytor"}</span> · {p.subject}
@@ -150,7 +150,7 @@ export function CennikClient({
                     <button
                       type="button"
                       disabled={pending}
-                      className="dash-sans rounded-full bg-moss px-2.5 py-1 text-[11px] font-bold text-snow disabled:opacity-60"
+                      className="badge-done disabled:opacity-60"
                       onClick={() => handleApprove(p)}
                     >
                       Zatwierdź
@@ -158,7 +158,7 @@ export function CennikClient({
                     <button
                       type="button"
                       disabled={pending}
-                      className="dash-sans rounded-full bg-claret px-2.5 py-1 text-[11px] font-bold text-snow disabled:opacity-60"
+                      className="rounded-ledger bg-mist px-2.5 py-1 text-[11px] font-bold text-steel disabled:opacity-60"
                       onClick={() => handleReject(p.id)}
                     >
                       Odrzuć
@@ -198,7 +198,7 @@ export function CennikClient({
                     onChange={(e) => setDraftRows((prev) => prev.map((x, idx) => (idx === i ? { ...x, worker: Number(e.target.value) } : x)))}
                     className="dash-mono rounded-app border px-2.5 py-2 text-sm"
                   />
-                  <input value={`${r.client - r.worker} zł`} readOnly className="dash-mono rounded-app border bg-luster px-2.5 py-2 text-sm font-semibold text-moss" />
+                  <input value={`${r.client - r.worker} zł`} readOnly className="dash-mono rounded-app border border-mist bg-paper px-2.5 py-2 text-sm font-semibold text-depths" />
                   <button
                     type="button"
                     onClick={() => removeDraftRow(i)}

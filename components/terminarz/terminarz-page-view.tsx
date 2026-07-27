@@ -3,11 +3,13 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PageShell } from "@/components/page-shell";
 import { LessonCompletionProvider } from "@/components/dashboard/lesson-completion-context";
 import { WeeklySchedule } from "@/components/dashboard/weekly-schedule";
 import {
   dayLabel,
   type Lesson,
+  type LessonStatus,
 } from "@/components/dashboard/lesson-data";
 import { LessonStatusBadge, resolveLessonStatus } from "@/components/lesson/lesson-status-badge";
 import { MonthNavigator, formatMonthLongFromKey, useMonthKey } from "@/components/month-navigator";
@@ -15,7 +17,7 @@ import { useWeekMondayIso } from "@/components/week-navigator";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { subjectsFromLine } from "@/lib/data/mappers";
 import { lessonDatesFromDraft } from "@/lib/data/mutations";
-import { deleteLesson, insertLessons, updateLesson } from "@/lib/actions/lessons";
+import { deleteLesson, deleteLessonAndRemainingInSeries, deleteLessonsByIds, insertLessons, updateLesson } from "@/lib/actions/lessons";
 import type { StudentUi } from "@/lib/types/database";
 
 type RecurrenceMode = "once" | "weekly" | "custom";
@@ -31,6 +33,8 @@ type LessonDraft = {
   end: string;
   recurrence: RecurrenceMode;
   selectedWeekdays: number[];
+  /** Data końcowa cyklicznych zajęć (YYYY-MM-DD) */
+  untilDateIso: string;
   notes: string;
 };
 
@@ -40,34 +44,44 @@ function todayIso(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function defaultUntilFromStart(dateIso: string): string {
+  const d = new Date(`${dateIso}T12:00:00`);
+  d.setDate(d.getDate() + 21);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function makeEmptyDraft(): LessonDraft {
+  const dateIso = todayIso();
   return {
     subject: "",
     studentId: "",
     studentName: "",
     initials: "",
     classLabel: "",
-    dateIso: todayIso(),
+    dateIso,
     start: "15:00",
     end: "16:00",
     recurrence: "once",
     selectedWeekdays: [],
+    untilDateIso: defaultUntilFromStart(dateIso),
     notes: "",
   };
 }
 
 function buildDraftFromLesson(lesson: Lesson): LessonDraft {
+  const dateIso = lesson.date ?? todayIso();
   return {
     subject: lesson.subject,
     studentId: lesson.studentId ?? "",
     studentName: lesson.studentName,
     initials: lesson.initials,
     classLabel: lesson.classLabel,
-    dateIso: lesson.date ?? todayIso(),
+    dateIso,
     start: lesson.start,
     end: lesson.end,
     recurrence: "once",
     selectedWeekdays: [lesson.dayIndex],
+    untilDateIso: defaultUntilFromStart(dateIso),
     notes: lesson.notes ?? "",
   };
 }
@@ -192,7 +206,7 @@ function LessonModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij" onClick={onClose} />
       <div
-        className="relative z-10 w-full max-w-[min(40rem,94vw)] rounded-app border-2 border-panel-frame bg-snow p-5 sm:p-6"
+        className="relative z-10 w-full max-w-[min(40rem,94vw)] rounded-app bg-snow p-5 sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="lesson-modal-title"
@@ -266,7 +280,17 @@ function LessonModal({
           <div className="grid gap-3 sm:grid-cols-[minmax(0,13rem)_1fr]">
             <div>
               <span className="text-depths/80 mb-1 block text-xs font-semibold">Dzień zajęć</span>
-              <MiniCalendar value={draft.dateIso} onChange={(dateIso) => setDraft((prev) => ({ ...prev, dateIso }))} />
+              <MiniCalendar
+                value={draft.dateIso}
+                onChange={(dateIso) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    dateIso,
+                    untilDateIso:
+                      prev.untilDateIso < dateIso ? defaultUntilFromStart(dateIso) : prev.untilDateIso,
+                  }))
+                }
+              />
             </div>
             <div className="grid content-start gap-3">
               <div className="grid grid-cols-2 gap-3">
@@ -342,6 +366,35 @@ function LessonModal({
                     })}
                   </div>
                 ) : null}
+                {mode === "add" && (draft.recurrence === "weekly" || draft.recurrence === "custom") ? (
+                  <label className="mt-2 grid gap-1">
+                    <span className="text-depths/80 text-xs font-semibold">Powtarzaj do (włącznie)</span>
+                    <input
+                      type="date"
+                      min={draft.dateIso}
+                      className="text-depths rounded-app bg-snow px-3 py-2 text-sm"
+                      value={draft.untilDateIso}
+                      onChange={(e) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          untilDateIso: e.target.value || defaultUntilFromStart(prev.dateIso),
+                        }))
+                      }
+                    />
+                    <span className="text-muted text-[0.65rem]">
+                      Powstanie{" "}
+                      {
+                        lessonDatesFromDraft({
+                          dateIso: draft.dateIso,
+                          recurrence: draft.recurrence,
+                          selectedWeekdays: draft.selectedWeekdays,
+                          untilDateIso: draft.untilDateIso,
+                        }).length
+                      }{" "}
+                      lekcji w terminarzu.
+                    </span>
+                  </label>
+                ) : null}
               </div>
             </div>
           </div>
@@ -406,23 +459,39 @@ function TerminarzInner({
   });
   const [draft, setDraft] = useState<LessonDraft>(() => makeEmptyDraft());
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Lesson | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(0);
   const [listMonthKey, setListMonthKey] = useMonthKey();
+  const [listSearch, setListSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | LessonStatus>("all");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [sortMode, setSortMode] = useState<"dateAsc" | "dateDesc" | "studentAz" | "studentZa" | "status">("dateAsc");
+
+  const lessonsMatchingSearch = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    if (!q) return lessons;
+    return lessons.filter((lesson) => {
+      const hay = `${lesson.studentName} ${lesson.subject} ${lesson.classLabel} ${lesson.initials}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [lessons, listSearch]);
 
   const sortedForMonth = useMemo(() => {
-    return [...lessons]
+    return [...lessonsMatchingSearch]
       .filter((lesson) => lesson.date?.startsWith(listMonthKey))
       .sort(
         (a, b) =>
           (a.date ?? "").localeCompare(b.date ?? "") ||
           a.start.localeCompare(b.start) ||
-          a.studentName.localeCompare(b.studentName),
+          a.studentName.localeCompare(b.studentName, "pl"),
       );
-  }, [lessons, listMonthKey]);
+  }, [lessonsMatchingSearch, listMonthKey]);
 
   const monthStats = useMemo(() => {
+    const monthLessons = lessons.filter((lesson) => lesson.date?.startsWith(listMonthKey));
     const counts = { planned: 0, pending: 0, verified: 0, unpaid: 0 };
-    for (const lesson of sortedForMonth) {
+    for (const lesson of monthLessons) {
       const s = resolveLessonStatus(lesson.status, lesson.isCompleted);
       if (s === "PLANNED") counts.planned += 1;
       else if (s === "PENDING_VERIFICATION") counts.pending += 1;
@@ -430,7 +499,47 @@ function TerminarzInner({
       else if (s === "UNPAID") counts.unpaid += 1;
     }
     return counts;
-  }, [sortedForMonth]);
+  }, [lessons, listMonthKey]);
+
+  const subjectOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const lesson of lessons) {
+      if (lesson.date?.startsWith(listMonthKey) && lesson.subject) set.add(lesson.subject);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "pl"));
+  }, [lessons, listMonthKey]);
+
+  const filteredForMonth = useMemo(() => {
+    const filtered = sortedForMonth.filter((lesson) => {
+      const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (subjectFilter && lesson.subject !== subjectFilter) return false;
+      return true;
+    });
+
+    const statusOrder: Record<LessonStatus, number> = {
+      UNPAID: 0,
+      PLANNED: 1,
+      PENDING_VERIFICATION: 2,
+      VERIFIED: 3,
+    };
+
+    return [...filtered].sort((a, b) => {
+      if (sortMode === "studentAz" || sortMode === "studentZa") {
+        const cmp = a.studentName.localeCompare(b.studentName, "pl");
+        return sortMode === "studentAz" ? cmp : -cmp;
+      }
+      if (sortMode === "status") {
+        const sa = resolveLessonStatus(a.status, a.isCompleted);
+        const sb = resolveLessonStatus(b.status, b.isCompleted);
+        const cmp = statusOrder[sa] - statusOrder[sb];
+        if (cmp !== 0) return cmp;
+      }
+      const dateCmp = (a.date ?? "").localeCompare(b.date ?? "") || a.start.localeCompare(b.start);
+      if (sortMode === "dateDesc") return -dateCmp || a.studentName.localeCompare(b.studentName, "pl");
+      return dateCmp || a.studentName.localeCompare(b.studentName, "pl");
+    });
+  }, [sortedForMonth, statusFilter, subjectFilter, sortMode]);
 
   function openAdd() {
     setDraft(makeEmptyDraft());
@@ -457,6 +566,7 @@ function TerminarzInner({
           dateIso: draft.dateIso,
           recurrence: draft.recurrence,
           selectedWeekdays: draft.selectedWeekdays,
+          untilDateIso: draft.untilDateIso,
         });
         await insertLessons({
           studentId: draft.studentId,
@@ -465,7 +575,10 @@ function TerminarzInner({
           start: draft.start,
           end: draft.end,
         });
-        toast.success("Dodano lekcję", draft.subject);
+        toast.success(
+          dates.length > 1 ? `Dodano ${dates.length} lekcji` : "Dodano lekcję",
+          draft.subject,
+        );
       } else if (modal.type === "edit") {
         await updateLesson(modal.id, {
           studentId: draft.studentId,
@@ -485,11 +598,80 @@ function TerminarzInner({
     }
   }
 
-  async function removeLesson(id: string) {
+  async function confirmDelete(mode: "one" | "series") {
+    if (!deleteTarget || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      if (mode === "series") {
+        let deleted = 0;
+        if (deleteTarget.seriesId) {
+          const result = await deleteLessonAndRemainingInSeries(deleteTarget.id);
+          deleted = result.deleted;
+          setLessons((prev) => {
+            if (!deleteTarget.seriesId || !deleteTarget.date) {
+              return prev.filter((l) => l.id !== deleteTarget.id);
+            }
+            return prev.filter(
+              (l) =>
+                !(
+                  l.seriesId === deleteTarget.seriesId &&
+                  l.date &&
+                  deleteTarget.date &&
+                  l.date >= deleteTarget.date
+                ),
+            );
+          });
+        } else {
+          const ids = remainingInSeries(deleteTarget).map((l) => l.id);
+          const result = await deleteLessonsByIds(ids);
+          deleted = result.deleted;
+          const idSet = new Set(ids);
+          setLessons((prev) => prev.filter((l) => !idSet.has(l.id)));
+        }
+        toast.success(deleted > 1 ? `Usunięto ${deleted} lekcji z serii` : "Usunięto lekcję");
+      } else {
+        await deleteLesson(deleteTarget.id);
+        setLessons((prev) => prev.filter((lesson) => lesson.id !== deleteTarget.id));
+        toast.success("Usunięto lekcję");
+      }
+      setDeleteTarget(null);
+      router.refresh();
+    } catch {
+      toast.error("Nie udało się usunąć lekcji");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  function remainingInSeries(lesson: Lesson): Lesson[] {
+    if (!lesson.date) return [lesson];
+    if (lesson.seriesId) {
+      return lessons.filter(
+        (l) => l.seriesId === lesson.seriesId && l.date && l.date >= lesson.date!,
+      );
+    }
+    return lessons.filter(
+      (l) =>
+        l.studentId === lesson.studentId &&
+        l.subject === lesson.subject &&
+        l.start === lesson.start &&
+        l.end === lesson.end &&
+        l.dayIndex === lesson.dayIndex &&
+        l.date &&
+        l.date >= lesson.date!,
+    );
+  }
+
+  async function removeLesson(lesson: Lesson) {
+    const remaining = remainingInSeries(lesson);
+    if (remaining.length > 1) {
+      setDeleteTarget(lesson);
+      return;
+    }
     if (!confirm("Usunąć tę lekcję z listy?")) return;
     try {
-      await deleteLesson(id);
-      setLessons((prev) => prev.filter((lesson) => lesson.id !== id));
+      await deleteLesson(lesson.id);
+      setLessons((prev) => prev.filter((item) => item.id !== lesson.id));
       toast.success("Usunięto lekcję");
       router.refresh();
     } catch {
@@ -498,89 +680,202 @@ function TerminarzInner({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-muted max-w-2xl text-sm font-medium">
-          Plan lekcji, kalendarz miesiąca i pełna lista wpisów zsynchronizowana z bazą Supabase.
-        </p>
-        <button
-          type="button"
-          className="shrink-0 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
-          onClick={openAdd}
-        >
-          + Dodaj lekcję
-        </button>
-      </div>
+    <PageShell
+      title="Terminarz"
+      titleAside={
+        <input
+          type="search"
+          value={listSearch}
+          onChange={(e) => setListSearch(e.target.value)}
+          placeholder="Szukaj…"
+          className="text-depths w-[11rem] rounded-full border border-panel-frame/50 bg-luster/80 py-1.5 pl-3 pr-3 text-xs outline-none placeholder:text-muted focus:border-[#000C4A]/50 sm:w-[13rem]"
+          aria-label="Szukaj lekcji"
+        />
+      }
+    >
+      <div className="flex flex-col gap-6">
+      <p className="text-muted max-w-2xl text-sm font-medium">
+        Plan lekcji, kalendarz miesiąca i pełna lista wpisów zsynchronizowana z bazą Supabase.
+      </p>
 
-      <div className="flex min-h-[min(280px,46svh)] flex-col lg:min-h-[min(52dvh,32rem)]">
+      <section className="card-quiet p-3 sm:p-4">
+        <p className="section-label mb-3">Status w miesiącu</p>
+        <div className="flex flex-wrap items-center gap-2 text-[0.65rem] font-semibold">
+          <span className="text-muted mr-1 text-[0.65rem] font-medium capitalize">
+            {formatMonthLongFromKey(listMonthKey)}:
+          </span>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "PLANNED" ? "all" : "PLANNED"))}
+            className={`rounded-ledger px-2.5 py-1 transition ${
+              statusFilter === "PLANNED" ? "ring-2 ring-depths/30" : ""
+            } bg-snow text-depths`}
+          >
+            {monthStats.planned} zaplanowanych
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setStatusFilter((prev) => (prev === "PENDING_VERIFICATION" ? "all" : "PENDING_VERIFICATION"))
+            }
+            className={`rounded-ledger px-2.5 py-1 transition ${
+              statusFilter === "PENDING_VERIFICATION" ? "ring-2 ring-depths/30" : ""
+            } badge-action`}
+          >
+            {monthStats.pending} oczekujących
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "VERIFIED" ? "all" : "VERIFIED"))}
+            className={`rounded-ledger px-2.5 py-1 transition ${
+              statusFilter === "VERIFIED" ? "ring-2 ring-lime/50" : ""
+            } badge-done`}
+          >
+            {monthStats.verified} zatwierdzonych
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "UNPAID" ? "all" : "UNPAID"))}
+            className={`rounded-ledger px-2.5 py-1 transition ${
+              statusFilter === "UNPAID" ? "ring-2 ring-steel/50" : ""
+            } bg-steel text-snow`}
+          >
+            {monthStats.unpaid} nieopłaconych
+          </button>
+        </div>
+      </section>
+
+      <section className="flex min-h-[min(280px,46svh)] flex-col gap-3 rounded-app bg-paper p-3 sm:p-4 lg:min-h-[min(52dvh,32rem)]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-depths text-base font-extrabold tracking-tight">Plan tygodnia</h2>
+          <button
+            type="button"
+            className="shrink-0 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+            onClick={openAdd}
+          >
+            + Dodaj lekcję
+          </button>
+        </div>
         <WeeklySchedule
-          lessons={lessons}
+          lessons={lessonsMatchingSearch}
           hideHeader
           weekMondayIso={weekMondayIso}
           onWeekMondayIsoChange={setWeekMondayIso}
         />
-      </div>
+      </section>
 
-      <section className="rounded-app border-2 border-panel-frame bg-luster/50 p-4">
+      <section className="rounded-app bg-paper p-4">
         <div>
-          <h2 className="text-depths text-base font-semibold tracking-tight">Lista lekcji — miesiąc</h2>
+          <h2 className="text-depths text-base font-extrabold tracking-tight">Lista lekcji — miesiąc</h2>
           <p className="text-muted mt-0.5 text-xs capitalize">{formatMonthLongFromKey(listMonthKey)}</p>
         </div>
 
         <MonthNavigator monthKey={listMonthKey} onMonthKeyChange={setListMonthKey} className="mt-3" />
 
-        <div className="mt-3 flex flex-wrap gap-2 text-[0.65rem] font-semibold">
-          <span className="rounded-full bg-luster px-2 py-0.5 text-depths">{monthStats.planned} zaplanowanych</span>
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-950">{monthStats.pending} oczekujących</span>
-          <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-900">{monthStats.verified} zatwierdzonych</span>
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-900">{monthStats.unpaid} nieopłaconych</span>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1">
+            <span className="text-depths/80 text-[0.65rem] font-semibold">Sortowanie</span>
+            <select
+              className="text-depths rounded-app border border-panel-frame/35 bg-snow px-3 py-2 text-sm"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+              aria-label="Sortowanie listy"
+            >
+              <option value="dateAsc">Data · od najwcześniejszej</option>
+              <option value="dateDesc">Data · od najpóźniejszej</option>
+              <option value="studentAz">Uczeń · A–Z</option>
+              <option value="studentZa">Uczeń · Z–A</option>
+              <option value="status">Status</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-depths/80 text-[0.65rem] font-semibold">Przedmiot</span>
+            <select
+              className="text-depths rounded-app border border-panel-frame/35 bg-snow px-3 py-2 text-sm"
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              aria-label="Filtr przedmiotu"
+            >
+              <option value="">Wszystkie</option>
+              {subjectOptions.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        <ul className="mt-4 flex flex-col gap-2.5">
-          {sortedForMonth.length === 0 ? (
-            <li className="text-muted py-6 text-center text-sm">Brak lekcji w wybranym miesiącu.</li>
+        {(listSearch.trim() || statusFilter !== "all" || subjectFilter) && (
+          <p className="text-muted mt-2 text-[0.65rem]">
+            Wyniki: {filteredForMonth.length}
+            {" · "}
+            <button
+              type="button"
+              className="font-semibold text-depths underline-offset-2 hover:underline"
+              onClick={() => {
+                setListSearch("");
+                setStatusFilter("all");
+                setSubjectFilter("");
+              }}
+            >
+              Wyczyść filtry
+            </button>
+          </p>
+        )}
+
+        <ul className="mt-4 flex flex-col gap-2">
+          {filteredForMonth.length === 0 ? (
+            <li className="text-muted py-6 text-center text-sm">
+              {sortedForMonth.length === 0 && !listSearch.trim()
+                ? "Brak lekcji w wybranym miesiącu."
+                : "Brak lekcji pasujących do wyszukiwania / filtrów."}
+            </li>
           ) : (
-            sortedForMonth.map((lesson) => {
+            filteredForMonth.map((lesson) => {
               const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
               const needsAction = status === "UNPAID" || status === "PLANNED";
               const isPast = Boolean(lesson.date && lesson.date < today);
+              const rail =
+                status === "UNPAID"
+                  ? "status-rail status-rail-unpaid"
+                  : status === "PENDING_VERIFICATION"
+                    ? "status-rail status-rail-pending"
+                    : status === "VERIFIED"
+                      ? "status-rail status-rail-verified"
+                      : "status-rail status-rail-neutral";
               return (
                 <li
                   key={lesson.id}
-                  className={`flex flex-col gap-3 rounded-app border px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                    status === "UNPAID"
-                      ? "border-red-400/60 bg-red-50"
-                      : status === "PLANNED"
-                        ? "border-panel-frame/30 bg-snow/95"
-                        : "border-panel-frame/30 bg-snow/95"
-                  }`}
+                  className={`flex flex-col gap-3 rounded-app bg-snow px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${rail}`}
                 >
                   <div className="flex min-w-0 items-start gap-3">
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                        status === "UNPAID" ? "bg-red-800 text-white" : "bg-[#000C4A] text-luster"
-                      }`}
-                    >
+                    <span className="avatar-initials h-10 w-10 shrink-0 text-sm">
                       {lesson.initials}
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-depths">{lesson.studentName}</p>
+                        <p className="truncate text-sm font-extrabold text-depths">
+                          {lesson.studentName}
+                        </p>
                         <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
                       </div>
                       <p className="truncate text-xs text-muted">
                         {lesson.subject} · {lesson.classLabel}
                       </p>
                       <p className="text-[0.6875rem] text-muted">
-                        {lesson.date ? formatLessonDatePl(lesson.date) : dayLabel(lesson.dayIndex)} · {lesson.start}–{lesson.end}
+                        {lesson.date ? formatLessonDatePl(lesson.date) : dayLabel(lesson.dayIndex)} ·{" "}
+                        {lesson.start}–{lesson.end}
                       </p>
                       {status === "UNPAID" ? (
-                        <p className="mt-1 text-[0.65rem] font-bold text-red-800">
+                        <p className="mt-1 text-[0.65rem] font-bold text-depths">
                           Brak wpłaty od rodzica — skontaktuj się i ponów w planie tygodnia.
                         </p>
                       ) : null}
                       {needsAction && status === "PLANNED" ? (
-                        <p className="text-muted mt-1 text-[0.65rem]">Po zajęciach zalicz lekcję w planie tygodnia.</p>
+                        <p className="text-muted mt-1 text-[0.65rem]">
+                          Po zajęciach zalicz lekcję w planie tygodnia.
+                        </p>
                       ) : null}
                       {isPast ? (
                         <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone — bez edycji</p>
@@ -599,7 +894,7 @@ function TerminarzInner({
                       <button
                         type="button"
                         className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
-                        onClick={() => removeLesson(lesson.id)}
+                        onClick={() => removeLesson(lesson)}
                       >
                         Usuń
                       </button>
@@ -624,7 +919,60 @@ function TerminarzInner({
           saving={saving}
         />
       ) : null}
-    </div>
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#000C4A]/50"
+            aria-label="Anuluj"
+            onClick={() => !deleteBusy && setDeleteTarget(null)}
+          />
+          <div
+            className="relative z-10 w-full max-w-md rounded-app bg-snow p-5 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-lesson-title"
+          >
+            <h2 id="delete-lesson-title" className="text-depths text-lg font-semibold tracking-tight">
+              Usuń lekcję cykliczną
+            </h2>
+            <p className="text-muted mt-2 text-sm leading-relaxed">
+              Ta lekcja należy do serii ({remainingInSeries(deleteTarget).length} pozostałych od{" "}
+              {deleteTarget.date ? formatLessonDatePl(deleteTarget.date) : "tej daty"}). Co chcesz
+              zrobić?
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => confirmDelete("one")}
+                className="rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60"
+              >
+                {deleteBusy ? "Usuwanie…" : "Usuń tylko tę lekcję"}
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => confirmDelete("series")}
+                className="rounded-full border border-claret/40 bg-claret/10 px-4 py-2.5 text-sm font-semibold text-claret disabled:opacity-60"
+              >
+                Usuń tę i wszystkie pozostałe
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-full bg-luster px-4 py-2 text-sm font-semibold text-depths disabled:opacity-60"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      </div>
+    </PageShell>
   );
 }
 

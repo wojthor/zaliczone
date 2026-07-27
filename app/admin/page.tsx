@@ -1,11 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AdminDashboardClient } from "./admin-dashboard-client";
-import {
-  DATES,
-  TUTOR_SHARE,
-  bonusProgress,
-  ewidencjaDeadlineIso,
-} from "@/lib/dates";
+import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import {
   getAllOperatingExpenses,
   getAllTutorProfiles,
@@ -28,35 +23,16 @@ function currentMonthKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function previousMonthKey(monthKey: string): string {
-  const [y, m] = monthKey.split("-").map(Number);
-  const d = new Date(y!, m! - 2, 15);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function formatMonthLongPl(monthKey: string): string {
   const [ys, ms] = monthKey.split("-");
   const d = new Date(Number(ys), Number(ms) - 1, 15);
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
 }
 
-function formatDayPl(iso: string): string {
-  return new Intl.DateTimeFormat("pl-PL", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${iso}T12:00:00`));
-}
-
 function daysUntilIso(iso: string, today = new Date()): number {
   const target = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return Math.round((target.getTime() - start.getTime()) / 86_400_000);
-}
-
-function isoFromYmd(year: number, month1Based: number, day: number): string {
-  const d = new Date(year, month1Based - 1, day);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Suma wynagrodzeń tutorów (lekcje + premia) dla podanego zbioru linii VERIFIED. */
@@ -82,7 +58,6 @@ function computeTutorCostForLines(lines: FinanceLineUi[]): number {
 export default async function AdminHomePage() {
   const today = new Date();
   const monthKey = currentMonthKey(today);
-  const prevKey = previousMonthKey(monthKey);
 
   const [pendingLessons, unpaidLessons, verifiedLines, tutors, operatingExpenses] =
     await Promise.all([
@@ -115,48 +90,15 @@ export default async function AdminHomePage() {
   const totalCostPln = Math.round((tutorCostPln + otherOperatingCostPln) * 100) / 100;
   const agencyProfitPln = Math.round((verifiedMonthSumPln - totalCostPln) * 100) / 100;
 
-  // Terminy
-  const ewidencjaIso = ewidencjaDeadlineIso(monthKey); // za bieżący miesiąc → dzień 3 kolejnego
-  const ewidencjaPrevIso = ewidencjaDeadlineIso(prevKey); // za poprzedni → dzień 3 bieżącego
-
-  const y = today.getFullYear();
-  const m = today.getMonth() + 1;
-  const payoutIso = isoFromYmd(y, m, DATES.payout.availableFromDay);
-  const closePrevIso = (() => {
-    // Zamknięcie miesiąca poprzedniego: dzień 5 bieżącego miesiąca
-    return isoFromYmd(y, m, DATES.monthClose.earliestDayOfNextMonth);
-  })();
-
-  const deadlines = [
-    {
-      id: "ewidencja-prev",
-      label: `Ewidencja godzin · ${formatMonthLongPl(prevKey)}`,
-      dateLabel: formatDayPl(ewidencjaPrevIso),
-      daysLeft: daysUntilIso(ewidencjaPrevIso, today),
-      href: "/admin/wyplaty",
-    },
-    {
-      id: "payout",
-      label: "Wypłaty (okno od)",
-      dateLabel: formatDayPl(payoutIso),
-      daysLeft: daysUntilIso(payoutIso, today),
-      href: "/admin/wyplaty",
-    },
-    {
-      id: "month-close",
-      label: `Zamknięcie miesiąca · ${formatMonthLongPl(prevKey)}`,
-      dateLabel: formatDayPl(closePrevIso),
-      daysLeft: daysUntilIso(closePrevIso, today),
-      href: "/admin/ksiegowosc",
-    },
-    {
-      id: "ewidencja-curr",
-      label: `Ewidencja godzin · ${formatMonthLongPl(monthKey)}`,
-      dateLabel: formatDayPl(ewidencjaIso),
-      daysLeft: daysUntilIso(ewidencjaIso, today),
-      href: "/admin/wyplaty",
-    },
-  ];
+  const expiringContracts = tutors
+    .filter((t): t is typeof t & { contract_end: string } => Boolean(t.contract_end))
+    .map((t) => ({
+      id: t.id,
+      name: t.full_name ?? "Nauczyciel",
+      daysLeft: daysUntilIso(t.contract_end, today),
+    }))
+    .filter((t) => t.daysLeft >= 0 && t.daysLeft <= 30)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
 
   return (
     <AdminDashboardClient
@@ -172,7 +114,7 @@ export default async function AdminHomePage() {
       pendingMonthCount={pendingThisMonth.length}
       verifiedMonthCount={verifiedThisMonth.length}
       unpaidMonthCount={unpaidThisMonth.length}
-      deadlines={deadlines}
+      expiringContracts={expiringContracts}
     />
   );
 }

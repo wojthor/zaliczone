@@ -47,6 +47,9 @@ export function MonthNavigator({ monthKey, onMonthKeyChange, className, summary 
     [displayKey, onMonthKeyChange],
   );
 
+  const todayKey = currentMonthKey();
+  const isCurrentMonth = displayKey === todayKey;
+
   return (
     <div
       className={`relative z-10 flex flex-wrap items-center justify-between gap-2 rounded-app border border-panel-frame/25 bg-snow px-3 py-2 ${className ?? ""}`}
@@ -63,6 +66,18 @@ export function MonthNavigator({ monthKey, onMonthKeyChange, className, summary 
           {formatMonthLongFromKey(displayKey)}
         </p>
         {summary}
+        {!isCurrentMonth ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDisplayKey(todayKey);
+              onMonthKeyChange(todayKey);
+            }}
+            className="mt-1.5 rounded-full bg-[#000C4A] px-3 py-1 text-[0.65rem] font-bold text-lime"
+          >
+            Dzisiaj
+          </button>
+        ) : null}
       </div>
       <button
         type="button"

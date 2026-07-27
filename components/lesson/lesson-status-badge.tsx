@@ -24,13 +24,13 @@ export function lessonStatusLabel(status: LessonStatus): string {
 export function lessonStatusBadgeClasses(status: LessonStatus): string {
   switch (status) {
     case "VERIFIED":
-      return "bg-green-100 text-green-900 ring-1 ring-green-600/30";
+      return "badge-done";
     case "PENDING_VERIFICATION":
-      return "bg-amber-100 text-amber-950 ring-1 ring-amber-500/40";
+      return "badge-action";
     case "UNPAID":
-      return "bg-red-100 text-red-900 ring-1 ring-red-600/40";
+      return "rounded-ledger bg-steel px-2.5 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-snow";
     default:
-      return "bg-luster text-depths ring-1 ring-panel-frame/40";
+      return "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-depths";
   }
 }
 
@@ -45,9 +45,7 @@ export function LessonStatusBadge({
 }) {
   const resolved = resolveLessonStatus(status, isCompleted);
   return (
-    <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide ${lessonStatusBadgeClasses(resolved)} ${className}`}
-    >
+    <span className={`inline-flex shrink-0 items-center ${lessonStatusBadgeClasses(resolved)} ${className}`}>
       {lessonStatusLabel(resolved)}
     </span>
   );

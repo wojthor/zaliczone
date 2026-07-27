@@ -208,106 +208,127 @@ export function UczniowieClient({
         </button>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1">
-          <span className="text-depths/80 text-xs font-semibold">Sortowanie</span>
-          <select
-            className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-          >
-            <option value="newest">Od najnowszych</option>
-            <option value="oldest">Od najstarszych</option>
-            <option value="az">Alfabetycznie A-Z</option>
-            <option value="za">Alfabetycznie Z-A</option>
-          </select>
-        </label>
-        <label className="grid gap-1">
-          <span className="text-depths/80 text-xs font-semibold">Filtr przedmiotu</span>
-          <select
-            className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
-            value={subjectFilter}
-            onChange={(e) => setSubjectFilter(e.target.value)}
-          >
-            <option value="">Wszystkie</option>
-            {activeSubjects.map((subject) => (
-              <option key={subject} value={subject}>
-                {subject}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <section className="card-quiet mb-5 p-4">
+        <p className="section-label mb-3">Filtry</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1">
+            <span className="text-muted text-xs font-semibold">Sortowanie</span>
+            <select
+              className="text-depths rounded-app bg-snow px-3 py-2 text-sm font-medium"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+            >
+              <option value="newest">Od najnowszych</option>
+              <option value="oldest">Od najstarszych</option>
+              <option value="az">Alfabetycznie A-Z</option>
+              <option value="za">Alfabetycznie Z-A</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-muted text-xs font-semibold">Filtr przedmiotu</span>
+            <select
+              className="text-depths rounded-app bg-snow px-3 py-2 text-sm font-medium"
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+            >
+              <option value="">Wszystkie</option>
+              {activeSubjects.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
 
-      <ul className="grid gap-4 sm:grid-cols-2">
-        {filtered.map((student) => (
-          <li key={student.id} className="rounded-app border-2 border-panel-frame/55 bg-snow/95 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#000C4A] text-sm font-bold text-luster">
-                {student.initials}
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-depths text-lg font-semibold leading-tight">{student.name}</h2>
-                <p className="mt-1 flex flex-wrap gap-1.5">
-                  {student.subjectsLine ? (
-                    student.subjectsLine.split(",").map((subject) => (
-                      <span key={subject} className="rounded-full bg-luster px-2.5 py-1 text-xs font-medium text-depths">
-                        {subject.trim()}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-muted text-sm">Brak przedmiotów</span>
-                  )}
-                </p>
-                <p className="text-depths/80 mt-2 text-xs font-semibold">
-                  {student.classLabel} · {student.schoolClass}
-                </p>
+      <section>
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <p className="section-label">Lista uczniów</p>
+          <span className="text-muted text-xs font-semibold tabular-nums">{filtered.length}</span>
+        </div>
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((student) => (
+            <li key={student.id} className="rounded-app bg-paper p-4">
+              <div className="flex items-start gap-3">
+                <span className="avatar-initials h-12 w-12 shrink-0 text-sm">
+                  {student.initials}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-depths text-lg font-extrabold leading-tight tracking-tight">
+                    {student.name}
+                  </h2>
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    {student.subjectsLine ? (
+                      student.subjectsLine.split(",").map((subject) => (
+                        <span
+                          key={subject}
+                          className="rounded-ledger bg-lime px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-depths"
+                        >
+                          {subject.trim()}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-muted text-sm">Brak przedmiotów</span>
+                    )}
+                  </p>
+                  <p className="text-muted mt-2 text-xs font-semibold">
+                    {student.classLabel} · {student.schoolClass}
+                  </p>
+                </div>
               </div>
-            </div>
-            <dl className="text-depths/90 mt-4 space-y-2 pt-1 text-sm">
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted font-medium">Telefon</dt>
-                <dd className="text-right font-semibold tabular-nums">{student.phone}</dd>
+
+              <dl className="mt-4 space-y-2 border-t-2 border-mist pt-3 text-sm">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted font-medium">Telefon</dt>
+                  <dd className="text-right font-semibold tabular-nums text-depths">{student.phone}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted font-medium">E-mail</dt>
+                  <dd className="min-w-0 truncate text-right font-medium text-depths">{student.email}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted font-medium">{student.guardian}</dt>
+                </div>
+              </dl>
+
+              <dl className="mt-3 space-y-2 border-t-2 border-mist pt-3 text-sm">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted font-medium">Stawka</dt>
+                  <dd className="font-extrabold tabular-nums text-depths">
+                    {student.ratePerHourPln} zł / h
+                  </dd>
+                </div>
+                <div>
+                  <dt className="section-label !text-muted mb-0.5">Następna lekcja</dt>
+                  <dd className="text-depths font-semibold">{student.nextLesson}</dd>
+                </div>
+                <div>
+                  <dt className="section-label !text-muted mb-0.5">Notatki</dt>
+                  <dd className="text-muted text-xs leading-snug">{student.notes}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 flex gap-2 border-t-2 border-mist pt-3">
+                <button
+                  type="button"
+                  onClick={() => openEdit(student)}
+                  className="rounded-ledger bg-depths px-3 py-1.5 text-xs font-extrabold text-lime"
+                >
+                  Edytuj
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeStudent(student.id, student.name)}
+                  className="rounded-ledger bg-mist px-3 py-1.5 text-xs font-extrabold text-steel"
+                >
+                  Usuń
+                </button>
               </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted font-medium">E-mail</dt>
-                <dd className="min-w-0 truncate text-right font-medium">{student.email}</dd>
-              </div>
-              <div>
-                <dt className="text-muted font-medium">{student.guardian}</dt>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted font-medium">Stawka</dt>
-                <dd className="font-bold tabular-nums">{student.ratePerHourPln} zł / h</dd>
-              </div>
-              <div>
-                <dt className="text-muted text-xs font-medium">Następna lekcja</dt>
-                <dd className="text-depths mt-0.5 font-semibold">{student.nextLesson}</dd>
-              </div>
-              <div>
-                <dt className="text-muted text-xs font-medium">Notatki</dt>
-                <dd className="text-depths/85 mt-0.5 text-xs leading-snug">{student.notes}</dd>
-              </div>
-            </dl>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => openEdit(student)}
-                className="rounded-full border border-panel-frame/50 px-3 py-1 text-xs font-bold text-depths"
-              >
-                Edytuj
-              </button>
-              <button
-                type="button"
-                onClick={() => removeStudent(student.id, student.name)}
-                className="rounded-full border border-red-300 px-3 py-1 text-xs font-bold text-red-700"
-              >
-                Usuń
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -317,7 +338,7 @@ export function UczniowieClient({
             aria-label="Zamknij"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-[min(42rem,94vw)] rounded-app border-2 border-panel-frame bg-snow p-5 sm:p-6">
+          <div className="relative z-10 w-full max-w-[min(42rem,94vw)] rounded-app bg-snow p-5 sm:p-6">
             <h2 className="text-depths text-lg font-semibold tracking-tight">
               {editId ? "Edytuj ucznia" : "Dodaj ucznia"}
             </h2>

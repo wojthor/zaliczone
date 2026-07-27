@@ -15,29 +15,74 @@ export const ADMIN_PIT_RATE = 0.12;
 export const DATES = {
   /**
    * Ewidencja godzin — deadline dla nauczyciela.
-   * „Do 3. dnia nowego miesiąca” = ewidencja za czerwiec należy wysłać do 3 lipca włącznie.
+   * Do 3. dnia nowego miesiąca (za miesiąc poprzedni).
+   * 1. dnia — mail przypominający o podpisanych ewidencjach.
    */
   ewidencja: {
-    /** Dzień miesiąca następnego, do którego włącznie obowiązuje deadline */
+    reminderDayOfNextMonth: 1,
     deadlineDayOfNextMonth: 3,
-    /** Od którego dnia miesiąca admin może prosić o ewidencję (powiadomienia) */
     requestAvailableFromDay: 1,
   },
 
   /**
-   * Wypłaty nauczycieli.
-   * Admin może oznaczać „Wypłacono” od tego dnia miesiąca (kolejnego względem miesiąca rozliczenia).
+   * Rachunki do podpisania — wysyłka do nauczycieli 3. dnia,
+   * zwrot podpisanych do 5. dnia (po przesłaniu ewidencji).
    */
-  payout: {
-    availableFromDay: 25,
+  rachunek: {
+    sendDayOfNextMonth: 3,
+    signedDeadlineDayOfNextMonth: 5,
   },
 
   /**
-   * Zamknięcie miesiąca w księgowości.
-   * Po tej dacie admin może zamknąć poprzedni miesiąc (checklist).
+   * Weryfikacja zgodności podpisanych dokumentów z systemem — po 5. dniu.
+   */
+  verification: {
+    fromDayOfNextMonth: 6,
+  },
+
+  /**
+   * Wypłaty nauczycieli — przelew i odznaczenie „WYPŁACONE” do 10. dnia.
+   */
+  payout: {
+    availableFromDay: 6,
+    deadlineDayOfNextMonth: 10,
+  },
+
+  /**
+   * Zamknięcie miesiąca w księgowości — najlepiej do 15. dnia:
+   * generacja księgowości, koszty (wypłaty na miesiąc bieżący) + podpisane rachunki.
    */
   monthClose: {
-    earliestDayOfNextMonth: 5,
+    earliestDayOfNextMonth: 6,
+    targetDayOfNextMonth: 15,
+  },
+
+  /**
+   * Weryfikacja finansów (limity, koszty) — po zamknięciu miesiąca.
+   */
+  financeReview: {
+    dayOfNextMonth: 16,
+  },
+
+  /**
+   * Podatki (np. zaliczka PIT na JDG) — do 20. dnia.
+   */
+  taxes: {
+    deadlineDayOfNextMonth: 20,
+  },
+
+  /**
+   * Terminy roczne (po zamknięciu roku kalendarzowego).
+   */
+  yearEnd: {
+    /** Zestawienie kosztów — do 15 stycznia */
+    costSummaryDay: 15,
+    /** PIT-11 do US — do końca stycznia */
+    pit11ToUsMonth: 1,
+    /** Maile z PIT do nauczycieli — do końca lutego */
+    pitToTeachersMonth: 2,
+    /** PIT-36 właściciela — do końca kwietnia */
+    pit36Month: 4,
   },
 
   /**
@@ -53,7 +98,7 @@ export const DATES = {
    * Kotwica demo / seedów (nie wpływa na produkcyjną logikę deadline’ów).
    */
   demo: {
-    temporalAnchorIso: "2026-07-13",
+    temporalAnchorIso: "2026-07-21",
   },
 } as const;
 
@@ -116,7 +161,7 @@ export function guideDeadlines(now = new Date()): {
   const previousMonthKey = monthKeyOf(previousMonthDate);
   const ewidencjaDeadlineLabel = formatEwidencjaDeadlinePl(previousMonthKey);
   const ewidencjaOverdue = now > new Date(`${ewidencjaDeadlineIso(previousMonthKey)}T23:59:59`);
-  const payoutAvailableLabel = formatDayLongPl(now.getFullYear(), now.getMonth(), DATES.payout.availableFromDay);
+  const payoutAvailableLabel = formatDayLongPl(now.getFullYear(), now.getMonth(), DATES.payout.deadlineDayOfNextMonth);
   return {
     previousMonthLabel: formatMonthLongPl(previousMonthKey),
     ewidencjaDeadlineLabel,

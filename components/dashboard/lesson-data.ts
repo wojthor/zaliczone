@@ -15,6 +15,8 @@ export type Lesson = {
   status?: LessonStatus;
   isCompleted?: boolean;
   notes?: string;
+  /** Wspólne ID serii cyklicznej (jeśli lekcja powstała z „co tydzień” / „własne”) */
+  seriesId?: string | null;
 };
 
 export type LessonStatus = "PLANNED" | "PENDING_VERIFICATION" | "VERIFIED" | "UNPAID";

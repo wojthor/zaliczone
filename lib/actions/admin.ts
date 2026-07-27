@@ -359,6 +359,23 @@ export async function markPayoutPaid(
   revalidatePath("/admin/wyplaty");
 }
 
+export async function unmarkPayoutPaid(tutorId: string, month: string) {
+  await assertMonthOpen(month);
+  const supabase = createServiceClient();
+
+  const { error } = await supabase
+    .from("payouts")
+    .delete()
+    .eq("tutor_id", tutorId)
+    .eq("month", month);
+
+  if (error) throw error;
+
+  revalidatePath("/admin/wyplaty");
+  revalidatePath("/admin/ksiegowosc");
+  revalidatePath("/finanse");
+}
+
 function nextMonthStartIso(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
   const d = new Date(y!, m!, 1); // month key is 1-based; Date ctor month is 0-based → m is next month

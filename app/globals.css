@@ -1,50 +1,113 @@
 @import "tailwindcss";
 
 @theme {
-  /* Paleta: krem #F7E9AD · limonka #D7FE51 · biel · lodowy #EBEFFE · stal #B1B9D1 */
+  /*
+   * Paleta ZALICZONE (źródło prawdy):
+   * Granat #000C4A · Limonka #D5ED21 · Jasna limonka #DFFD6F
+   * Szary #AAAAAA · Karty #E8E8E6 · Papier #F6F5F0 · Biel #FFFFFF · Tekst #5F5E5A
+   */
   --color-depths: #000c4a;
-  --color-luster: #ebeffe;
-  --color-butter: #f7e9ad;
-  --color-snow: #ffffff;
-  --color-steel: #b1b9d1;
-  --color-lime: #d7fe51;
-  --color-muted: #5a6278;
-  --color-taupe: color-mix(in srgb, #ebeffe 72%, #b1b9d1 28%);
-  --color-aster: #8f97b0;
   --color-royal: #000c4a;
-  --color-habanero: #8f97b0;
-  --color-jodhpur: color-mix(in srgb, #ebeffe 82%, #ffffff 18%);
-  --color-sage: #c8cedd;
-  --color-panel-frame: #889acc;
+  --color-lime: #d5ed21;
+  --color-soft-lime: #dffd6f;
+  --color-butter: #dffd6f;
+  --color-snow: #ffffff;
+  --color-paper: #f6f5f0;
+  --color-mist: #e8e8e6;
+  --color-luster: #e8e8e6;
+  --color-steel: #aaaaaa;
+  --color-muted: #5f5e5a;
+  --color-taupe: #e8e8e6;
+  --color-aster: #aaaaaa;
+  --color-habanero: #aaaaaa;
+  --color-jodhpur: #f6f5f0;
+  --color-sage: #e8e8e6;
+  --color-panel-frame: #e8e8e6;
 
-  /* Inki statusów liczbowych (panel finansowy admina) — ciemne, czytelne na snow/luster */
-  --color-claret: #8a1f2f; /* ujemne / nieopłacone */
-  --color-moss: #1f5c3e; /* dodatnie / zatwierdzone / marża */
-  --color-toffee: #8a6a1f; /* uwaga / koszty / do zatwierdzenia — pod ton butter */
+  /* Statusy — tylko granat / limonka / szary */
+  --color-claret: #000c4a;
+  --color-moss: #000c4a;
+  --color-toffee: #aaaaaa;
 }
 
 @utility rounded-app {
-  border-radius: 1.125rem;
+  border-radius: 0.375rem;
 }
 
-/* Ledger/dane finansowe: rogi ostre — kontrast wobec miękkiego chrome (sidebar, karty). */
 @utility rounded-ledger {
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
 }
 
-/* Blokowy przycisk główny — ostry, wysoki kontrast, koniec z uniwersalnym rounded-full. */
 @utility btn-block {
-  border-radius: 0.375rem;
-  font-weight: 700;
+  border-radius: 0.25rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
-/*
- * Typografia „ledger” panelu finansowego admina (na razie: /admin dashboard).
- * Celowo NIE zmienia fontu na <body> — dotyczy tylko elementów opatrzonych
- * klasami .dash-sans / .dash-mono (patrz lib/dashboard-fonts.ts).
- */
+@utility section-label {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-depths);
+}
+
+@utility nav-active {
+  background-color: var(--color-lime);
+  color: var(--color-depths);
+  font-weight: 800;
+}
+
+@utility card-feature {
+  background-color: var(--color-depths);
+  color: var(--color-lime);
+  border-radius: 0.375rem;
+}
+
+@utility card-feature-alt {
+  background-color: var(--color-depths);
+  color: var(--color-soft-lime);
+  border-radius: 0.375rem;
+}
+
+@utility card-quiet {
+  background-color: var(--color-paper);
+  border-radius: 0.375rem;
+}
+
+@utility badge-action {
+  border-radius: 0.25rem;
+  background-color: var(--color-lime);
+  color: var(--color-depths);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+}
+
+@utility badge-done {
+  border-radius: 0.25rem;
+  background-color: var(--color-depths);
+  color: var(--color-soft-lime);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+}
+
+@utility avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: var(--color-depths);
+  color: var(--color-lime);
+  font-weight: 800;
+}
+
 .dash-sans {
   font-family: var(--font-dash-sans), system-ui, sans-serif;
 }
@@ -55,7 +118,52 @@
   letter-spacing: -0.01em;
 }
 
-/* Animacja „przeskoku” pozycji z oczekujących do opłaconych (panel rozliczeń admina) */
+.mark-highlight {
+  position: relative;
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  z-index: 0;
+  color: var(--color-lime);
+}
+
+.mark-highlight::before {
+  content: "";
+  position: absolute;
+  left: -0.08em;
+  right: -0.08em;
+  bottom: 0.08em;
+  height: 0.38em;
+  background: var(--color-lime);
+  opacity: 0.55;
+  z-index: -1;
+  border-radius: 2px;
+}
+
+.mark-highlight-on-dark {
+  position: relative;
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  z-index: 0;
+  color: var(--color-snow);
+}
+
+.mark-highlight-on-dark::before {
+  content: "";
+  position: absolute;
+  left: -0.08em;
+  right: -0.08em;
+  bottom: 0.08em;
+  height: 0.38em;
+  background: var(--color-lime);
+  opacity: 0.85;
+  z-index: -1;
+  border-radius: 2px;
+}
+
 @keyframes hopToPaid {
   0% {
     transform: translateX(0) scale(1);
@@ -91,7 +199,6 @@
   animation: addTutorSuccessPop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Pulz potwierdzenia wiersza (Rozliczenia) — odpala się na kliknięciu, przed hop-to-paid */
 @keyframes rowConfirmPulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 55%, transparent);
@@ -111,7 +218,6 @@
   animation: rowConfirmPulse 0.32s ease-out;
 }
 
-/* Wejście ConfirmDialog */
 @keyframes confirmDialogIn {
   0% {
     opacity: 0;
@@ -127,7 +233,6 @@
   animation: confirmDialogIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Wejście ConfirmDialog na mobile — bottom sheet zamiast wyśrodkowanej karty. */
 @keyframes confirmSheetIn {
   0% {
     opacity: 0;
@@ -145,10 +250,6 @@
   }
 }
 
-/*
- * Pas statusu rekordu (tabele/karty admina) — sygnaturowy element nowego kierunku wizualnego.
- * Gruby, kolorowy lewy pas zamiast dyskretnej plakietki — status widoczny bez czytania tekstu.
- */
 .status-rail {
   border-left-width: 6px;
   border-left-style: solid;
@@ -157,16 +258,15 @@
   border-left-color: var(--color-lime);
 }
 .status-rail-pending {
-  border-left-color: var(--color-butter);
+  border-left-color: var(--color-soft-lime);
 }
 .status-rail-unpaid {
-  border-left-color: var(--color-claret);
+  border-left-color: var(--color-steel);
 }
 .status-rail-neutral {
-  border-left-color: var(--color-panel-frame);
+  border-left-color: var(--color-mist);
 }
 
-/* Tooltip CSS-only dla zwiniętego sidebara admina — pokazuje się na hover rodzica .group */
 .sidebar-tooltip {
   position: absolute;
   left: calc(100% + 0.5rem);
@@ -176,7 +276,9 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%) translateX(-0.25rem);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .group:hover .sidebar-tooltip {
@@ -184,7 +286,6 @@
   transform: translateY(-50%) translateX(0);
 }
 
-/* Ukryty pasek przewijania (treść nadal przewijalna) */
 .scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -195,7 +296,6 @@
   height: 0;
 }
 
-/* Cienki pasek w kolumnach terminarza (Firefox + WebKit) */
 .scrollbar-panel {
   scrollbar-width: thin;
   scrollbar-color: var(--color-steel) transparent;
@@ -215,7 +315,7 @@
 }
 
 body {
-  background-color: var(--color-luster);
+  background-color: var(--color-paper);
   color: var(--color-depths);
   font-family:
     system-ui,

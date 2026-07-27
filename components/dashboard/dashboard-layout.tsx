@@ -1,6 +1,9 @@
 "use client";
 
-import { FinanceProfilePanel } from "@/components/dashboard/finance-profile-panel";
+import {
+  FinanceProfilePanel,
+  type LessonSummaryStats,
+} from "@/components/dashboard/finance-profile-panel";
 import { MonthlyCalendar } from "@/components/dashboard/monthly-calendar";
 import { GuideShortcutPanel } from "@/components/dashboard/guide-shortcut-panel";
 import { StudentsPanel } from "@/components/students-panel";
@@ -14,7 +17,7 @@ type DashboardLayoutProps = {
   students: StudentUi[];
   tutorName: string;
   totalPayout: number;
-  totalHours: number;
+  lessonStats: LessonSummaryStats;
   verifiedHoursThisMonth: number;
 };
 
@@ -23,13 +26,13 @@ export function DashboardLayout({
   students,
   tutorName,
   totalPayout,
-  totalHours,
+  lessonStats,
   verifiedHoursThisMonth,
 }: DashboardLayoutProps) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
+    <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
       <BonusProgressBar hoursDone={verifiedHoursThisMonth} compact showCelebration />
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
         <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">
           <WeeklySchedule lessons={lessons} />
         </div>
@@ -42,12 +45,11 @@ export function DashboardLayout({
         <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <GuideShortcutPanel />
         </div>
-        <div className="min-h-[min(220px,36svh)] min-w-0 overflow-hidden max-lg:min-h-52 lg:col-span-1 lg:row-start-2 lg:min-h-0">
+        <div className="min-h-[min(280px,42svh)] min-w-0 overflow-hidden max-lg:min-h-64 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <FinanceProfilePanel
             tutorName={tutorName}
             totalPayout={totalPayout}
-            totalHours={totalHours}
-            studentCount={students.length}
+            lessonStats={lessonStats}
           />
         </div>
       </div>

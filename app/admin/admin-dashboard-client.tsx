@@ -1,117 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { LedgerBand, LedgerStat } from "@/components/admin/ledger-stat";
+import { useMemo, useState } from "react";
+import { FinanceTile } from "@/components/admin/finance-tile";
 
-type ChecklistItem = { id: string; label: string };
+type ExpiringContract = {
+  id: string;
+  name: string;
+  daysLeft: number;
+};
 
-const NEW_EMPLOYEE_ITEMS: ChecklistItem[] = [
-  { id: "ne-1", label: "Załóż konto w systemie" },
-  { id: "ne-2", label: "Pobierz dane do umowy zlecenie" },
-  { id: "ne-3", label: "Zgłoś studenta do ZUS (ZZA) w ciągu 7 dni" },
-  { id: "ne-4", label: "Podpisz oświadczenie o statusie studenta < 26 lat" },
-];
-
-const PAYOUT_ITEMS: ChecklistItem[] = [
-  { id: "po-1", label: "Wyślij prośbę o ewidencję (przycisk na Wypłatach)" },
-  { id: "po-2", label: "Odbierz podpisany skan PDF od tutora" },
-  { id: "po-3", label: "Wykonaj przelew wychodzący w banku" },
-  { id: "po-4", label: "Odznacz jako „WYPŁACONE” w systemie" },
-];
-
-type DeadlineItem = {
+type MonthDeadline = {
   id: string;
   label: string;
-  dateLabel: string;
+  dateIso: string;
   daysLeft: number;
   href: string;
 };
-
-function readChecklistState(storageKey: string): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function usePersistedChecklist(storageKey: string, items: ChecklistItem[]) {
-  const [checked, setChecked] = useState<Record<string, boolean>>(() => readChecklistState(storageKey));
-
-  function toggle(id: string) {
-    setChecked((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }
-
-  const doneCount = items.filter((item) => checked[item.id]).length;
-  const progress = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
-
-  return { checked, toggle, doneCount, progress };
-}
-
-function ChecklistCard({
-  title,
-  subtitle,
-  items,
-  storageKey,
-  accent,
-}: {
-  title: string;
-  subtitle: string;
-  items: ChecklistItem[];
-  storageKey: string;
-  accent: "lime" | "butter";
-}) {
-  const { checked, toggle, doneCount, progress } = usePersistedChecklist(storageKey, items);
-  const bar = accent === "lime" ? "bg-lime" : "bg-butter";
-
-  return (
-    <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="dash-sans text-depths text-base font-bold tracking-tight">{title}</h3>
-          <p className="dash-sans text-muted mt-1 text-xs leading-relaxed">{subtitle}</p>
-        </div>
-        <span className="dash-mono text-muted shrink-0 rounded-full bg-luster px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide">
-          {doneCount}/{items.length}
-        </span>
-      </div>
-      <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-luster">
-        <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${progress}%` }} />
-      </div>
-      <ul className="space-y-2">
-        {items.map((item) => {
-          const isDone = Boolean(checked[item.id]);
-          return (
-            <li key={item.id}>
-              <label className="flex cursor-pointer items-start gap-3 rounded-app border border-transparent px-2 py-2 transition hover:border-panel-frame/30 hover:bg-luster/50">
-                <input
-                  type="checkbox"
-                  checked={isDone}
-                  onChange={() => toggle(item.id)}
-                  className="mt-0.5 size-4 shrink-0 accent-[#000C4A]"
-                />
-                <span className={`dash-sans text-sm leading-snug ${isDone ? "text-muted line-through" : "text-depths"}`}>
-                  {item.label}
-                </span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-    </article>
-  );
-}
 
 function formatPln(n: number): string {
   return `${n.toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
@@ -123,6 +28,479 @@ function daysLeftLabel(days: number): string {
   if (days === 0) return "dziś";
   if (days === -1) return "wczoraj";
   return `${Math.abs(days)} dni po terminie`;
+}
+
+const WEEKDAY_LABELS = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
+const DEADLINES_DONE_KEY = "zaliczone-admin-deadlines-done";
+const DEADLINES_STATUS_KEY = "zaliczone-admin-deadlines-status";
+
+const MONTHLY_CYCLE: Array<{ id: string; day: number; label: string; href: string }> = [
+  { id: "ewidencja-mail", day: 1, label: "Mail o ewidencjach", href: "/admin/wyplaty" },
+  { id: "ewidencja-deadline", day: 3, label: "Ewidencje podpisane (do)", href: "/admin/wyplaty" },
+  { id: "rachunek-send", day: 3, label: "Wysyłka rachunków do podpisania", href: "/admin/wyplaty" },
+  { id: "rachunek-deadline", day: 5, label: "Rachunki podpisane (do)", href: "/admin/wyplaty" },
+  { id: "verification", day: 6, label: "Weryfikacja z systemem", href: "/admin/rozliczenia" },
+  { id: "payout", day: 10, label: "Wypłaty + odznaczenie", href: "/admin/wyplaty" },
+  { id: "month-close", day: 15, label: "Zamknięcie miesiąca + koszty", href: "/admin/ksiegowosc" },
+  { id: "finance-review", day: 16, label: "Weryfikacja finansów (limity)", href: "/admin/ksiegowosc" },
+  { id: "taxes", day: 20, label: "Podatki / zaliczka PIT (JDG)", href: "/admin/ksiegowosc" },
+];
+
+function toIsoLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function deadlineDoneKey(d: Pick<MonthDeadline, "dateIso" | "id">): string {
+  return `${d.dateIso}:${d.id}`;
+}
+
+function readDeadlinesDone(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const statusRaw = localStorage.getItem(DEADLINES_STATUS_KEY);
+    if (statusRaw) {
+      const statuses = JSON.parse(statusRaw) as Record<string, string>;
+      const done: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(statuses)) {
+        if (v === "done") done[k] = true;
+      }
+      return done;
+    }
+    const raw = localStorage.getItem(DEADLINES_DONE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistDeadlineDone(doneMap: Record<string, boolean>) {
+  try {
+    localStorage.setItem(DEADLINES_DONE_KEY, JSON.stringify(doneMap));
+    let statuses: Record<string, string> = {};
+    try {
+      const raw = localStorage.getItem(DEADLINES_STATUS_KEY);
+      if (raw) statuses = JSON.parse(raw) as Record<string, string>;
+    } catch {
+      /* ignore */
+    }
+    for (const [k, v] of Object.entries(doneMap)) {
+      if (v) statuses[k] = "done";
+      else if (statuses[k] === "done") statuses[k] = "todo";
+    }
+    localStorage.setItem(DEADLINES_STATUS_KEY, JSON.stringify(statuses));
+  } catch {
+    /* ignore */
+  }
+}
+
+function daysUntilFromIso(iso: string, today = new Date()): number {
+  const target = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((target.getTime() - start.getTime()) / 86_400_000);
+}
+
+function buildMonthCycleDeadlines(year: number, monthIndex0: number, today = new Date()): MonthDeadline[] {
+  const monthLabel = new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(
+    new Date(year, monthIndex0, 15),
+  );
+  const daysInMonth = new Date(year, monthIndex0 + 1, 0).getDate();
+  return MONTHLY_CYCLE.filter((item) => item.day <= daysInMonth).map((item) => {
+    const dateIso = `${year}-${String(monthIndex0 + 1).padStart(2, "0")}-${String(item.day).padStart(2, "0")}`;
+    return {
+      id: item.id,
+      label: `${item.label} · ${monthLabel}`,
+      dateIso,
+      daysLeft: daysUntilFromIso(dateIso, today),
+      href: item.href,
+    };
+  });
+}
+
+/** Bieżący + następny miesiąc — żeby „kolejne terminy” nie znikały pod koniec miesiąca. */
+function buildHomeDeadlines(): MonthDeadline[] {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const next = new Date(y, m + 1, 1);
+  const map = new Map<string, MonthDeadline>();
+  for (const d of buildMonthCycleDeadlines(y, m, now)) map.set(`${d.dateIso}:${d.id}`, d);
+  for (const d of buildMonthCycleDeadlines(next.getFullYear(), next.getMonth(), now)) {
+    map.set(`${d.dateIso}:${d.id}`, d);
+  }
+  return [...map.values()].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+}
+
+/** Uproszczony kalendarz — tylko bieżący miesiąc, bez listy i nawigacji. */
+function CurrentMonthCalendar({ monthLabel }: { monthLabel: string }) {
+  const todayIso = toIsoLocal(new Date());
+  const year = Number(todayIso.slice(0, 4));
+  const month = Number(todayIso.slice(5, 7)) - 1;
+  const [selectedIso, setSelectedIso] = useState<string | null>(todayIso);
+  const [done, setDone] = useState<Record<string, boolean>>(() => readDeadlinesDone());
+  const deadlines = useMemo(() => buildHomeDeadlines(), []);
+
+  function isDone(d: MonthDeadline): boolean {
+    return Boolean(done[deadlineDoneKey(d)]);
+  }
+
+  function toggleDone(d: MonthDeadline) {
+    const key = deadlineDoneKey(d);
+    setDone((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      persistDeadlineDone(next);
+      return next;
+    });
+  }
+
+  const byDate = useMemo(() => {
+    const map = new Map<string, MonthDeadline[]>();
+    for (const d of deadlines) {
+      // Na siatce kalendarza tylko bieżący miesiąc
+      if (Number(d.dateIso.slice(0, 4)) !== year || Number(d.dateIso.slice(5, 7)) - 1 !== month) continue;
+      const list = map.get(d.dateIso) ?? [];
+      list.push(d);
+      map.set(d.dateIso, list);
+    }
+    return map;
+  }, [deadlines, year, month]);
+
+  const cells = useMemo(() => {
+    const first = new Date(year, month, 1);
+    const startOffset = (first.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const result: Array<{ day: number | null; iso: string | null }> = [];
+    for (let i = 0; i < startOffset; i++) result.push({ day: null, iso: null });
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      result.push({ day, iso });
+    }
+    while (result.length % 7 !== 0) result.push({ day: null, iso: null });
+    return result;
+  }, [year, month]);
+
+  const selectedItems = selectedIso ? (byDate.get(selectedIso) ?? []) : [];
+
+  const previousItems = useMemo(() => {
+    if (!selectedIso) return [];
+    const past = deadlines
+      .filter((d) => d.dateIso < selectedIso)
+      .sort((a, b) => b.dateIso.localeCompare(a.dateIso) || b.id.localeCompare(a.id));
+    return past.slice(0, 1);
+  }, [deadlines, selectedIso]);
+
+  const followingItems = useMemo(() => {
+    if (!selectedIso) return [];
+    return deadlines
+      .filter((d) => d.dateIso > selectedIso)
+      .sort((a, b) => a.dateIso.localeCompare(b.dateIso) || a.id.localeCompare(b.id));
+  }, [deadlines, selectedIso]);
+
+  const selectedLabel = selectedIso
+    ? new Intl.DateTimeFormat("pl-PL", { weekday: "long", day: "numeric", month: "long" }).format(
+        new Date(`${selectedIso}T12:00:00`),
+      )
+    : null;
+
+  function renderDeadlineRow(d: MonthDeadline, tone: "past" | "focus" | "future") {
+    const checked = isDone(d);
+    const urgent = !checked && d.daysLeft <= 5;
+    const isPast = tone === "past";
+    const isFocus = tone === "focus";
+
+    const cardClass = checked
+      ? isPast
+        ? "border-depths/15 bg-depths/5 opacity-55"
+        : "border-depths/25 bg-depths/10"
+      : isPast
+        ? "border-panel-frame/15 bg-luster/20 opacity-50"
+        : urgent
+          ? isFocus
+            ? "border-steel/50 bg-steel/15 ring-1 ring-steel/20"
+            : "border-steel/35 bg-steel/10"
+          : isFocus
+            ? "border-depths/25 bg-depths/5 ring-1 ring-depths/10"
+            : "border-panel-frame/25 bg-luster/30";
+
+    return (
+      <li key={`${d.dateIso}:${d.id}:${tone}`} className={`rounded-app border px-3 py-2 ${cardClass}`}>
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => toggleDone(d)}
+            className="mt-0.5 size-4 shrink-0 accent-depths"
+          />
+          <span className="min-w-0 flex-1">
+            {tone !== "focus" ? (
+              <span className="dash-sans text-muted mb-0.5 block text-[10px] font-semibold capitalize">
+                {new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "long" }).format(
+                  new Date(`${d.dateIso}T12:00:00`),
+                )}
+              </span>
+            ) : null}
+            <span
+              className={`dash-sans block text-xs font-semibold ${
+                checked
+                  ? "text-depths line-through"
+                  : isPast
+                    ? "text-muted"
+                    : urgent
+                      ? "text-steel"
+                      : "text-depths"
+              }`}
+            >
+              {d.label}
+            </span>
+            <span className="mt-1 flex items-center justify-between gap-2">
+              <span
+                className={`dash-mono text-[11px] font-bold ${
+                  checked ? "text-depths" : isPast ? "text-muted" : urgent ? "text-steel" : "text-muted"
+                }`}
+              >
+                {checked ? "✓ zrobione" : daysLeftLabel(d.daysLeft)}
+              </span>
+              <Link
+                href={d.href}
+                className={`dash-sans text-[11px] font-bold hover:underline ${
+                  isPast ? "text-muted" : "text-depths"
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Otwórz →
+              </Link>
+            </span>
+          </span>
+        </label>
+      </li>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="dash-sans text-depths text-sm font-bold capitalize">{monthLabel}</p>
+          <Link
+            href="/admin/kalendarz"
+            className="dash-sans text-[11px] font-bold text-depths hover:underline"
+          >
+            Pełny kalendarz →
+          </Link>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {WEEKDAY_LABELS.map((w) => (
+            <span key={w} className="dash-sans text-muted py-1 text-[10px] font-bold uppercase">
+              {w}
+            </span>
+          ))}
+          {cells.map((cell, i) => {
+            if (!cell.day || !cell.iso) {
+              return <span key={`e-${i}`} className="aspect-square" />;
+            }
+            const dayItems = byDate.get(cell.iso) ?? [];
+            const marked = dayItems.length > 0;
+            const openItems = dayItems.filter((d) => !isDone(d));
+            const allDone = marked && openItems.length === 0;
+            const hasUrgent = openItems.some((d) => d.daysLeft <= 5);
+            const isToday = cell.iso === todayIso;
+            const isSelected = cell.iso === selectedIso;
+            const dayTone = allDone
+              ? "bg-depths/15 text-depths hover:bg-depths/25"
+              : hasUrgent
+                ? "bg-steel/25 text-steel hover:bg-steel/40"
+                : marked
+                  ? "bg-lime/35 text-depths hover:bg-lime/50"
+                  : "text-depths hover:bg-luster/70";
+            const dotTone = allDone
+              ? "bg-depths"
+              : hasUrgent
+                ? "bg-steel"
+                : "bg-lime";
+            return (
+              <button
+                key={cell.iso}
+                type="button"
+                onClick={() => setSelectedIso(cell.iso)}
+                className={`dash-mono relative flex aspect-square items-center justify-center rounded-full text-xs font-bold transition ${
+                  isSelected ? "bg-depths text-snow" : isToday ? "bg-lime text-depths" : dayTone
+                }`}
+              >
+                {cell.day}
+                {marked && !isSelected ? (
+                  <span className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${dotTone}`} />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </article>
+
+      <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+        <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">
+          Terminy · odhacz zrobione
+        </p>
+
+        <div className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto overscroll-contain pr-1 scrollbar-panel sm:max-h-[32rem]">
+          {previousItems.length > 0 ? (
+            <div>
+              <p className="dash-sans text-muted/70 mb-1.5 text-[9px] font-semibold uppercase tracking-wide">
+                Poprzedni
+              </p>
+              <ul className="space-y-1.5">{previousItems.map((d) => renderDeadlineRow(d, "past"))}</ul>
+            </div>
+          ) : null}
+
+          <div className="rounded-app bg-depths/5 px-3 py-3">
+            <p className="dash-sans text-depths text-center text-sm font-bold capitalize">{selectedLabel}</p>
+            {selectedItems.length === 0 ? (
+              <p className="dash-sans text-muted mt-2 text-center text-xs">Brak terminów w tym dniu.</p>
+            ) : (
+              <ul className="mt-2.5 space-y-2">{selectedItems.map((d) => renderDeadlineRow(d, "focus"))}</ul>
+            )}
+          </div>
+
+          <div>
+            <p className="dash-sans text-muted mb-1.5 text-[9px] font-semibold uppercase tracking-wide">
+              Kolejne terminy
+            </p>
+            {followingItems.length === 0 ? (
+              <p className="dash-sans text-muted text-xs">Brak kolejnych terminów.</p>
+            ) : (
+              <ul className="space-y-1.5">{followingItems.map((d) => renderDeadlineRow(d, "future"))}</ul>
+            )}
+          </div>
+        </div>
+
+        <Link
+          href="/admin/kalendarz"
+          className="dash-sans mt-4 inline-block text-[11px] font-bold text-depths hover:underline"
+        >
+          Pełny kalendarz i checklisty →
+        </Link>
+      </article>
+    </div>
+  );
+}
+
+function LessonsDonut({
+  pending,
+  verified,
+  unpaid,
+}: {
+  pending: number;
+  verified: number;
+  unpaid: number;
+}) {
+  const total = pending + verified + unpaid;
+  const pendingDeg = total > 0 ? (pending / total) * 360 : 0;
+  const verifiedDeg = total > 0 ? (verified / total) * 360 : 0;
+  const pendingLight = "#D5ED21";
+  const verifiedLight = "#000C4A";
+  const unpaidLight = "#AAAAAA";
+  const background =
+    total > 0
+      ? `conic-gradient(${pendingLight} 0deg ${pendingDeg}deg, ${verifiedLight} ${pendingDeg}deg ${pendingDeg + verifiedDeg}deg, ${unpaidLight} ${pendingDeg + verifiedDeg}deg 360deg)`
+      : "var(--color-luster)";
+
+  return (
+    <div className="flex h-full items-center gap-6">
+      <div className="relative size-28 shrink-0 rounded-full sm:size-32" style={{ background }}>
+        <div className="absolute inset-[10px] flex items-center justify-center rounded-full bg-snow">
+          <span className="dash-mono text-depths text-2xl font-bold tabular-nums sm:text-3xl">{total}</span>
+        </div>
+      </div>
+      <ul className="min-w-0 flex-1 space-y-2.5">
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: pendingLight }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#000C4A" }}>
+            Do zatwierdzenia
+          </span>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#000C4A" }}>
+            {pending}
+          </span>
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: verifiedLight }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#000C4A" }}>
+            Zatwierdzone
+          </span>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#000C4A" }}>
+            {verified}
+          </span>
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: unpaidLight }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#AAAAAA" }}>
+            Nieopłacone
+          </span>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#AAAAAA" }}>
+            {unpaid}
+          </span>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+function RevenueSplitDonut({
+  costs,
+  margin,
+  unpaid,
+}: {
+  costs: number;
+  margin: number;
+  unpaid: number;
+}) {
+  const total = costs + margin + unpaid;
+  const costsDeg = total > 0 ? (Math.max(costs, 0) / total) * 360 : 0;
+  const marginDeg = total > 0 ? (Math.max(margin, 0) / total) * 360 : 0;
+  const costsColor = "#D5ED21";
+  const marginColor = "#000C4A";
+  const unpaidColor = "#AAAAAA";
+  const background =
+    total > 0
+      ? `conic-gradient(${costsColor} 0deg ${costsDeg}deg, ${marginColor} ${costsDeg}deg ${costsDeg + marginDeg}deg, ${unpaidColor} ${costsDeg + marginDeg}deg 360deg)`
+      : "var(--color-luster)";
+  const marginPct = total > 0 ? Math.round((margin / total) * 100) : 0;
+
+  return (
+    <div className="flex h-full items-center gap-3">
+      <div className="relative size-14 shrink-0 rounded-full" style={{ background }}>
+        <div className="absolute inset-[5px] flex flex-col items-center justify-center rounded-full bg-snow">
+          <span className="dash-mono text-depths text-xs font-bold tabular-nums">{marginPct}%</span>
+        </div>
+      </div>
+      <ul className="min-w-0 flex-1 space-y-1">
+        <li className="flex items-center gap-1.5">
+          <span className="size-1.5 shrink-0 rounded-full" style={{ background: costsColor }} />
+          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#000C4A" }}>
+            Koszty
+          </span>
+          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#000C4A" }}>
+            {formatPln(costs)}
+          </span>
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="size-1.5 shrink-0 rounded-full" style={{ background: marginColor }} />
+          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#000C4A" }}>
+            Marża
+          </span>
+          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#000C4A" }}>
+            {formatPln(margin)}
+          </span>
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="size-1.5 shrink-0 rounded-full" style={{ background: unpaidColor }} />
+          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#AAAAAA" }}>
+            Nieopł.
+          </span>
+          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#AAAAAA" }}>
+            {formatPln(unpaid)}
+          </span>
+        </li>
+      </ul>
+    </div>
+  );
 }
 
 export function AdminDashboardClient({
@@ -138,7 +516,7 @@ export function AdminDashboardClient({
   pendingMonthCount,
   verifiedMonthCount,
   unpaidMonthCount,
-  deadlines,
+  expiringContracts,
 }: {
   todayLabel: string;
   monthLabel: string;
@@ -152,7 +530,7 @@ export function AdminDashboardClient({
   pendingMonthCount: number;
   verifiedMonthCount: number;
   unpaidMonthCount: number;
-  deadlines: DeadlineItem[];
+  expiringContracts: ExpiringContract[];
 }) {
   return (
     <div className="space-y-7">
@@ -168,51 +546,91 @@ export function AdminDashboardClient({
 
       <section>
         <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Finanse miesiąca</h2>
-        <LedgerBand columns={4}>
-          <LedgerStat label="Przychód" tick="neutral" ink="depths">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <FinanceTile label="Przychód" tone="navy">
             {formatPln(verifiedMonthSumPln)}
-          </LedgerStat>
-          <LedgerStat label="Koszty · wypłaty / wszystkie" tick="butter" ink="toffee">
+          </FinanceTile>
+          <FinanceTile label="Koszty · wypłaty / wszystkie" tone="orange">
             {formatPln(payoutCostPln)}
-            <span className="text-luster/40"> / </span>
+            <span className="opacity-40"> / </span>
             {formatPln(totalCostPln)}
-          </LedgerStat>
-          <LedgerStat label="Marża agencji" tick="lime" ink="moss">
+          </FinanceTile>
+          <FinanceTile label="Marża agencji" tone="green">
             {formatPln(agencyProfitPln)}
-          </LedgerStat>
-          <LedgerStat label="Nieopłacone" tick={unpaidMonthSumPln > 0 ? "claret" : "neutral"} ink="claret">
+          </FinanceTile>
+          <FinanceTile label="Nieopłacone" tone="red">
             −{formatPln(unpaidMonthSumPln)}
-          </LedgerStat>
-        </LedgerBand>
+          </FinanceTile>
+          <article className="rounded-3xl border border-panel-frame/35 bg-snow p-4 sm:p-5">
+            <p className="dash-sans text-muted text-[10px] font-bold uppercase tracking-[0.16em]">Podział</p>
+            <div className="mt-2.5">
+              <RevenueSplitDonut
+                costs={totalCostPln}
+                margin={agencyProfitPln}
+                unpaid={unpaidMonthSumPln}
+              />
+            </div>
+          </article>
+        </div>
       </section>
 
       <section>
         <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Zespół i lekcje</h2>
         <div className="grid gap-3 lg:grid-cols-3">
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Nauczyciele</p>
-            <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{tutorCount}</p>
-          </article>
+          <div className="flex flex-col gap-3">
+            <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+              <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Nauczyciele</p>
+              <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{tutorCount}</p>
+            </article>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Uczniowie</p>
-            <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{studentCount}</p>
-          </article>
+            <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+              <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Uczniowie</p>
+              <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{studentCount}</p>
+            </article>
+          </div>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-            <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Lekcje · {monthLabel}</p>
-            <div className="mt-2.5 grid grid-cols-3 gap-2">
-              <div className="status-rail status-rail-pending pl-2.5">
-                <p className="dash-sans text-toffee text-[10px] font-bold uppercase tracking-wide">Do zatw.</p>
-                <p className="dash-mono text-toffee mt-0.5 text-lg font-bold tabular-nums">{pendingMonthCount}</p>
+          <article className="rounded-app border border-panel-frame/35 bg-snow p-4 lg:col-span-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:border-r sm:border-panel-frame/25 sm:pr-4">
+                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">
+                  Umowy - 30 dni
+                </p>
+                <ul className="mt-2.5 max-h-40 space-y-1.5 overflow-y-auto pr-1 scrollbar-panel">
+                  {expiringContracts.length === 0 ? (
+                    <li className="dash-sans text-muted text-xs">Brak umów kończących się wkrótce.</li>
+                  ) : (
+                    expiringContracts.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between gap-2">
+                        <Link
+                          href={`/admin/nauczyciele/${t.id}`}
+                          className="dash-sans text-depths min-w-0 truncate text-xs font-semibold hover:underline"
+                        >
+                          {t.name}
+                        </Link>
+                        <span
+                          className={`dash-mono shrink-0 text-[11px] font-bold tabular-nums ${
+                            t.daysLeft <= 7 ? "text-claret" : "text-toffee"
+                          }`}
+                        >
+                          {daysLeftLabel(t.daysLeft)}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
               </div>
-              <div className="status-rail status-rail-verified pl-2.5">
-                <p className="dash-sans text-moss text-[10px] font-bold uppercase tracking-wide">Zatw.</p>
-                <p className="dash-mono text-moss mt-0.5 text-lg font-bold tabular-nums">{verifiedMonthCount}</p>
-              </div>
-              <div className="status-rail status-rail-unpaid pl-2.5">
-                <p className="dash-sans text-claret text-[10px] font-bold uppercase tracking-wide">Nieopł.</p>
-                <p className="dash-mono text-claret mt-0.5 text-lg font-bold tabular-nums">{unpaidMonthCount}</p>
+
+              <div>
+                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">
+                  Lekcje - {monthLabel}
+                </p>
+                <div className="mt-2.5 flex items-center">
+                  <LessonsDonut
+                    pending={pendingMonthCount}
+                    verified={verifiedMonthCount}
+                    unpaid={unpaidMonthCount}
+                  />
+                </div>
               </div>
             </div>
           </article>
@@ -220,46 +638,10 @@ export function AdminDashboardClient({
       </section>
 
       <section>
-        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Najważniejsze daty</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {deadlines.map((d) => {
-            const overdue = d.daysLeft < 0;
-            const soon = d.daysLeft >= 0 && d.daysLeft <= 3;
-            const rail = overdue ? "status-rail-unpaid" : soon ? "status-rail-pending" : "status-rail-neutral";
-            const daysTone = overdue ? "text-claret" : soon ? "text-toffee" : "text-muted";
-            return (
-              <Link
-                key={d.id}
-                href={d.href}
-                className={`status-rail ${rail} rounded-app border border-panel-frame/35 bg-snow p-4 transition hover:bg-luster/60`}
-              >
-                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">{d.label}</p>
-                <p className="dash-sans text-depths mt-1.5 text-sm font-bold capitalize">{d.dateLabel}</p>
-                <p className={`dash-mono mt-2 text-xs font-bold ${daysTone}`}>{daysLeftLabel(d.daysLeft)}</p>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Checklisty</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ChecklistCard
-            title="Nowy pracownik"
-            subtitle="Formalności po dodaniu konta."
-            items={NEW_EMPLOYEE_ITEMS}
-            storageKey="zaliczone-admin-checklist-new-employee"
-            accent="lime"
-          />
-          <ChecklistCard
-            title="Proces wypłat"
-            subtitle="Cykl na koniec miesiąca — od ewidencji po przelew."
-            items={PAYOUT_ITEMS}
-            storageKey="zaliczone-admin-checklist-payouts"
-            accent="butter"
-          />
-        </div>
+        <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">
+          Kalendarz · {monthLabel}
+        </h2>
+        <CurrentMonthCalendar monthLabel={monthLabel} />
       </section>
     </div>
   );

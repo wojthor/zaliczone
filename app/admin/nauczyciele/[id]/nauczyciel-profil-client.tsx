@@ -124,9 +124,28 @@ export function NauczycielProfilClient({
           <Link href="/admin/nauczyciele" className="dash-sans text-muted text-xs font-semibold hover:underline">
             ← Nauczyciele
           </Link>
-          <h1 className="dash-sans text-depths mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="dash-sans text-depths mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
+            <span className="avatar-initials h-11 w-11 shrink-0 text-sm" aria-hidden>
+              {tutor.name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((p) => p[0]?.toUpperCase() ?? "")
+                .join("") || "?"}
+            </span>
             {tutor.name}
           </h1>
+          <p className="mt-2">
+            <span
+              className={
+                tutor.acceptingStudents
+                  ? "badge-action"
+                  : "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.7rem] font-bold uppercase tracking-wide text-steel"
+              }
+            >
+              {tutor.acceptingStudents ? "Przyjmuje uczniów" : "Bez nowych uczniów"}
+            </span>
+          </p>
           <p className="dash-sans text-muted mt-2 text-sm">
             <span>{tutor.phone ?? "brak tel."}</span>
             <span className="mx-1.5 opacity-40">·</span>
@@ -170,7 +189,7 @@ export function NauczycielProfilClient({
               tutor.subjects.map((s, i) => (
                 <span
                   key={`${tutor.id}-${s}-${i}`}
-                  className="dash-sans rounded-full border border-panel-frame/40 bg-luster/50 px-2.5 py-0.5 text-[0.7rem] font-semibold text-depths"
+                  className="dash-sans rounded-ledger border border-mist bg-paper px-2.5 py-0.5 text-[0.7rem] font-semibold text-depths"
                 >
                   {s}
                 </span>
@@ -210,7 +229,7 @@ export function NauczycielProfilClient({
           </div>
           <Link
             href={`/admin/dokumenty?tab=employees&tutor=${tutor.id}`}
-            className="flex aspect-square w-26 flex-col items-center justify-center gap-2 rounded-app border border-panel-frame/35 bg-snow text-center transition hover:border-[#000C4A]/40 hover:bg-luster/40"
+            className="flex aspect-square w-26 flex-col items-center justify-center gap-2 rounded-app bg-snow text-center transition hover:bg-paper"
             title={`Dokumenty → Pracownicy → ${tutor.name}`}
           >
             <IconFolder className="h-9 w-9 text-[#000C4A]" />
@@ -222,8 +241,8 @@ export function NauczycielProfilClient({
       {feedback ? <p className="dash-sans text-xs font-semibold text-[#000C4A]">{feedback}</p> : null}
 
       {editing ? (
-        <section className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <h2 className="dash-sans text-depths text-sm font-semibold">Edycja profilu</h2>
+        <section className="card-quiet p-4">
+          <h2 className="section-label">Edycja profilu</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 sm:col-span-2">
               <span className="dash-sans text-xs font-semibold text-depths/80">Imię i nazwisko</span>
@@ -297,38 +316,40 @@ export function NauczycielProfilClient({
 
       {/* Dwa obszary: finanse | uczniowie */}
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <h2 className="dash-sans text-depths text-sm font-semibold">Bieżący miesiąc</h2>
+        <div className="rounded-app bg-snow p-4">
+          <h2 className="section-label">Bieżący miesiąc</h2>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4">
             <Metric label="Lekcje" value={String(monthStats.lessons)} />
             <Metric label="Godziny" value={String(monthStats.hours)} />
             <Metric label="Przychód (klient)" value={formatPln(monthStats.revenue)} />
-            <Metric
-              label="Jego wypłata"
-              value={formatPln(monthStats.payout)}
-              hint={
-                monthStats.bonusAchieved
+            <div>
+              <p className="section-label !text-muted">Jego wypłata</p>
+              <p className="mark-highlight dash-mono mt-0.5 text-2xl font-black">
+                {formatPln(monthStats.payout)}
+              </p>
+              <p className="dash-sans text-muted mt-0.5 text-[10px]">
+                {monthStats.bonusAchieved
                   ? `70% + premia ${monthStats.bonusPln} zł`
-                  : "70% ze stawki klienta"
-              }
-            />
+                  : "70% ze stawki klienta"}
+              </p>
+            </div>
           </div>
           <BonusProgressBar hoursDone={monthStats.hours} minimal className="mt-4 w-full max-w-none" />
         </div>
 
-        <div className="rounded-app border border-panel-frame/35 bg-snow p-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="dash-sans text-depths text-sm font-semibold">Uczniowie</h2>
+        <div className="rounded-app bg-snow p-4">
+          <div className="flex items-baseline justify-between gap-2 border-b-2 border-paper pb-2">
+            <h2 className="section-label">Uczniowie</h2>
             <span className="dash-mono text-muted text-sm font-medium">{students.length}</span>
           </div>
-          <ul className="mt-3 max-h-56 space-y-1.5 overflow-y-auto pr-1 scrollbar-panel">
+          <ul className="mt-3 max-h-56 space-y-0 overflow-y-auto pr-1 scrollbar-panel">
             {students.length === 0 ? (
               <li className="dash-sans text-muted text-sm">Brak przypisanych uczniów.</li>
             ) : (
               students.map((s) => (
                 <li
                   key={s.id}
-                  className="flex flex-wrap items-baseline justify-between gap-2 border-b border-panel-frame/20 py-2 text-sm last:border-0"
+                  className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-paper py-2 text-sm last:border-0"
                 >
                   <span className="dash-sans font-semibold text-depths">{s.name}</span>
                   <span className="dash-sans text-muted text-xs">
@@ -388,7 +409,7 @@ function Metric({
 }) {
   return (
     <div>
-      <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">{label}</p>
+      <p className="section-label !text-muted">{label}</p>
       <p className="dash-mono text-depths mt-0.5 text-2xl font-black">{value}</p>
       {hint ? <p className="dash-sans text-muted mt-0.5 text-[10px]">{hint}</p> : null}
     </div>
@@ -404,13 +425,13 @@ function LessonList({
   lines: FinanceLineUi[];
   tone: "toffee" | "claret" | "moss";
 }) {
-  const bg = tone === "toffee" ? "bg-butter/25" : tone === "claret" ? "bg-claret/5" : "bg-lime/20";
-  const amount = tone === "claret" ? "text-claret" : tone === "moss" ? "text-moss" : "text-depths";
+  const bg = tone === "toffee" ? "bg-soft-lime/40" : tone === "claret" ? "bg-mist" : "bg-paper";
+  const amount = "text-depths";
 
   return (
-    <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="dash-sans text-depths font-semibold">{title}</h3>
+    <article className="rounded-app bg-snow p-4">
+      <div className="flex items-baseline justify-between gap-2 border-b-2 border-paper pb-2">
+        <h3 className="section-label">{title}</h3>
         <span className="dash-mono text-muted text-sm font-medium">{lines.length}</span>
       </div>
       <ul className="mt-2 max-h-52 space-y-1.5 overflow-y-auto scrollbar-panel">

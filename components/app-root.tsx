@@ -9,7 +9,9 @@ import { ToastProvider } from "@/components/ui/toast";
 function isPrintDocumentPath(pathname: string): boolean {
   return (
     pathname.startsWith("/finanse/ewidencja") ||
-    pathname.startsWith("/admin/ksiegowosc/ewidencja")
+    pathname.startsWith("/admin/ksiegowosc/ewidencja") ||
+    pathname.startsWith("/admin/ksiegowosc/koszty") ||
+    pathname.startsWith("/admin/wyplaty/lista-plac")
   );
 }
 
@@ -27,7 +29,7 @@ export function AppRoot({ children }: { children: ReactNode }) {
     <ToastProvider>
       <LessonCompletionProvider>
         {isAdmin ? (
-          <div className="min-h-dvh bg-luster p-1.5">{children}</div>
+          <div className="min-h-dvh bg-paper p-1.5">{children}</div>
         ) : (
           <AppShell>{children}</AppShell>
         )}

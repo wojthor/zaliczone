@@ -58,7 +58,7 @@ export default function LoginForm() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-luster p-4">
-      <div className="w-full max-w-md rounded-app border-2 border-panel-frame bg-snow p-6 shadow-sm sm:p-8">
+      <div className="w-full max-w-md rounded-app bg-snow p-6 sm:p-8">
         <p className={`${logoFont.className} text-depths text-center text-2xl font-bold tracking-tight`}>
           ZALICZONE
         </p>
@@ -73,7 +73,7 @@ export default function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
               placeholder="twoj@email.pl"
             />
           </label>
@@ -86,12 +86,12 @@ export default function LoginForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
             />
           </label>
 
           {error ? (
-            <p className="rounded-app bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            <p className="rounded-app bg-mist px-3 py-2 text-sm text-depths" role="alert">
               {error}
             </p>
           ) : null}

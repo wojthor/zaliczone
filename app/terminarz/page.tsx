@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { PageShell } from "@/components/page-shell";
 import { TerminarzPageView } from "@/components/terminarz/terminarz-page-view";
 import { getCurrentUserProfile, getTutorLessons, getTutorStudents } from "@/lib/data/queries";
 
@@ -14,12 +13,10 @@ export default async function TerminarzPage() {
   ]);
 
   return (
-    <PageShell title="Terminarz">
-      <TerminarzPageView
-        initialLessons={lessons}
-        students={students}
-        activeSubjects={profile.active_subjects ?? []}
-      />
-    </PageShell>
+    <TerminarzPageView
+      initialLessons={lessons}
+      students={students}
+      activeSubjects={profile.active_subjects ?? []}
+    />
   );
 }

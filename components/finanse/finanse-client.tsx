@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/page-shell";
+import { tutorPayoutFromCennik, sumTutorPayoutFromCennik, financeLinesHours } from "@/lib/data/mappers";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
@@ -32,11 +33,6 @@ function formatMonthLongPl(monthKey: string): string {
   const [ys, ms] = monthKey.split("-");
   const d = new Date(Number(ys), Number(ms) - 1, 15);
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
-}
-
-function minutesFromFinanceLabel(label: string): number {
-  const match = label.match(/(\d+)\s*min/);
-  return match ? Number(match[1]) : 60;
 }
 
 export function FinanseClient({
@@ -74,21 +70,11 @@ export function FinanseClient({
     () => financeLines.filter((line) => line.monthKey === selectedMonthKey),
     [financeLines, selectedMonthKey],
   );
-  const clientTotal = useMemo(
-    () => linesForMonth.reduce((sum, line) => sum + line.amountPln, 0),
-    [linesForMonth],
-  );
   const lessonsSharePln = useMemo(
-    () => Math.round(clientTotal * TUTOR_SHARE * 100) / 100,
-    [clientTotal],
+    () => sumTutorPayoutFromCennik(linesForMonth, priceTiers, TUTOR_SHARE),
+    [linesForMonth, priceTiers],
   );
-  const hoursMonth = useMemo(
-    () =>
-      Math.round(
-        (linesForMonth.reduce((sum, line) => sum + minutesFromFinanceLabel(line.label), 0) / 60) * 10,
-      ) / 10,
-    [linesForMonth],
-  );
+  const hoursMonth = useMemo(() => financeLinesHours(linesForMonth), [linesForMonth]);
   const bonus = useMemo(() => bonusProgress(hoursMonth), [hoursMonth]);
   const expectedPayoutPln = useMemo(
     () => Math.round((lessonsSharePln + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100,
@@ -103,10 +89,6 @@ export function FinanseClient({
     [payouts, selectedMonthKey],
   );
   const isMonthClosed = closedMonths.includes(selectedMonthKey);
-
-  function tutorShareOf(amount: number): number {
-    return Math.round(amount * TUTOR_SHARE * 100) / 100;
-  }
 
   useEffect(() => {
     if (!cennikOpen) return;
@@ -134,7 +116,7 @@ export function FinanseClient({
             <button
               type="button"
               onClick={() => setCennikOpen(true)}
-              className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium transition-colors hover:bg-luster/90"
+              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium transition-colors hover:bg-paper"
             >
               Cennik
             </button>
@@ -142,7 +124,7 @@ export function FinanseClient({
           <label className="grid w-full shrink-0 gap-1 sm:w-auto sm:min-w-56">
             <span className="text-depths/80 text-xs font-semibold">Miesiąc</span>
             <select
-              className="text-depths rounded-app border-2 border-panel-frame bg-luster px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
               value={selectedMonthKey}
               onChange={(e) => setSelectedMonthKey(e.target.value)}
             >
@@ -158,9 +140,10 @@ export function FinanseClient({
       </div>
 
       <section className="mb-6 rounded-app border border-panel-frame/40 bg-luster/40 p-4">
-        <h2 className="text-depths text-sm font-semibold">Ewidencja godzin</h2>
+        <h2 className="text-depths text-sm font-semibold">Ewidencja zajęć dydaktycznych</h2>
         <p className="text-muted mt-1 text-xs leading-relaxed">
-          Generuj PDF ewidencji dla wybranego miesiąca — dokument jest zawsze dostępny w Finansach.
+          Generuj PDF ewidencji dla wybranego miesiąca — wiersz na każdą godzinę, z poziomem nauczania
+          i formą zajęć.
           {ewidencjaUnlockedForMonth === selectedMonthKey
             ? " Administrator odblokował ten miesiąc do wysyłki."
             : null}
@@ -234,7 +217,7 @@ export function FinanseClient({
             {bonus.achieved ? ` · +premia ${bonus.bonusPln} zł` : null}
           </p>
         </div>
-        <div className="rounded-app border-2 border-panel-frame bg-jodhpur p-4">
+        <div className="rounded-app bg-paper p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Godziny / uczniowie</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
             {hoursMonth}
@@ -244,7 +227,7 @@ export function FinanseClient({
             {studentsInMonth} uczniów w mies. · {studentCount} w bazie
           </p>
         </div>
-        <div className="rounded-app border-2 border-panel-frame bg-luster/70 p-4">
+        <div className="rounded-app bg-mist p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status wypłaty</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
             {payoutForMonth ? `${Number(payoutForMonth.amount).toLocaleString("pl-PL")} zł` : "—"}
@@ -252,9 +235,9 @@ export function FinanseClient({
           <p
             className={`mt-1 text-xs font-semibold ${
               payoutForMonth?.status === "PAID"
-                ? "text-green-800"
+                ? "text-depths"
                 : payoutForMonth
-                  ? "text-amber-900"
+                  ? "text-steel"
                   : "text-depths/70"
             }`}
           >
@@ -292,7 +275,7 @@ export function FinanseClient({
                   </p>
                 </div>
                 <p className="shrink-0 self-start rounded-app bg-[#000C4A] px-3 py-2 text-base font-bold tabular-nums text-lime sm:self-center">
-                  +{tutorShareOf(line.amountPln)} zł
+                  +{tutorPayoutFromCennik(line, priceTiers, TUTOR_SHARE)} zł
                 </p>
               </li>
             ))}
