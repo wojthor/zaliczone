@@ -24,22 +24,56 @@
   --color-sage: #e8e8e6;
   --color-panel-frame: #e8e8e6;
 
-  /* Statusy — tylko granat / limonka / szary */
-  --color-claret: #000c4a;
-  --color-moss: #000c4a;
+  /* Statusy lekcji */
+  --color-status-planned: #d4d3ce;
+  --color-status-pending: #000c4a;
+  --color-status-unpaid: #e23b3b;
+  --color-status-verified: #d5ed21;
+
+  /* Semantyczne aliasy UI (ostrzeżenia / sukces) */
+  --color-claret: #c0392b;
+  --color-moss: #2d8a4e;
   --color-toffee: #aaaaaa;
 }
 
 @utility rounded-app {
-  border-radius: 0.375rem;
+  border-radius: 1.25rem;
 }
 
 @utility rounded-ledger {
-  border-radius: 0.25rem;
+  border-radius: 9999px;
+}
+
+@utility card-feature {
+  background-color: var(--color-depths);
+  color: var(--color-lime);
+  border-radius: 1.75rem;
+  border: 1px solid rgba(213, 237, 33, 0.12);
+  box-shadow: 0 12px 32px rgba(0, 12, 74, 0.18);
+}
+
+@utility card-feature-alt {
+  background: linear-gradient(165deg, #000c4a 0%, #001a6e 55%, #00082f 100%);
+  color: var(--color-soft-lime);
+  border-radius: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 32px rgba(0, 12, 74, 0.16);
+}
+
+@utility card-quiet {
+  background-color: var(--color-snow);
+  border-radius: 1.75rem;
+  box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
+}
+
+@utility soft-panel {
+  background-color: var(--color-snow);
+  border-radius: 1.75rem;
+  box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
 }
 
 @utility btn-block {
-  border-radius: 0.25rem;
+  border-radius: 9999px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -59,43 +93,48 @@
   font-weight: 800;
 }
 
-@utility card-feature {
-  background-color: var(--color-depths);
-  color: var(--color-lime);
-  border-radius: 0.375rem;
-}
-
-@utility card-feature-alt {
-  background-color: var(--color-depths);
-  color: var(--color-soft-lime);
-  border-radius: 0.375rem;
-}
-
-@utility card-quiet {
-  background-color: var(--color-paper);
-  border-radius: 0.375rem;
-}
-
 @utility badge-action {
-  border-radius: 0.25rem;
-  background-color: var(--color-lime);
+  border-radius: 9999px;
+  background-color: var(--color-status-pending);
+  color: var(--color-lime);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+}
+
+@utility badge-done {
+  border-radius: 9999px;
+  background-color: var(--color-status-verified);
   color: var(--color-depths);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 0.15rem 0.45rem;
+  padding: 0.15rem 0.55rem;
 }
 
-@utility badge-done {
-  border-radius: 0.25rem;
-  background-color: var(--color-depths);
-  color: var(--color-soft-lime);
+@utility badge-planned {
+  border-radius: 9999px;
+  background-color: var(--color-status-planned);
+  color: var(--color-depths);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 0.15rem 0.45rem;
+  padding: 0.15rem 0.55rem;
+}
+
+@utility badge-unpaid {
+  border-radius: 9999px;
+  background-color: var(--color-status-unpaid);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
 }
 
 @utility avatar-initials {
@@ -116,52 +155,6 @@
   font-family: var(--font-dash-mono), ui-monospace, "SFMono-Regular", monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-}
-
-.mark-highlight {
-  position: relative;
-  display: inline-block;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  z-index: 0;
-  color: var(--color-lime);
-}
-
-.mark-highlight::before {
-  content: "";
-  position: absolute;
-  left: -0.08em;
-  right: -0.08em;
-  bottom: 0.08em;
-  height: 0.38em;
-  background: var(--color-lime);
-  opacity: 0.55;
-  z-index: -1;
-  border-radius: 2px;
-}
-
-.mark-highlight-on-dark {
-  position: relative;
-  display: inline-block;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  z-index: 0;
-  color: var(--color-snow);
-}
-
-.mark-highlight-on-dark::before {
-  content: "";
-  position: absolute;
-  left: -0.08em;
-  right: -0.08em;
-  bottom: 0.08em;
-  height: 0.38em;
-  background: var(--color-lime);
-  opacity: 0.85;
-  z-index: -1;
-  border-radius: 2px;
 }
 
 @keyframes hopToPaid {
@@ -250,21 +243,71 @@
   }
 }
 
+/* Mobile drawer: CSS-driven slide + backdrop fade (niezależne od Tailwind translate) */
+.mobile-drawer-backdrop {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.mobile-drawer-backdrop[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-drawer-panel {
+  transition-property: transform, width;
+  transition-duration: 0.32s, 0.3s;
+  transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  will-change: transform;
+}
+
+@media (max-width: 1023.98px) {
+  .mobile-drawer-panel {
+    position: fixed;
+    z-index: 50;
+    transform: translate3d(calc(-100% - 1.25rem), 0, 0);
+    pointer-events: none;
+  }
+
+  .mobile-drawer-panel[data-mobile-open="true"] {
+    transform: translate3d(0, 0, 0);
+    pointer-events: auto;
+  }
+
+  .mobile-drawer-panel[data-mobile-open="true"] a,
+  .mobile-drawer-panel[data-mobile-open="true"] button {
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-drawer-panel {
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+
+  .mobile-drawer-backdrop {
+    display: none;
+  }
+}
+
 .status-rail {
   border-left-width: 6px;
   border-left-style: solid;
 }
 .status-rail-verified {
-  border-left-color: var(--color-lime);
+  border-left-color: var(--color-status-verified);
 }
 .status-rail-pending {
-  border-left-color: var(--color-soft-lime);
+  border-left-color: var(--color-status-pending);
+  background-color: color-mix(in srgb, var(--color-status-pending) 12%, transparent);
 }
 .status-rail-unpaid {
-  border-left-color: var(--color-steel);
+  border-left-color: var(--color-status-unpaid);
 }
 .status-rail-neutral {
-  border-left-color: var(--color-mist);
+  border-left-color: var(--color-status-planned);
 }
 
 .sidebar-tooltip {

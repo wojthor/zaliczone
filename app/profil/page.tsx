@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserProfile, getTutorDocumentFiles, getTutorSubjectRequests } from "@/lib/data/queries";
+import { getCurrentUserProfile, getTutorSubjectRequests } from "@/lib/data/queries";
+import { getTutorDriveFilesForViewer } from "@/lib/actions/drive";
 import { ProfilClient } from "./profil-client";
 
 export default async function ProfilPage() {
@@ -13,9 +14,9 @@ export default async function ProfilPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [subjectRequests, adminDocuments] = await Promise.all([
+  const [subjectRequests, driveDocuments] = await Promise.all([
     getTutorSubjectRequests(profile.id),
-    getTutorDocumentFiles(profile.id),
+    getTutorDriveFilesForViewer(),
   ]);
 
   return (
@@ -23,7 +24,7 @@ export default async function ProfilPage() {
       profile={profile}
       email={user?.email ?? "—"}
       subjectRequests={subjectRequests}
-      adminDocuments={adminDocuments}
+      driveDocuments={driveDocuments}
     />
   );
 }

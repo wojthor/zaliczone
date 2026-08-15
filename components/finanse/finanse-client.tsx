@@ -116,7 +116,7 @@ export function FinanseClient({
             <button
               type="button"
               onClick={() => setCennikOpen(true)}
-              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium transition-colors hover:bg-paper"
+              className="rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-semibold text-depths transition hover:border-[#000C4A]/30"
             >
               Cennik
             </button>
@@ -124,7 +124,7 @@ export function FinanseClient({
           <label className="grid w-full shrink-0 gap-1 sm:w-auto sm:min-w-56">
             <span className="text-depths/80 text-xs font-semibold">Miesiąc</span>
             <select
-              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
               value={selectedMonthKey}
               onChange={(e) => setSelectedMonthKey(e.target.value)}
             >
@@ -139,45 +139,48 @@ export function FinanseClient({
         </div>
       </div>
 
-      <section className="mb-6 rounded-app border border-panel-frame/40 bg-luster/40 p-4">
-        <h2 className="text-depths text-sm font-semibold">Ewidencja zajęć dydaktycznych</h2>
-        <p className="text-muted mt-1 text-xs leading-relaxed">
-          Generuj PDF ewidencji dla wybranego miesiąca — wiersz na każdą godzinę, z poziomem nauczania
-          i formą zajęć.
-          {ewidencjaUnlockedForMonth === selectedMonthKey
-            ? " Administrator odblokował ten miesiąc do wysyłki."
-            : null}
-        </p>
+      <section className="mb-4 flex flex-wrap items-center justify-between gap-3 soft-panel px-4 py-3.5">
+        <div className="min-w-0">
+          <p className="section-label">Ewidencja zajęć</p>
+          <p className="text-muted mt-0.5 text-[11px] leading-snug">
+            PDF za {monthLabel}
+            {ewidencjaUnlockedForMonth === selectedMonthKey ? " · odblokowana" : ""}
+          </p>
+        </div>
         {canGenerateEwidencja ? (
           <a
             href={`/finanse/ewidencja?month=${selectedMonthKey}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-flex rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-xs font-bold text-depths hover:bg-jodhpur"
+            className="inline-flex shrink-0 items-center rounded-full bg-[#000C4A] px-4 py-2 text-xs font-semibold text-lime"
           >
-            Otwórz ewidencję do druku · {monthLabel}
+            Generuj
           </a>
         ) : (
-          <p className="text-muted mt-3 text-xs">Brak zatwierdzonych lekcji w tym miesiącu — nie ma czego generować.</p>
+          <p className="text-muted shrink-0 text-[11px]">Brak zatwierdzonych lekcji</p>
         )}
       </section>
 
       {cennikOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij cennik" onClick={() => setCennikOpen(false)} />
-          <div className="relative z-10 w-full max-w-lg rounded-app border border-panel-frame/70 bg-snow/95 p-6 shadow-lg sm:p-8">
-            <button
-              type="button"
-              onClick={() => setCennikOpen(false)}
-              className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-xl font-light leading-none text-depths/60 transition-colors hover:bg-luster/80 hover:text-depths"
-              aria-label="Zamknij cennik"
-            >
-              ×
-            </button>
-            <h2 className="pr-12 text-lg font-medium tracking-tight text-depths">Cennik</h2>
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              Twoja stawka godzinowa za zajęcia (umowa zlecenia).
-            </p>
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-app border border-panel-frame/70 bg-snow/95 shadow-2xl sm:rounded-app">
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+            <div className="relative shrink-0 px-5 pt-3 sm:px-8 sm:pt-8">
+              <button
+                type="button"
+                onClick={() => setCennikOpen(false)}
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-xl font-light leading-none text-depths/60 transition-colors hover:bg-luster/80 hover:text-depths touch-manipulation"
+                aria-label="Zamknij cennik"
+              >
+                ×
+              </button>
+              <h2 className="pr-12 text-lg font-medium tracking-tight text-depths">Cennik</h2>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Twoja stawka godzinowa za zajęcia (umowa zlecenia).
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8 sm:pb-8">
             {priceTiers.length === 0 ? (
               <p className="mt-6 text-sm font-medium text-muted">Brak pozycji w cenniku.</p>
             ) : (
@@ -200,13 +203,14 @@ export function FinanseClient({
                 </tbody>
               </table>
             )}
+            </div>
           </div>
         </div>
       ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-app bg-[#000C4A] p-4 text-luster sm:col-span-2 lg:col-span-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-luster/75">
+        <div className="rounded-[1.75rem] bg-[#000C4A] p-4 text-luster shadow-[0_12px_32px_rgba(0,12,74,0.18)] sm:col-span-2 lg:col-span-1">
+          <p className="text-[0.65rem] font-extrabold uppercase tracking-[0.08em] text-lime/80">
             {isCurrentMonth ? "Do wypłaty w tym miesiącu" : "Do wypłaty"}
           </p>
           <p className="mt-1 text-2xl font-black tabular-nums text-lime">
@@ -217,8 +221,8 @@ export function FinanseClient({
             {bonus.achieved ? ` · +premia ${bonus.bonusPln} zł` : null}
           </p>
         </div>
-        <div className="rounded-app bg-paper p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Godziny / uczniowie</p>
+        <div className="soft-panel p-4">
+          <p className="section-label !text-muted">Godziny / uczniowie</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
             {hoursMonth}
             <span className="text-muted text-base font-semibold"> h</span>
@@ -227,8 +231,8 @@ export function FinanseClient({
             {studentsInMonth} uczniów w mies. · {studentCount} w bazie
           </p>
         </div>
-        <div className="rounded-app bg-mist p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status wypłaty</p>
+        <div className="soft-panel p-4">
+          <p className="section-label !text-muted">Status wypłaty</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
             {payoutForMonth ? `${Number(payoutForMonth.amount).toLocaleString("pl-PL")} zł` : "—"}
           </p>
@@ -254,8 +258,8 @@ export function FinanseClient({
         </div>
       </div>
 
-      <section className="rounded-app bg-luster/60 p-4">
-        <h2 className="text-base font-semibold tracking-tight text-depths">Twoje zatwierdzone lekcje</h2>
+      <section className="soft-panel p-4">
+        <h2 className="section-label">Twoje zatwierdzone lekcje</h2>
         <p className="mt-1 text-xs font-medium capitalize text-muted">
           Kwoty według Twojej stawki · {monthLabel}
         </p>
@@ -266,7 +270,7 @@ export function FinanseClient({
             {linesForMonth.map((line) => (
               <li
                 key={line.id}
-                className="flex flex-col gap-3 rounded-app bg-snow px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                className="flex flex-col gap-3 rounded-[1.35rem] bg-paper/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <div className="min-w-0">
                   <p className="font-semibold text-depths">{line.studentName}</p>
@@ -274,7 +278,7 @@ export function FinanseClient({
                     {line.label} · {line.date}
                   </p>
                 </div>
-                <p className="shrink-0 self-start rounded-app bg-[#000C4A] px-3 py-2 text-base font-bold tabular-nums text-lime sm:self-center">
+                <p className="shrink-0 self-start rounded-full bg-[#000C4A] px-3.5 py-1.5 text-sm font-bold tabular-nums text-lime sm:self-center">
                   +{tutorPayoutFromCennik(line, priceTiers, TUTOR_SHARE)} zł
                 </p>
               </li>

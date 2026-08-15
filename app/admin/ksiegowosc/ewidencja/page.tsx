@@ -9,7 +9,7 @@ export default async function EwidencjaSprzedazyPage({
 }) {
   const profile = await getCurrentUserProfile();
   if (!profile) redirect("/login");
-  if (profile.role !== "ADMIN") redirect("/");
+  if (profile.role !== "ADMIN") redirect("/panel");
 
   const { month, year } = await searchParams;
   const all = await getAllVerifiedFinanceLines();

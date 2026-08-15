@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isLessonLocked } from "@/lib/data/mappers";
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
+import { lessonTimesOverlap, normalizeLessonTime } from "@/lib/lessons/time-overlap";
 import type { LessonStatus } from "@/lib/types/database";
 
 /**
@@ -22,6 +23,49 @@ type InsertLessonInput = {
   seriesId?: string | null;
 };
 
+async function assertNoTutorTimeConflict(opts: {
+  tutorId: string;
+  dates: string[];
+  start: string;
+  end: string;
+  excludeLessonId?: string;
+}) {
+  const start = normalizeLessonTime(opts.start);
+  const end = normalizeLessonTime(opts.end);
+  if (!start || !end || start >= end) {
+    throw new Error("Godzina zakończenia musi być późniejsza niż rozpoczęcia.");
+  }
+
+  const uniqueDates = [...new Set(opts.dates.filter(Boolean))];
+  if (uniqueDates.length === 0) return;
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("lessons")
+    .select("id, date, start_time, end_time")
+    .eq("tutor_id", opts.tutorId)
+    .in("date", uniqueDates);
+
+  if (opts.excludeLessonId) {
+    query = query.neq("id", opts.excludeLessonId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const conflicts = (data ?? []).filter((row) =>
+    lessonTimesOverlap(start, end, row.start_time, row.end_time),
+  );
+
+  if (conflicts.length === 0) return;
+
+  const first = conflicts[0]!;
+  const timeLabel = normalizeLessonTime(first.start_time);
+  throw new Error(
+    `Masz już lekcję ${first.date} o ${timeLabel}. Wybierz inną godzinę tego dnia.`,
+  );
+}
+
 export async function insertLessons(input: InsertLessonInput) {
   const supabase = await createClient();
   const {
@@ -33,6 +77,20 @@ export async function insertLessons(input: InsertLessonInput) {
     await assertMonthOpen(monthKeyFromDate(date));
   }
 
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const past = input.dates.find((d) => d < todayKey);
+  if (past) {
+    throw new Error("Nie możesz dodawać lekcji na dzień wcześniejszy niż dziś.");
+  }
+
+  await assertNoTutorTimeConflict({
+    tutorId: user.id,
+    dates: input.dates,
+    start: input.start,
+    end: input.end,
+  });
+
   const seriesId =
     input.seriesId ?? (input.dates.length > 1 ? crypto.randomUUID() : null);
 
@@ -40,8 +98,8 @@ export async function insertLessons(input: InsertLessonInput) {
     tutor_id: user.id,
     student_id: input.studentId,
     date,
-    start_time: input.start,
-    end_time: input.end,
+    start_time: normalizeLessonTime(input.start),
+    end_time: normalizeLessonTime(input.end),
     subject: input.subject,
     status: "PLANNED" as LessonStatus,
   }));
@@ -78,9 +136,37 @@ export async function updateLesson(
   },
 ) {
   const supabase = await createClient();
-  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
-  if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Brak sesji.");
+
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("date, status, tutor_id")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!existing) throw new Error("Nie znaleziono lekcji.");
+  if (existing.tutor_id !== user.id) throw new Error("Brak uprawnień.");
+  if (existing.status !== "PLANNED") {
+    throw new Error("Możesz edytować tylko lekcje ze statusem zaplanowana.");
+  }
+  if (existing.date) await assertMonthOpen(monthKeyFromDate(existing.date));
   await assertMonthOpen(monthKeyFromDate(input.date));
+
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (input.date < todayKey) {
+    throw new Error("Nie możesz ustawić lekcji na dzień wcześniejszy niż dziś.");
+  }
+
+  await assertNoTutorTimeConflict({
+    tutorId: user.id,
+    dates: [input.date],
+    start: input.start,
+    end: input.end,
+    excludeLessonId: lessonId,
+  });
 
   const { error } = await supabase
     .from("lessons")
@@ -88,8 +174,8 @@ export async function updateLesson(
       student_id: input.studentId,
       subject: input.subject,
       date: input.date,
-      start_time: input.start,
-      end_time: input.end,
+      start_time: normalizeLessonTime(input.start),
+      end_time: normalizeLessonTime(input.end),
     })
     .eq("id", lessonId);
 
@@ -99,8 +185,22 @@ export async function updateLesson(
 
 export async function deleteLesson(lessonId: string) {
   const supabase = await createClient();
-  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
-  if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Brak sesji.");
+
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("date, status, tutor_id")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!existing) throw new Error("Nie znaleziono lekcji.");
+  if (existing.tutor_id !== user.id) throw new Error("Brak uprawnień.");
+  if (existing.status !== "PLANNED") {
+    throw new Error("Możesz usuwać tylko lekcje ze statusem zaplanowana.");
+  }
+  if (existing.date) await assertMonthOpen(monthKeyFromDate(existing.date));
 
   const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
   if (error) throw error;
@@ -110,18 +210,17 @@ export async function deleteLesson(lessonId: string) {
 /**
  * Usuwa lekcję oraz wszystkie późniejsze z tej samej serii (date >= fromDate).
  * Jeśli brak series_id — usuwa tylko wskazaną lekcję.
+ * Tylko status PLANNED.
  */
 export async function deleteLessonAndRemainingInSeries(lessonId: string) {
   const supabase = await createClient();
   const { data: existing, error: fetchError } = await supabase
     .from("lessons")
-    .select("id, date, series_id, tutor_id")
+    .select("id, date, series_id, tutor_id, status")
     .eq("id", lessonId)
     .maybeSingle();
   if (fetchError) throw fetchError;
   if (!existing) throw new Error("Nie znaleziono lekcji.");
-
-  await assertMonthOpen(monthKeyFromDate(existing.date));
 
   const {
     data: { user },
@@ -129,6 +228,11 @@ export async function deleteLessonAndRemainingInSeries(lessonId: string) {
   if (!user || existing.tutor_id !== user.id) {
     throw new Error("Brak uprawnień.");
   }
+  if (existing.status !== "PLANNED") {
+    throw new Error("Możesz usuwać tylko lekcje ze statusem zaplanowana.");
+  }
+
+  await assertMonthOpen(monthKeyFromDate(existing.date));
 
   if (!existing.series_id) {
     const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
@@ -139,9 +243,10 @@ export async function deleteLessonAndRemainingInSeries(lessonId: string) {
 
   const { data: siblings, error: sibError } = await supabase
     .from("lessons")
-    .select("id, date")
+    .select("id, date, status")
     .eq("series_id", existing.series_id)
     .eq("tutor_id", user.id)
+    .eq("status", "PLANNED")
     .gte("date", existing.date);
 
   if (sibError) throw sibError;
@@ -163,7 +268,7 @@ export async function deleteLessonAndRemainingInSeries(lessonId: string) {
 }
 
 /**
- * Usuwa wiele lekcji po ID (tylko własne). Sprawdza otwarte miesiące.
+ * Usuwa wiele lekcji po ID (tylko własne, tylko PLANNED). Sprawdza otwarte miesiące.
  */
 export async function deleteLessonsByIds(lessonIds: string[]) {
   const uniqueIds = [...new Set(lessonIds.filter(Boolean))];
@@ -177,9 +282,10 @@ export async function deleteLessonsByIds(lessonIds: string[]) {
 
   const { data: rows, error: fetchError } = await supabase
     .from("lessons")
-    .select("id, date, tutor_id")
+    .select("id, date, tutor_id, status")
     .in("id", uniqueIds)
-    .eq("tutor_id", user.id);
+    .eq("tutor_id", user.id)
+    .eq("status", "PLANNED");
   if (fetchError) throw fetchError;
 
   for (const row of rows ?? []) {
@@ -187,7 +293,9 @@ export async function deleteLessonsByIds(lessonIds: string[]) {
   }
 
   const ids = (rows ?? []).map((r) => r.id);
-  if (ids.length === 0) return { deleted: 0 };
+  if (ids.length === 0) {
+    throw new Error("Możesz usuwać tylko lekcje ze statusem zaplanowana.");
+  }
 
   const { error } = await supabase.from("lessons").delete().in("id", ids);
   if (error) throw error;

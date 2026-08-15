@@ -12,11 +12,15 @@
     "seed:battle": "node --env-file=.env.local scripts/seed-battle.mjs",
     "seed:clean": "node --env-file=.env.local scripts/seed-clean.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
-    "seed:july21": "node --env-file=.env.local scripts/seed-july21.mjs"
+    "seed:july21": "node --env-file=.env.local scripts/seed-july21.mjs",
+    "seed:pit": "node --env-file=.env.local scripts/seed-tutor-pit.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
+    "googleapis": "^174.0.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -30,6 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "2.1.9"
   }
 }

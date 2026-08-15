@@ -15,7 +15,6 @@ import type { StudentUi } from "@/lib/types/database";
 type DashboardLayoutProps = {
   lessons: Lesson[];
   students: StudentUi[];
-  tutorName: string;
   totalPayout: number;
   lessonStats: LessonSummaryStats;
   verifiedHoursThisMonth: number;
@@ -24,15 +23,14 @@ type DashboardLayoutProps = {
 export function DashboardLayout({
   lessons,
   students,
-  tutorName,
   totalPayout,
   lessonStats,
   verifiedHoursThisMonth,
 }: DashboardLayoutProps) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
       <BonusProgressBar hoursDone={verifiedHoursThisMonth} compact showCelebration />
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
         <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">
           <WeeklySchedule lessons={lessons} />
         </div>
@@ -45,12 +43,8 @@ export function DashboardLayout({
         <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <GuideShortcutPanel />
         </div>
-        <div className="min-h-[min(280px,42svh)] min-w-0 overflow-hidden max-lg:min-h-64 lg:col-span-1 lg:row-start-2 lg:min-h-0">
-          <FinanceProfilePanel
-            tutorName={tutorName}
-            totalPayout={totalPayout}
-            lessonStats={lessonStats}
-          />
+        <div className="min-h-[min(220px,36svh)] min-w-0 overflow-hidden max-lg:min-h-56 lg:col-span-1 lg:row-start-2 lg:min-h-0">
+          <FinanceProfilePanel totalPayout={totalPayout} lessonStats={lessonStats} />
         </div>
       </div>
     </div>

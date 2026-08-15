@@ -13,7 +13,7 @@ export default async function ZestawienieKosztowPage({
 }) {
   const profile = await getCurrentUserProfile();
   if (!profile) redirect("/login");
-  if (profile.role !== "ADMIN") redirect("/");
+  if (profile.role !== "ADMIN") redirect("/panel");
 
   const { month, year } = await searchParams;
   const [allExpenses, payouts] = await Promise.all([

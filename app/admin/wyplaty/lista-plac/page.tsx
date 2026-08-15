@@ -54,7 +54,7 @@ export default async function ListaPlacPage({
 }) {
   const profile = await getCurrentUserProfile();
   if (!profile) redirect("/login");
-  if (profile.role !== "ADMIN") redirect("/");
+  if (profile.role !== "ADMIN") redirect("/panel");
 
   const { month } = await searchParams;
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {

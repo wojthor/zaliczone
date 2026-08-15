@@ -9,8 +9,8 @@
 /** Udział nauczyciela w stawce klienta (0.7 = 70%) */
 export const TUTOR_SHARE = 0.7;
 
-/** Stawka PIT ryczałt / liniowy używana w panelu księgowości admina */
-export const ADMIN_PIT_RATE = 0.12;
+/** Stawka PIT skali (I próg) — kanoniczna wartość w `lib/podatki-config.ts`. */
+export { ADMIN_PIT_RATE } from "@/lib/podatki-config";
 
 export const DATES = {
   /**

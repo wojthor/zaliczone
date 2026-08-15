@@ -18,6 +18,7 @@ import { Spinner, useToast } from "@/components/ui/toast";
 import { subjectsFromLine } from "@/lib/data/mappers";
 import { lessonDatesFromDraft } from "@/lib/data/mutations";
 import { deleteLesson, deleteLessonAndRemainingInSeries, deleteLessonsByIds, insertLessons, updateLesson } from "@/lib/actions/lessons";
+import { lessonTimesOverlap } from "@/lib/lessons/time-overlap";
 import type { StudentUi } from "@/lib/types/database";
 
 type RecurrenceMode = "once" | "weekly" | "custom";
@@ -108,12 +109,16 @@ function formatLessonDatePl(dateIso: string): string {
 function MiniCalendar({
   value,
   onChange,
+  minDateIso,
 }: {
   value: string;
   onChange: (dateIso: string) => void;
+  /** Daty wcześniejsze niż ta są niedostępne (YYYY-MM-DD) */
+  minDateIso?: string;
 }) {
   const selected = new Date(`${value}T12:00:00`);
   const [view, setView] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1, 12, 0, 0, 0));
+  const minIso = minDateIso ?? todayIso();
 
   const { cells, month0, year } = useMemo(() => {
     const y = view.getFullYear();
@@ -160,13 +165,21 @@ function MiniCalendar({
           if (day === null) return <span key={`empty-${index}`} className="block h-6" aria-hidden />;
           const dateIso = todayIso(new Date(year, month0, day));
           const active = dateIso === value;
+          const disabled = dateIso < minIso;
           return (
             <button
               key={dateIso}
               type="button"
-              onClick={() => onChange(dateIso)}
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) onChange(dateIso);
+              }}
               className={`flex h-6 items-center justify-center rounded-full text-[0.65rem] font-semibold transition ${
-                active ? "bg-[#000C4A] text-lime" : "bg-luster text-depths hover:bg-jodhpur"
+                disabled
+                  ? "cursor-not-allowed text-steel/50"
+                  : active
+                    ? "bg-[#000C4A] text-lime"
+                    : "bg-luster text-depths hover:bg-jodhpur"
               }`}
             >
               {day}
@@ -203,18 +216,22 @@ function LessonModal({
   }, [draft.subject, students]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij" onClick={onClose} />
       <div
-        className="relative z-10 w-full max-w-[min(40rem,94vw)] rounded-app bg-snow p-5 sm:p-6"
+        className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(40rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:max-h-[min(90dvh,40rem)] sm:max-w-[min(40rem,94vw)] sm:rounded-app"
         role="dialog"
         aria-modal="true"
         aria-labelledby="lesson-modal-title"
       >
-        <h2 id="lesson-modal-title" className="text-depths text-lg font-semibold tracking-tight">
-          {mode === "add" ? "Nowa lekcja" : "Edytuj lekcję"}
-        </h2>
-        <div className="mt-4 grid gap-3">
+        <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+        <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-6">
+          <h2 id="lesson-modal-title" className="text-depths text-lg font-semibold tracking-tight">
+            {mode === "add" ? "Nowa lekcja" : "Edytuj lekcję"}
+          </h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+        <div className="grid gap-3">
           <label className="grid gap-1">
             <span className="text-depths/80 text-xs font-semibold">Przedmiot</span>
             {activeSubjects.length === 0 ? (
@@ -282,6 +299,7 @@ function LessonModal({
               <span className="text-depths/80 mb-1 block text-xs font-semibold">Dzień zajęć</span>
               <MiniCalendar
                 value={draft.dateIso}
+                minDateIso={todayIso()}
                 onChange={(dateIso) =>
                   setDraft((prev) => ({
                     ...prev,
@@ -410,20 +428,21 @@ function LessonModal({
             </label>
           </div>
         </div>
+        </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-panel-frame/30 bg-snow px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
           <p className="text-muted text-xs capitalize">{formatDateChip(draft.dateIso)}</p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="text-depths rounded-full bg-luster px-4 py-2 text-sm font-semibold"
+              className="text-depths rounded-full bg-luster px-4 py-2.5 text-sm font-semibold touch-manipulation"
               onClick={onClose}
             >
               Anuluj
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
               onClick={onSave}
               disabled={saving || activeSubjects.length === 0}
             >
@@ -548,6 +567,11 @@ function TerminarzInner({
 
   function openEdit(lesson: Lesson) {
     if (lesson.date && lesson.date < today) return;
+    const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
+    if (status !== "PLANNED") {
+      toast.error("Brak edycji", "Możesz edytować tylko lekcje ze statusem zaplanowana.");
+      return;
+    }
     setDraft(buildDraftFromLesson(lesson));
     setModal({ type: "edit", id: lesson.id });
   }
@@ -559,24 +583,54 @@ function TerminarzInner({
   async function saveModal() {
     if (!draft.subject || !draft.studentId || !draft.start || !draft.end || saving) return;
 
+    if (draft.start >= draft.end) {
+      toast.error("Niepoprawne godziny", "Godzina „Do” musi być późniejsza niż „Od”.");
+      return;
+    }
+
+    const candidateDates =
+      modal.type === "add"
+        ? lessonDatesFromDraft({
+            dateIso: draft.dateIso,
+            recurrence: draft.recurrence,
+            selectedWeekdays: draft.selectedWeekdays,
+            untilDateIso: draft.untilDateIso,
+          })
+        : [draft.dateIso];
+
+    const minDay = today;
+    const pastDate = candidateDates.find((d) => d < minDay);
+    if (pastDate) {
+      toast.error("Data w przeszłości", "Nie możesz dodawać ani przenosić lekcji na dzień wcześniejszy niż dziś.");
+      return;
+    }
+
+    const conflict = lessons.find((lesson) => {
+      if (modal.type === "edit" && lesson.id === modal.id) return false;
+      if (!lesson.date || !candidateDates.includes(lesson.date)) return false;
+      return lessonTimesOverlap(draft.start, draft.end, lesson.start, lesson.end);
+    });
+
+    if (conflict) {
+      toast.error(
+        "Termin zajęty",
+        `Masz już lekcję ${conflict.date} o ${conflict.start}. Wybierz inną godzinę tego dnia.`,
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       if (modal.type === "add") {
-        const dates = lessonDatesFromDraft({
-          dateIso: draft.dateIso,
-          recurrence: draft.recurrence,
-          selectedWeekdays: draft.selectedWeekdays,
-          untilDateIso: draft.untilDateIso,
-        });
         await insertLessons({
           studentId: draft.studentId,
           subject: draft.subject,
-          dates,
+          dates: candidateDates,
           start: draft.start,
           end: draft.end,
         });
         toast.success(
-          dates.length > 1 ? `Dodano ${dates.length} lekcji` : "Dodano lekcję",
+          candidateDates.length > 1 ? `Dodano ${candidateDates.length} lekcji` : "Dodano lekcję",
           draft.subject,
         );
       } else if (modal.type === "edit") {
@@ -591,8 +645,11 @@ function TerminarzInner({
       }
       closeModal();
       router.refresh();
-    } catch {
-      toast.error("Nie udało się zapisać lekcji");
+    } catch (e) {
+      toast.error(
+        "Nie udało się zapisać lekcji",
+        e instanceof Error ? e.message : undefined,
+      );
     } finally {
       setSaving(false);
     }
@@ -617,7 +674,8 @@ function TerminarzInner({
                   l.seriesId === deleteTarget.seriesId &&
                   l.date &&
                   deleteTarget.date &&
-                  l.date >= deleteTarget.date
+                  l.date >= deleteTarget.date &&
+                  resolveLessonStatus(l.status, l.isCompleted) === "PLANNED"
                 ),
             );
           });
@@ -636,33 +694,44 @@ function TerminarzInner({
       }
       setDeleteTarget(null);
       router.refresh();
-    } catch {
-      toast.error("Nie udało się usunąć lekcji");
+    } catch (e) {
+      toast.error(
+        "Nie udało się usunąć lekcji",
+        e instanceof Error ? e.message : undefined,
+      );
     } finally {
       setDeleteBusy(false);
     }
   }
 
   function remainingInSeries(lesson: Lesson): Lesson[] {
-    if (!lesson.date) return [lesson];
-    if (lesson.seriesId) {
+    const sameSeries = (() => {
+      if (!lesson.date) return [lesson];
+      if (lesson.seriesId) {
+        return lessons.filter(
+          (l) => l.seriesId === lesson.seriesId && l.date && l.date >= lesson.date!,
+        );
+      }
       return lessons.filter(
-        (l) => l.seriesId === lesson.seriesId && l.date && l.date >= lesson.date!,
+        (l) =>
+          l.studentId === lesson.studentId &&
+          l.subject === lesson.subject &&
+          l.start === lesson.start &&
+          l.end === lesson.end &&
+          l.dayIndex === lesson.dayIndex &&
+          l.date &&
+          l.date >= lesson.date!,
       );
-    }
-    return lessons.filter(
-      (l) =>
-        l.studentId === lesson.studentId &&
-        l.subject === lesson.subject &&
-        l.start === lesson.start &&
-        l.end === lesson.end &&
-        l.dayIndex === lesson.dayIndex &&
-        l.date &&
-        l.date >= lesson.date!,
-    );
+    })();
+    return sameSeries.filter((l) => resolveLessonStatus(l.status, l.isCompleted) === "PLANNED");
   }
 
   async function removeLesson(lesson: Lesson) {
+    const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
+    if (status !== "PLANNED") {
+      toast.error("Brak usuwania", "Możesz usuwać tylko lekcje ze statusem zaplanowana.");
+      return;
+    }
     const remaining = remainingInSeries(lesson);
     if (remaining.length > 1) {
       setDeleteTarget(lesson);
@@ -674,8 +743,11 @@ function TerminarzInner({
       setLessons((prev) => prev.filter((item) => item.id !== lesson.id));
       toast.success("Usunięto lekcję");
       router.refresh();
-    } catch {
-      toast.error("Nie udało się usunąć lekcji");
+    } catch (e) {
+      toast.error(
+        "Nie udało się usunąć lekcji",
+        e instanceof Error ? e.message : undefined,
+      );
     }
   }
 
@@ -709,7 +781,7 @@ function TerminarzInner({
             onClick={() => setStatusFilter((prev) => (prev === "PLANNED" ? "all" : "PLANNED"))}
             className={`rounded-ledger px-2.5 py-1 transition ${
               statusFilter === "PLANNED" ? "ring-2 ring-depths/30" : ""
-            } bg-snow text-depths`}
+            } badge-planned`}
           >
             {monthStats.planned} zaplanowanych
           </button>
@@ -719,7 +791,7 @@ function TerminarzInner({
               setStatusFilter((prev) => (prev === "PENDING_VERIFICATION" ? "all" : "PENDING_VERIFICATION"))
             }
             className={`rounded-ledger px-2.5 py-1 transition ${
-              statusFilter === "PENDING_VERIFICATION" ? "ring-2 ring-depths/30" : ""
+              statusFilter === "PENDING_VERIFICATION" ? "ring-2 ring-[var(--color-status-pending)]/40" : ""
             } badge-action`}
           >
             {monthStats.pending} oczekujących
@@ -728,7 +800,7 @@ function TerminarzInner({
             type="button"
             onClick={() => setStatusFilter((prev) => (prev === "VERIFIED" ? "all" : "VERIFIED"))}
             className={`rounded-ledger px-2.5 py-1 transition ${
-              statusFilter === "VERIFIED" ? "ring-2 ring-lime/50" : ""
+              statusFilter === "VERIFIED" ? "ring-2 ring-[var(--color-status-verified)]/40" : ""
             } badge-done`}
           >
             {monthStats.verified} zatwierdzonych
@@ -737,8 +809,8 @@ function TerminarzInner({
             type="button"
             onClick={() => setStatusFilter((prev) => (prev === "UNPAID" ? "all" : "UNPAID"))}
             className={`rounded-ledger px-2.5 py-1 transition ${
-              statusFilter === "UNPAID" ? "ring-2 ring-steel/50" : ""
-            } bg-steel text-snow`}
+              statusFilter === "UNPAID" ? "ring-2 ring-[var(--color-status-unpaid)]/40" : ""
+            } badge-unpaid`}
           >
             {monthStats.unpaid} nieopłaconych
           </button>
@@ -836,6 +908,8 @@ function TerminarzInner({
               const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
               const needsAction = status === "UNPAID" || status === "PLANNED";
               const isPast = Boolean(lesson.date && lesson.date < today);
+              const canEdit = !isPast && status === "PLANNED";
+              const canDelete = !isPast && status === "PLANNED";
               const rail =
                 status === "UNPAID"
                   ? "status-rail status-rail-unpaid"
@@ -879,27 +953,35 @@ function TerminarzInner({
                       ) : null}
                       {isPast ? (
                         <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone — bez edycji</p>
+                      ) : status !== "PLANNED" ? (
+                        <p className="text-muted mt-1 text-[0.65rem]">
+                          Edycja i usuwanie tylko dla lekcji zaplanowanych
+                        </p>
                       ) : null}
                     </div>
                   </div>
-                  {isPast ? null : (
+                  {canEdit || canDelete ? (
                     <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full bg-jodhpur px-3 py-1.5 text-xs font-semibold text-depths"
-                        onClick={() => openEdit(lesson)}
-                      >
-                        Edytuj
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
-                        onClick={() => removeLesson(lesson)}
-                      >
-                        Usuń
-                      </button>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="rounded-full bg-jodhpur px-3 py-1.5 text-xs font-semibold text-depths"
+                          onClick={() => openEdit(lesson)}
+                        >
+                          Edytuj
+                        </button>
+                      ) : null}
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
+                          onClick={() => removeLesson(lesson)}
+                        >
+                          Usuń
+                        </button>
+                      ) : null}
                     </div>
-                  )}
+                  ) : null}
                 </li>
               );
             })
@@ -921,7 +1003,7 @@ function TerminarzInner({
       ) : null}
 
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <button
             type="button"
             className="absolute inset-0 bg-[#000C4A]/50"
@@ -929,25 +1011,28 @@ function TerminarzInner({
             onClick={() => !deleteBusy && setDeleteTarget(null)}
           />
           <div
-            className="relative z-10 w-full max-w-md rounded-app bg-snow p-5 sm:p-6"
+            className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:rounded-app"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-lesson-title"
           >
-            <h2 id="delete-lesson-title" className="text-depths text-lg font-semibold tracking-tight">
-              Usuń lekcję cykliczną
-            </h2>
-            <p className="text-muted mt-2 text-sm leading-relaxed">
-              Ta lekcja należy do serii ({remainingInSeries(deleteTarget).length} pozostałych od{" "}
-              {deleteTarget.date ? formatLessonDatePl(deleteTarget.date) : "tej daty"}). Co chcesz
-              zrobić?
-            </p>
-            <div className="mt-5 flex flex-col gap-2">
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-3 sm:p-6">
+              <h2 id="delete-lesson-title" className="text-depths text-lg font-semibold tracking-tight">
+                Usuń lekcję cykliczną
+              </h2>
+              <p className="text-muted mt-2 text-sm leading-relaxed">
+                Ta lekcja należy do serii ({remainingInSeries(deleteTarget).length} pozostałych od{" "}
+                {deleteTarget.date ? formatLessonDatePl(deleteTarget.date) : "tej daty"}). Co chcesz
+                zrobić?
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 border-t border-panel-frame/30 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
               <button
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => confirmDelete("one")}
-                className="rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60"
+                className="rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
               >
                 {deleteBusy ? "Usuwanie…" : "Usuń tylko tę lekcję"}
               </button>
@@ -955,7 +1040,7 @@ function TerminarzInner({
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => confirmDelete("series")}
-                className="rounded-full border border-claret/40 bg-claret/10 px-4 py-2.5 text-sm font-semibold text-claret disabled:opacity-60"
+                className="rounded-full border border-claret/40 bg-claret/10 px-4 py-2.5 text-sm font-semibold text-claret disabled:opacity-60 touch-manipulation"
               >
                 Usuń tę i wszystkie pozostałe
               </button>
@@ -963,7 +1048,7 @@ function TerminarzInner({
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => setDeleteTarget(null)}
-                className="rounded-full bg-luster px-4 py-2 text-sm font-semibold text-depths disabled:opacity-60"
+                className="rounded-full bg-luster px-4 py-2.5 text-sm font-semibold text-depths disabled:opacity-60 touch-manipulation"
               >
                 Anuluj
               </button>

@@ -172,57 +172,123 @@ export function CennikClient({
       </section>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button type="button" className="absolute inset-0 bg-[#000C4A]/50" onClick={() => setOpen(false)} aria-label="zamknij" />
-          <div className="confirm-dialog-in relative z-10 max-h-[min(90vh,720px)] w-full max-w-3xl overflow-y-auto rounded-app border border-panel-frame/40 bg-snow p-4 sm:p-6">
-            <h3 className="dash-sans text-depths text-lg font-bold">Edycja cennika</h3>
-            <p className="dash-sans text-muted mt-1 text-xs">Dodaj kolejne poziomy stawek — każdy wiersz to osobna pozycja cennika.</p>
-            <div className="mt-4 space-y-3">
-              {draftRows.map((r, i) => (
-                <div key={`cennik-draft-${i}`} className="grid grid-cols-1 gap-3 rounded-app border border-panel-frame/25 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-                  <input
-                    value={r.label}
-                    placeholder="Nazwa poziomu"
-                    onChange={(e) => setDraftRows((prev) => prev.map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)))}
-                    className="dash-sans rounded-app border px-2.5 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={r.client}
-                    onChange={(e) => setDraftRows((prev) => prev.map((x, idx) => (idx === i ? { ...x, client: Number(e.target.value) } : x)))}
-                    className="dash-mono rounded-app border px-2.5 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={r.worker}
-                    onChange={(e) => setDraftRows((prev) => prev.map((x, idx) => (idx === i ? { ...x, worker: Number(e.target.value) } : x)))}
-                    className="dash-mono rounded-app border px-2.5 py-2 text-sm"
-                  />
-                  <input value={`${r.client - r.worker} zł`} readOnly className="dash-mono rounded-app border border-mist bg-paper px-2.5 py-2 text-sm font-semibold text-depths" />
-                  <button
-                    type="button"
-                    onClick={() => removeDraftRow(i)}
-                    className="dash-sans rounded-full border border-claret/40 px-2 py-1 text-xs font-bold text-claret"
-                  >
-                    Usuń
-                  </button>
-                </div>
-              ))}
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#000C4A]/50"
+            onClick={() => setOpen(false)}
+            aria-label="zamknij"
+          />
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-app border border-panel-frame/40 bg-snow shadow-2xl sm:rounded-app">
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+            <div className="shrink-0 px-4 pt-3 sm:px-5 sm:pt-5">
+              <h3 className="dash-sans text-depths text-lg font-bold">Edycja cennika</h3>
+              <p className="dash-sans text-muted mt-0.5 text-xs">
+                Każdy wiersz to osobna pozycja stawek.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={addDraftRow}
-              className="dash-sans mt-3 rounded-full border border-panel-frame/40 px-3 py-1.5 text-xs font-bold text-depths"
-            >
-              + Dodaj pozycję cennika
-            </button>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="dash-sans rounded-full border px-3 py-1.5 text-xs font-semibold">
-                Anuluj
+
+            <div className="mt-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5">
+              <div className="dash-sans text-muted mb-1.5 hidden grid-cols-[minmax(0,1.4fr)_5.5rem_5.5rem_5.5rem_auto] gap-2 px-1 text-[10px] font-bold uppercase tracking-wide sm:grid">
+                <span>Poziom</span>
+                <span className="text-right">Klient</span>
+                <span className="text-right">Pracownik</span>
+                <span className="text-right">Marża</span>
+                <span className="w-14" />
+              </div>
+              <div className="space-y-1.5">
+                {draftRows.map((r, i) => (
+                  <div
+                    key={`cennik-draft-${i}`}
+                    className="grid grid-cols-2 items-center gap-1.5 rounded-app border border-panel-frame/25 p-2 sm:grid-cols-[minmax(0,1.4fr)_5.5rem_5.5rem_5.5rem_auto] sm:gap-2 sm:px-2 sm:py-1.5"
+                  >
+                    <input
+                      value={r.label}
+                      placeholder="Nazwa poziomu"
+                      aria-label="Poziom"
+                      onChange={(e) =>
+                        setDraftRows((prev) =>
+                          prev.map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)),
+                        )
+                      }
+                      className="dash-sans col-span-2 rounded-app border border-panel-frame/40 px-2 py-1.5 text-sm sm:col-span-1"
+                    />
+                    <label className="flex min-w-0 flex-col gap-0.5 sm:contents">
+                      <span className="dash-sans text-muted text-[10px] font-bold uppercase sm:hidden">
+                        Klient
+                      </span>
+                      <input
+                        type="number"
+                        value={r.client}
+                        aria-label="Stawka klienta"
+                        onChange={(e) =>
+                          setDraftRows((prev) =>
+                            prev.map((x, idx) =>
+                              idx === i ? { ...x, client: Number(e.target.value) } : x,
+                            ),
+                          )
+                        }
+                        className="dash-mono w-full rounded-app border border-panel-frame/40 px-2 py-1.5 text-right text-sm"
+                      />
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-0.5 sm:contents">
+                      <span className="dash-sans text-muted text-[10px] font-bold uppercase sm:hidden">
+                        Pracownik
+                      </span>
+                      <input
+                        type="number"
+                        value={r.worker}
+                        aria-label="Stawka pracownika"
+                        onChange={(e) =>
+                          setDraftRows((prev) =>
+                            prev.map((x, idx) =>
+                              idx === i ? { ...x, worker: Number(e.target.value) } : x,
+                            ),
+                          )
+                        }
+                        className="dash-mono w-full rounded-app border border-panel-frame/40 px-2 py-1.5 text-right text-sm"
+                      />
+                    </label>
+                    <div className="dash-mono rounded-app border border-mist bg-paper px-2 py-1.5 text-right text-sm font-semibold text-depths">
+                      {r.client - r.worker} zł
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeDraftRow(i)}
+                      className="dash-sans col-span-2 rounded-app border border-claret/40 px-2 py-1.5 text-xs font-bold text-claret sm:col-span-1 sm:w-14"
+                    >
+                      Usuń
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-panel-frame/30 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-5">
+              <button
+                type="button"
+                onClick={addDraftRow}
+                className="dash-sans rounded-app border border-panel-frame/40 px-3 py-1.5 text-xs font-bold text-depths touch-manipulation"
+              >
+                + Dodaj pozycję
               </button>
-              <button type="button" onClick={handleSaveCennik} disabled={pending} className="dash-sans btn-block bg-[#000C4A] px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-60">
-                Zapisz i powiadom
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="dash-sans rounded-app border px-3 py-1.5 text-xs font-semibold touch-manipulation"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCennik}
+                  disabled={pending}
+                  className="dash-sans btn-block bg-[#000C4A] px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-60 touch-manipulation"
+                >
+                  Zapisz i powiadom
+                </button>
+              </div>
             </div>
           </div>
         </div>

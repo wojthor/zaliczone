@@ -28,6 +28,15 @@ function ensureDateIso(line: FinanceLineUi): FinanceLineUi {
   };
 }
 
+function dedupeById(rows: FinanceLineUi[]): FinanceLineUi[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+}
+
 export function RozliczeniaClient({
   pendingLines,
   verifiedLines,
@@ -39,9 +48,9 @@ export function RozliczeniaClient({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [pending, setPending] = useState<FinanceLineUi[]>(() => pendingLines.map(ensureDateIso));
-  const [verified, setVerified] = useState<FinanceLineUi[]>(() => verifiedLines.map(ensureDateIso));
-  const [unpaid, setUnpaid] = useState<FinanceLineUi[]>(() => unpaidLines.map(ensureDateIso));
+  const [pending, setPending] = useState<FinanceLineUi[]>(() => dedupeById(pendingLines.map(ensureDateIso)));
+  const [verified, setVerified] = useState<FinanceLineUi[]>(() => dedupeById(verifiedLines.map(ensureDateIso)));
+  const [unpaid, setUnpaid] = useState<FinanceLineUi[]>(() => dedupeById(unpaidLines.map(ensureDateIso)));
   const [query, setQuery] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(null);
@@ -57,9 +66,9 @@ export function RozliczeniaClient({
   const [verifyMethod, setVerifyMethod] = useState("");
 
   useEffect(() => {
-    setPending(pendingLines.map(ensureDateIso));
-    setVerified(verifiedLines.map(ensureDateIso));
-    setUnpaid(unpaidLines.map(ensureDateIso));
+    setPending(dedupeById(pendingLines.map(ensureDateIso)));
+    setVerified(dedupeById(verifiedLines.map(ensureDateIso)));
+    setUnpaid(dedupeById(unpaidLines.map(ensureDateIso)));
   }, [pendingLines, verifiedLines, unpaidLines]);
 
   useEffect(() => {
@@ -161,7 +170,10 @@ export function RozliczeniaClient({
       const row = sourceList.find((x) => x.id === id);
       if (row) {
         setSourceList((prev) => prev.filter((x) => x.id !== id));
-        setVerified((prev) => [applyVerifiedPayment(row, paidIso, verifyMethod), ...prev]);
+        setVerified((prev) => {
+          if (prev.some((x) => x.id === id)) return prev;
+          return [applyVerifiedPayment(row, paidIso, verifyMethod), ...prev];
+        });
       }
       router.refresh();
     });
@@ -177,10 +189,13 @@ export function RozliczeniaClient({
         const row = pending.find((x) => x.id === id);
         if (row) {
           setPending((prev) => prev.filter((x) => x.id !== id));
-          setUnpaid((prev) => [
-            { ...row, status: "UNPAID", paymentReceivedAt: null, paymentReceivedAtIso: null },
-            ...prev,
-          ]);
+          setUnpaid((prev) => {
+            if (prev.some((x) => x.id === id)) return prev;
+            return [
+              { ...row, status: "UNPAID", paymentReceivedAt: null, paymentReceivedAtIso: null },
+              ...prev,
+            ];
+          });
         }
         router.refresh();
       });
@@ -442,9 +457,9 @@ function PaymentsPanel({
             <div key={dayLabelText} className="min-w-0">
               <p className="dash-sans mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-muted">{dayLabelText}</p>
               <ul className="space-y-1.5">
-                {dayRows.map((r) => (
+                {dayRows.map((r, idx) => (
                   <LessonRow
-                    key={r.id}
+                    key={`${variant}-${r.id}-${idx}`}
                     row={r}
                     variant={variant}
                     busy={movingId === r.id}
@@ -570,8 +585,11 @@ function LessonRow({
 }
 
 function groupByDayDesc(rows: FinanceLineUi[]): [string, FinanceLineUi[]][] {
+  const seen = new Set<string>();
   const map = new Map<string, FinanceLineUi[]>();
   for (const r of rows) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
     const k = r.dateIso;
     const list = map.get(k) ?? [];
     list.push(r);

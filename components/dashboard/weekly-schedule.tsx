@@ -49,16 +49,47 @@ function lessonStatus(lesson: Lesson): LessonStatus {
   return lesson.status ?? (lesson.isCompleted ? "PENDING_VERIFICATION" : "PLANNED");
 }
 
-function tileClasses(_status: LessonStatus): string {
-  return "bg-mist";
+function tileClasses(status: LessonStatus): string {
+  switch (status) {
+    case "PENDING_VERIFICATION":
+      return "bg-[var(--color-status-pending)]";
+    case "VERIFIED":
+      return "bg-[var(--color-status-verified)]";
+    case "UNPAID":
+      return "bg-[var(--color-status-unpaid)]";
+    default:
+      return "bg-[var(--color-status-planned)]";
+  }
 }
 
-function textClasses(_status: LessonStatus): { primary: string; secondary: string; time: string } {
-  return {
-    primary: "text-muted",
-    secondary: "text-steel",
-    time: "text-muted",
-  };
+function textClasses(status: LessonStatus): { primary: string; secondary: string; time: string } {
+  switch (status) {
+    case "PLANNED":
+      return {
+        primary: "text-depths",
+        secondary: "text-depths/65",
+        time: "text-depths",
+      };
+    case "VERIFIED":
+      return {
+        primary: "text-depths",
+        secondary: "text-depths/70",
+        time: "text-depths",
+      };
+    case "PENDING_VERIFICATION":
+      return {
+        primary: "text-lime",
+        secondary: "text-soft-lime/85",
+        time: "text-lime",
+      };
+    case "UNPAID":
+    default:
+      return {
+        primary: "text-white",
+        secondary: "text-white/80",
+        time: "text-white",
+      };
+  }
 }
 
 function actionLabel(status: LessonStatus): string {
@@ -72,6 +103,14 @@ function actionLabel(status: LessonStatus): string {
     default:
       return "Zalicz";
   }
+}
+
+function actionButtonClasses(status: LessonStatus, locked: boolean): string {
+  const base =
+    status === "PLANNED" || status === "VERIFIED"
+      ? "bg-[#000C4A]/15 text-depths"
+      : "bg-white/20 text-white";
+  return `${base} backdrop-blur-[1px] ${locked ? "cursor-not-allowed opacity-90" : "hover:brightness-110"}`;
 }
 
 
@@ -153,7 +192,7 @@ export function WeeklySchedule({
         weekMondayIso={weekMondayIso}
         onWeekMondayIsoChange={handleWeekChange}
         compact
-        className="mb-2 shrink-0 py-1.5"
+        className="mb-2 w-full shrink-0 py-1.5"
       />
 
       <div className="scrollbar-panel flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-y-contain [align-items:stretch] lg:grid lg:grid-cols-7 lg:grid-rows-[auto] lg:items-start lg:gap-1.5">
@@ -164,7 +203,9 @@ export function WeeklySchedule({
             <div
               key={dayKey}
               className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-app lg:min-h-0 lg:h-auto ${
-                isToday ? "bg-lime px-0.5" : "card-quiet"
+                isToday
+                  ? "border-[3px] border-lime bg-snow px-0.5 shadow-[0_0_0_1px_rgba(213,237,33,0.35)]"
+                  : "card-quiet"
               }`}
             >
               <div className="flex shrink-0 flex-col items-center px-1 py-1.5">
@@ -174,7 +215,7 @@ export function WeeklySchedule({
                 >
                   {label}
                 </span>
-                <span className={`text-center text-[0.6rem] font-semibold tabular-nums ${isToday ? "text-depths/70" : "text-muted"}`}>
+                <span className={`text-center text-[0.6rem] font-semibold tabular-nums ${isToday ? "text-depths" : "text-muted"}`}>
                   {formatDayDateFromMondayIso(weekMondayIso, dayIndex)}
                 </span>
               </div>
@@ -215,7 +256,7 @@ export function WeeklySchedule({
                             {lesson.classLabel}
                           </p>
                           {status === "UNPAID" ? (
-                            <p className="mt-0.5 text-center text-[0.5rem] font-extrabold uppercase leading-tight text-steel">
+                            <p className="mt-0.5 text-center text-[0.5rem] font-extrabold uppercase leading-tight text-white/90">
                               Brak wpłaty — interweniuj
                             </p>
                           ) : null}
@@ -234,11 +275,7 @@ export function WeeklySchedule({
                                   ? "Cofnij zaliczenie"
                                   : "Zalicz lekcję"
                           }
-                          className={`mt-auto flex w-full shrink-0 items-center justify-center gap-1 rounded-ledger py-1 text-[0.6rem] font-extrabold ${
-                            locked
-                              ? "cursor-not-allowed bg-depths/50 text-soft-lime/70"
-                              : "bg-depths text-lime"
-                          }`}
+                          className={`mt-auto flex w-full shrink-0 items-center justify-center gap-1 rounded-ledger py-1 text-[0.6rem] font-extrabold ${actionButtonClasses(status, locked)}`}
                         >
                           {status === "VERIFIED" || status === "PENDING_VERIFICATION" ? (
                             <IconCheck className="h-4 w-4 shrink-0" />
@@ -259,7 +296,7 @@ export function WeeklySchedule({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col rounded-app bg-snow p-2.5 ${className ?? ""}`}
+      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col soft-panel p-3 text-depths ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Terminarz" compact titleHref="/terminarz" />}
       {grid}

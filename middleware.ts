@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/", "/login", "/polityka-prywatnosci", "/regulamin"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
   const { supabase, user, supabaseResponse } = await updateSession(request);
 
   const isPublic = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
+    (path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)),
   );
 
   if (!user && !isPublic) {
@@ -29,12 +29,12 @@ export async function middleware(request: NextRequest) {
 
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/panel";
     return NextResponse.redirect(url);
   }
 
-  // Zalogowany ADMIN na / nie może wejść na panel korepetytora — tylko po wylogowaniu i logowaniu jako TUTOR.
-  if (user && supabase && pathname === "/") {
+  // Zalogowany ADMIN na /panel nie może wejść na panel korepetytora
+  if (user && supabase && (pathname === "/panel" || pathname === "/")) {
     try {
       const { data: profile } = await supabase
         .from("profiles")
@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (profile?.role === "ADMIN") {
+      if (profile?.role === "ADMIN" && pathname === "/panel") {
         const url = request.nextUrl.clone();
         url.pathname = "/admin";
         return NextResponse.redirect(url);
@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
 
       if (profile?.role !== "ADMIN") {
         const url = request.nextUrl.clone();
-        url.pathname = "/";
+        url.pathname = "/panel";
         return NextResponse.redirect(url);
       }
     } catch {

@@ -28,9 +28,9 @@ export function lessonStatusBadgeClasses(status: LessonStatus): string {
     case "PENDING_VERIFICATION":
       return "badge-action";
     case "UNPAID":
-      return "rounded-ledger bg-steel px-2.5 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-snow";
+      return "badge-unpaid";
     default:
-      return "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-depths";
+      return "badge-planned";
   }
 }
 

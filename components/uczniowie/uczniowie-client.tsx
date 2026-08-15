@@ -208,13 +208,13 @@ export function UczniowieClient({
         </button>
       </div>
 
-      <section className="card-quiet mb-5 p-4">
+      <section className="mb-5 soft-panel p-4">
         <p className="section-label mb-3">Filtry</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1">
             <span className="text-muted text-xs font-semibold">Sortowanie</span>
             <select
-              className="text-depths rounded-app bg-snow px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
             >
@@ -227,7 +227,7 @@ export function UczniowieClient({
           <label className="grid gap-1">
             <span className="text-muted text-xs font-semibold">Filtr przedmiotu</span>
             <select
-              className="text-depths rounded-app bg-snow px-3 py-2 text-sm font-medium"
+              className="text-depths rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
             >
@@ -249,7 +249,10 @@ export function UczniowieClient({
         </div>
         <ul className="grid gap-4 sm:grid-cols-2">
           {filtered.map((student) => (
-            <li key={student.id} className="rounded-app bg-paper p-4">
+            <li
+              key={student.id}
+              className="soft-panel p-4"
+            >
               <div className="flex items-start gap-3">
                 <span className="avatar-initials h-12 w-12 shrink-0 text-sm">
                   {student.initials}
@@ -263,7 +266,7 @@ export function UczniowieClient({
                       student.subjectsLine.split(",").map((subject) => (
                         <span
                           key={subject}
-                          className="rounded-ledger bg-lime px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-[0.04em] text-depths"
+                          className="rounded-full bg-lime px-2.5 py-0.5 text-[0.65rem] font-semibold text-depths"
                         >
                           {subject.trim()}
                         </span>
@@ -278,7 +281,7 @@ export function UczniowieClient({
                 </div>
               </div>
 
-              <dl className="mt-4 space-y-2 border-t-2 border-mist pt-3 text-sm">
+              <dl className="mt-4 space-y-2 border-t border-panel-frame/50 pt-3 text-sm">
                 <div className="flex justify-between gap-2">
                   <dt className="text-muted font-medium">Telefon</dt>
                   <dd className="text-right font-semibold tabular-nums text-depths">{student.phone}</dd>
@@ -292,7 +295,7 @@ export function UczniowieClient({
                 </div>
               </dl>
 
-              <dl className="mt-3 space-y-2 border-t-2 border-mist pt-3 text-sm">
+              <dl className="mt-3 space-y-2 border-t border-panel-frame/50 pt-3 text-sm">
                 <div className="flex justify-between gap-2">
                   <dt className="text-muted font-medium">Stawka</dt>
                   <dd className="font-extrabold tabular-nums text-depths">
@@ -309,18 +312,18 @@ export function UczniowieClient({
                 </div>
               </dl>
 
-              <div className="mt-4 flex gap-2 border-t-2 border-mist pt-3">
+              <div className="mt-4 flex gap-2 border-t border-panel-frame/50 pt-3">
                 <button
                   type="button"
                   onClick={() => openEdit(student)}
-                  className="rounded-ledger bg-depths px-3 py-1.5 text-xs font-extrabold text-lime"
+                  className="rounded-full bg-[#000C4A] px-3.5 py-1.5 text-xs font-semibold text-lime"
                 >
                   Edytuj
                 </button>
                 <button
                   type="button"
                   onClick={() => removeStudent(student.id, student.name)}
-                  className="rounded-ledger bg-mist px-3 py-1.5 text-xs font-extrabold text-steel"
+                  className="rounded-full border border-panel-frame/50 bg-snow px-3.5 py-1.5 text-xs font-semibold text-steel"
                 >
                   Usuń
                 </button>
@@ -331,18 +334,22 @@ export function UczniowieClient({
       </section>
 
       {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <button
             type="button"
             className="absolute inset-0 bg-[#000C4A]/50"
             aria-label="Zamknij"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-[min(42rem,94vw)] rounded-app bg-snow p-5 sm:p-6">
-            <h2 className="text-depths text-lg font-semibold tracking-tight">
-              {editId ? "Edytuj ucznia" : "Dodaj ucznia"}
-            </h2>
-            <div className="mt-4 grid gap-3">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(42rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:max-w-[min(42rem,94vw)] sm:rounded-app">
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+            <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-6">
+              <h2 className="text-depths text-lg font-semibold tracking-tight">
+                {editId ? "Edytuj ucznia" : "Dodaj ucznia"}
+              </h2>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+            <div className="grid gap-3">
               <label className="grid gap-1">
                 <span className="text-depths/80 text-xs font-semibold">Imię i nazwisko</span>
                 <input
@@ -450,18 +457,19 @@ export function UczniowieClient({
                 />
               </label>
             </div>
+            </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-panel-frame/30 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
               <button
                 type="button"
-                className="rounded-full bg-luster px-4 py-2 text-sm font-semibold text-depths"
+                className="rounded-full bg-luster px-4 py-2.5 text-sm font-semibold text-depths touch-manipulation"
                 onClick={() => setModalOpen(false)}
               >
                 Anuluj
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
                 onClick={saveStudent}
                 disabled={saving || activeSubjects.length === 0}
               >

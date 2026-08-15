@@ -206,7 +206,7 @@ export function WyplatyClient({
 
       <FinanceTilesRow columns={3}>
         <FinanceTile label="Przychód" tone="navy">
-          <span className="mark-highlight-on-dark">{formatMoney(totals.przychod)}</span>
+          {formatMoney(totals.przychod)}
         </FinanceTile>
         <FinanceTile label="Do wypłaty / Wypłacone" tone="orange">
           {formatMoney(totals.doWyplaty)}

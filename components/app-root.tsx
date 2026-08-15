@@ -15,13 +15,22 @@ function isPrintDocumentPath(pathname: string): boolean {
   );
 }
 
+function isMarketingPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/polityka-prywatnosci") ||
+    pathname.startsWith("/regulamin")
+  );
+}
+
 export function AppRoot({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isLogin = pathname === "/login";
   const isAdmin = pathname.startsWith("/admin");
   const isPrintDoc = isPrintDocumentPath(pathname);
+  const isMarketing = isMarketingPath(pathname);
 
-  if (isLogin || isPrintDoc) {
+  if (isLogin || isPrintDoc || isMarketing) {
     return <ToastProvider>{children}</ToastProvider>;
   }
 

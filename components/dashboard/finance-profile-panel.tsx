@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { IconLogout, IconUser, IconWallet } from "@/components/icons";
+import { IconWallet } from "@/components/icons";
 import { SeeMoreLink } from "@/components/see-more-link";
-import { signOut } from "@/lib/data/mutations";
 
 export type LessonSummaryStats = {
   total: number;
@@ -15,16 +12,15 @@ export type LessonSummaryStats = {
 };
 
 type FinanceProfilePanelProps = {
-  tutorName: string;
   totalPayout: number;
   lessonStats: LessonSummaryStats;
 };
 
-/** Statusy wyłącznie z palety granat/limonka/szary */
+/** Statusy: oczekuje / zatwierdzona / nieopłacona */
 const LESSON_STATUS_COLORS = {
-  pending: "#D5ED21",
-  verified: "#000C4A",
-  unpaid: "#AAAAAA",
+  pending: "#000C4A",
+  verified: "#D5ED21",
+  unpaid: "#E23B3B",
 } as const;
 
 function StatCell({
@@ -54,19 +50,7 @@ function StatCell({
   );
 }
 
-export function FinanceProfilePanel({
-  tutorName,
-  totalPayout,
-  lessonStats,
-}: FinanceProfilePanelProps) {
-  const router = useRouter();
-
-  async function handleLogout() {
-    await signOut();
-    router.replace("/login");
-    router.refresh();
-  }
-
+export function FinanceProfilePanel({ totalPayout, lessonStats }: FinanceProfilePanelProps) {
   const hoursLabel = Number(lessonStats.totalHours).toLocaleString("pl-PL", {
     maximumFractionDigits: 1,
   });
@@ -76,83 +60,51 @@ export function FinanceProfilePanel({
   });
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden">
-      <div className="card-feature flex min-h-0 flex-1 flex-col overflow-hidden px-2.5 py-2">
-        <div className="section-label flex shrink-0 items-center gap-1.5 !text-lime">
-          <IconWallet className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+    <div className="grid h-full min-h-0 min-w-0 grid-rows-2 gap-2 overflow-hidden">
+      <div className="card-feature flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden px-3 py-3 text-center">
+        <p className="section-label flex shrink-0 items-center justify-center gap-1.5 !text-lime">
+          <IconWallet className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
           Do wypłaty
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col items-stretch justify-center py-1">
-          <p className="text-center leading-none">
-            <span className="mark-highlight-on-dark text-[clamp(2rem,5vw,3.5rem)]">
-              {amountLabel}
-            </span>
-            <span className="ml-1 text-base font-bold text-soft-lime sm:text-lg">zł</span>
-          </p>
-        </div>
-        <div className="flex shrink-0 justify-center pt-0.5">
+        </p>
+        <p className="shrink-0 leading-none">
+          <span className="text-[clamp(1.6rem,3.2vw,2.1rem)] font-extrabold tabular-nums tracking-tight text-snow">
+            {amountLabel}
+          </span>
+          <span className="ml-1 align-baseline text-sm font-bold text-soft-lime">zł</span>
+        </p>
+        <div className="shrink-0">
           <SeeMoreLink href="/finanse" compact inverted />
         </div>
       </div>
 
-      <div className="shrink-0 rounded-app bg-snow px-2.5 py-2">
-        <div className="text-center">
-          <p className="text-depths text-2xl font-extrabold tabular-nums leading-none tracking-tight">
-            {hoursLabel}
-          </p>
-          <p className="section-label mt-1">godz. łącznie</p>
-        </div>
-        <div className="mt-2 border-t-2 border-paper pt-2">
-          <div className="grid grid-cols-4 gap-1">
-            <StatCell value={lessonStats.total} label="lekcji" />
-            <StatCell
-              value={lessonStats.pending}
-              label="do zatw."
-              color={LESSON_STATUS_COLORS.pending}
-            />
-            <StatCell
-              value={lessonStats.verified}
-              label="zatwierdz."
-              color={LESSON_STATUS_COLORS.verified}
-            />
-            <StatCell
-              value={lessonStats.unpaid}
-              label="brak wpłaty"
-              color={LESSON_STATUS_COLORS.unpaid}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="card-feature-alt shrink-0 px-2.5 py-2">
-        <Link href="/profil" className="flex min-w-0 items-center gap-2.5">
-          <span className="avatar-initials h-9 w-9 shrink-0 text-sm">
-            <IconUser className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="section-label !text-soft-lime/80">Profil</p>
-            <p className="mt-0.5 truncate text-sm font-extrabold leading-tight text-soft-lime">
-              {tutorName}
+      <div className="soft-panel flex min-h-0 flex-col overflow-hidden px-3 py-2.5 text-depths">
+        <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-hidden">
+          <div className="shrink-0 text-center">
+            <p className="text-depths text-[clamp(1.25rem,2.5vw,1.75rem)] font-extrabold tabular-nums leading-none tracking-tight">
+              {hoursLabel}
             </p>
+            <p className="section-label mt-1">godz. łącznie</p>
           </div>
-          <span className="shrink-0 text-xl font-light leading-none text-lime" aria-hidden>
-            ›
-          </span>
-        </Link>
-        <div className="mt-1.5 border-t border-white/10 pt-1.5">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="group flex w-full items-center justify-between rounded-ledger bg-white/6 px-2.5 py-1.5 text-xs font-bold text-luster/90 transition hover:bg-white/10 hover:text-lime"
-          >
-            <span className="flex items-center gap-2">
-              <IconLogout className="h-3.5 w-3.5" />
-              Wyloguj
-            </span>
-            <span className="text-base leading-none text-luster/50 transition group-hover:text-lime" aria-hidden>
-              ›
-            </span>
-          </button>
+          <div className="shrink-0 border-t border-panel-frame/50 pt-2">
+            <div className="grid grid-cols-4 gap-1">
+              <StatCell value={lessonStats.total} label="lekcji" />
+              <StatCell
+                value={lessonStats.pending}
+                label="do zatw."
+                color={LESSON_STATUS_COLORS.pending}
+              />
+              <StatCell
+                value={lessonStats.verified}
+                label="zatwierdz."
+                color={LESSON_STATUS_COLORS.verified}
+              />
+              <StatCell
+                value={lessonStats.unpaid}
+                label="brak wpłaty"
+                color={LESSON_STATUS_COLORS.unpaid}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

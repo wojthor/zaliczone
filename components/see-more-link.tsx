@@ -11,15 +11,14 @@ export function SeeMoreLink({ href, compact, inverted }: SeeMoreLinkProps) {
   return (
     <Link
       href={href}
-      className={`inline-flex items-center gap-1 font-semibold ${inverted ? "text-luster" : "text-depths"} ${compact ? "text-xs" : "text-sm"}`}
+      className={`inline-flex items-center gap-1 rounded-full font-semibold transition ${
+        inverted
+          ? "bg-lime px-2.5 py-1 text-depths hover:brightness-105"
+          : "bg-[#000C4A] px-2.5 py-1 text-lime hover:brightness-110"
+      } ${compact ? "text-[0.65rem]" : "text-xs"}`}
     >
-      Zobacz więcej{" "}
-      <span
-        className={`text-sm font-bold ${inverted ? "text-lime" : "text-depths"}`}
-        aria-hidden
-      >
-        ➔
-      </span>
+      Zobacz więcej
+      <span aria-hidden>➔</span>
     </Link>
   );
 }

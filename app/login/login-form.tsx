@@ -4,11 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logoFont } from "@/lib/logo-font";
+import { dashboardSans } from "@/lib/dashboard-fonts";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/";
+  const next = searchParams.get("next") ?? "/panel";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,7 +50,7 @@ export default function LoginForm() {
           ? next
           : "/admin"
         : next.startsWith("/admin")
-          ? "/"
+          ? "/panel"
           : next;
 
     router.replace(destination);
@@ -57,41 +58,63 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-luster p-4">
-      <div className="w-full max-w-md rounded-app bg-snow p-6 sm:p-8">
-        <p className={`${logoFont.className} text-depths text-center text-2xl font-bold tracking-tight`}>
-          ZALICZONE
-        </p>
-        <p className="text-muted mt-2 text-center text-sm">Zaloguj się do panelu</p>
+    <div
+      className={`relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#000C4A] px-4 py-16 ${dashboardSans.variable}`}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 55% at 20% 25%, rgba(213,237,33,0.26), transparent 55%), radial-gradient(ellipse 70% 50% at 85% 75%, rgba(223,253,111,0.16), transparent 50%), linear-gradient(165deg, #000C4A 0%, #001a6e 45%, #00082f 100%)",
+        }}
+        aria-hidden
+      />
 
-        <form onSubmit={handleSubmit} className="mt-8 grid gap-4">
-          <label className="grid gap-1">
-            <span className="text-depths/80 text-xs font-semibold">E-mail</span>
+      <div className="relative z-10 w-full max-w-md">
+        <p
+          className={`${logoFont.className} text-center text-4xl font-extrabold italic uppercase leading-none tracking-tighter text-lime sm:text-5xl`}
+        >
+          Zaliczone
+        </p>
+        <p className="dash-sans mt-4 text-center text-lg font-bold tracking-tight text-snow">
+          PANEL KOREPETYTORA
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-10 grid gap-5">
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-lime/75">
+              E-mail
+            </span>
             <input
               type="email"
               autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
+              className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-snow placeholder:text-luster/40 outline-none transition focus:border-lime/50 focus:bg-white/15"
               placeholder="twoj@email.pl"
             />
           </label>
 
-          <label className="grid gap-1">
-            <span className="text-depths/80 text-xs font-semibold">Hasło</span>
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-lime/75">
+              Hasło
+            </span>
             <input
               type="password"
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="text-depths rounded-app bg-mist px-3 py-2 text-sm font-medium"
+              className="rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-snow placeholder:text-luster/40 outline-none transition focus:border-lime/50 focus:bg-white/15"
             />
           </label>
 
           {error ? (
-            <p className="rounded-app bg-mist px-3 py-2 text-sm text-depths" role="alert">
+            <p
+              className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm text-luster"
+              role="alert"
+            >
               {error}
             </p>
           ) : null}
@@ -99,11 +122,20 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60"
+            className="mt-1 inline-flex items-center justify-center rounded-full bg-lime px-6 py-3 text-sm font-extrabold uppercase tracking-wide text-depths transition enabled:hover:brightness-105 disabled:opacity-60"
           >
             {loading ? "Logowanie…" : "Zaloguj się"}
           </button>
         </form>
+
+        <p className="mt-5 text-center text-sm">
+          <a
+            href="/"
+            className="font-semibold text-luster/80 underline decoration-white/30 underline-offset-4 transition hover:text-lime"
+          >
+            ← Strona główna
+          </a>
+        </p>
       </div>
     </div>
   );

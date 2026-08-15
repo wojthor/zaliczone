@@ -5,15 +5,18 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   archiveTutorAccount,
-  deleteTutorAccount,
+  clearTutorPhoto,
   updateTutorProfile,
+  uploadTutorPhoto,
 } from "@/lib/actions/admin";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
 import { SubjectMultiSelect } from "@/components/admin/subject-multi-select";
-import { IconFolder } from "@/components/icons";
+import { TutorPhotoField } from "@/components/admin/tutor-photo-field";
+import { TutorPitPanel } from "@/components/admin/tutor-pit-panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { AdminTutorSummary, FinanceLineUi } from "@/lib/types/database";
+import type { TutorPitYearSummary } from "@/lib/types/pit";
 import type { AdminStudentRow } from "@/lib/types/messages";
 
 function formatDdMmYyyy(iso: string | null): string {
@@ -38,18 +41,20 @@ export function NauczycielProfilClient({
   pending,
   unpaid,
   verified,
+  pitYearSummary,
 }: {
   tutor: AdminTutorSummary;
   students: AdminStudentRow[];
   pending: FinanceLineUi[];
   unpaid: FinanceLineUi[];
   verified: FinanceLineUi[];
+  pitYearSummary: TutorPitYearSummary;
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [pitOpen, setPitOpen] = useState(false);
   const [form, setForm] = useState<{
     fullName: string;
     phone: string;
@@ -68,6 +73,8 @@ export function NauczycielProfilClient({
     contractEnd: tutor.contractEnd ?? "",
   });
   const [feedback, setFeedback] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const monthStats = useMemo(() => {
     const revenue = verified.reduce((s, l) => s + l.amountPln, 0);
@@ -100,6 +107,12 @@ export function NauczycielProfilClient({
           contractStart: form.contractStart || null,
           contractEnd: form.contractEnd || null,
         });
+        if (photoFile) {
+          const fd = new FormData();
+          fd.set("photo", photoFile);
+          await uploadTutorPhoto(tutor.id, fd);
+          setPhotoFile(null);
+        }
         setEditing(false);
         setFeedback("Zapisano.");
         router.refresh();
@@ -109,13 +122,54 @@ export function NauczycielProfilClient({
     });
   }
 
+  function savePhotoOnly() {
+    if (!photoFile) return;
+    setPhotoBusy(true);
+    startTransition(async () => {
+      try {
+        const fd = new FormData();
+        fd.set("photo", photoFile);
+        await uploadTutorPhoto(tutor.id, fd);
+        setPhotoFile(null);
+        setFeedback("Zdjęcie zaktualizowane.");
+        router.refresh();
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Nie udało się zapisać zdjęcia.");
+      } finally {
+        setPhotoBusy(false);
+      }
+    });
+  }
+
+  function removePhoto() {
+    setPhotoBusy(true);
+    startTransition(async () => {
+      try {
+        await clearTutorPhoto(tutor.id);
+        setPhotoFile(null);
+        setFeedback("Zdjęcie usunięte.");
+        router.refresh();
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Nie udało się usunąć zdjęcia.");
+      } finally {
+        setPhotoBusy(false);
+      }
+    });
+  }
+
   async function handleArchiveConfirmed() {
     await archiveTutorAccount(tutor.id);
   }
 
-  async function handleDeleteConfirmed() {
-    await deleteTutorAccount(tutor.id);
-  }
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isFormer = Boolean(tutor.contractEnd && tutor.contractEnd <= todayIso);
+  const initials =
+    tutor.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?";
 
   return (
     <div className="space-y-6">
@@ -125,25 +179,31 @@ export function NauczycielProfilClient({
             ← Nauczyciele
           </Link>
           <h1 className="dash-sans text-depths mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
-            <span className="avatar-initials h-11 w-11 shrink-0 text-sm" aria-hidden>
-              {tutor.name
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((p) => p[0]?.toUpperCase() ?? "")
-                .join("") || "?"}
-            </span>
+            {tutor.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={tutor.photoUrl}
+                alt=""
+                className="h-14 w-11 shrink-0 rounded-app object-cover sm:h-16 sm:w-12"
+              />
+            ) : (
+              <span className="avatar-initials h-11 w-11 shrink-0 text-sm" aria-hidden>
+                {initials}
+              </span>
+            )}
             {tutor.name}
           </h1>
-          <p className="mt-2">
+          <p className="mt-2 flex flex-wrap items-center gap-1.5">
             <span
               className={
-                tutor.acceptingStudents
-                  ? "badge-action"
-                  : "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.7rem] font-bold uppercase tracking-wide text-steel"
+                isFormer
+                  ? "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.7rem] font-bold uppercase tracking-wide text-steel"
+                  : tutor.acceptingStudents
+                    ? "badge-action"
+                    : "rounded-ledger bg-mist px-2.5 py-0.5 text-[0.7rem] font-bold uppercase tracking-wide text-steel"
               }
             >
-              {tutor.acceptingStudents ? "Przyjmuje uczniów" : "Bez nowych uczniów"}
+              {isFormer ? "Były pracownik" : tutor.acceptingStudents ? "Przyjmuje uczniów" : "Bez nowych uczniów"}
             </span>
           </p>
           <p className="dash-sans text-muted mt-2 text-sm">
@@ -202,6 +262,13 @@ export function NauczycielProfilClient({
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <button
               type="button"
+              onClick={() => setPitOpen(true)}
+              className="dash-sans rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths hover:bg-paper"
+            >
+              Dane do PIT
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setEditing((v) => !v);
                 setFeedback("");
@@ -210,35 +277,45 @@ export function NauczycielProfilClient({
             >
               {editing ? "Anuluj edycję" : "Edytuj"}
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirmArchiveOpen(true)}
-              disabled={busy}
-              className="dash-sans rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths disabled:opacity-60"
-            >
-              Archiwizuj
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmDeleteOpen(true)}
-              disabled={busy}
-              className="dash-sans rounded-full border border-claret/40 bg-transparent px-4 py-2 text-xs font-bold text-claret disabled:opacity-60"
-            >
-              Usuń konto
-            </button>
+            {!isFormer ? (
+              <button
+                type="button"
+                onClick={() => setConfirmArchiveOpen(true)}
+                disabled={busy}
+                className="dash-sans rounded-full border border-panel-frame/40 bg-transparent px-4 py-2 text-xs font-bold text-depths disabled:opacity-60"
+              >
+                Zakończ współpracę
+              </button>
+            ) : null}
           </div>
-          <Link
-            href={`/admin/dokumenty?tab=employees&tutor=${tutor.id}`}
-            className="flex aspect-square w-26 flex-col items-center justify-center gap-2 rounded-app bg-snow text-center transition hover:bg-paper"
-            title={`Dokumenty → Pracownicy → ${tutor.name}`}
-          >
-            <IconFolder className="h-9 w-9 text-[#000C4A]" />
-            <span className="dash-sans text-depths text-xs font-bold leading-none">Dokumenty</span>
-          </Link>
         </div>
       </div>
 
       {feedback ? <p className="dash-sans text-xs font-semibold text-[#000C4A]">{feedback}</p> : null}
+
+      <section className="card-quiet p-4">
+        <h2 className="section-label">Zdjęcie na landing</h2>
+        <div className="mt-3">
+          <TutorPhotoField
+            currentUrl={tutor.photoUrl}
+            file={photoFile}
+            onFileChange={setPhotoFile}
+            onClearSaved={tutor.photoUrl ? removePhoto : undefined}
+            clearing={photoBusy}
+            disabled={busy || photoBusy}
+          />
+          {photoFile ? (
+            <button
+              type="button"
+              onClick={savePhotoOnly}
+              disabled={busy || photoBusy}
+              className="dash-sans mt-3 rounded-full bg-[#000C4A] px-4 py-2 text-xs font-bold text-lime disabled:opacity-60"
+            >
+              {photoBusy ? "Zapisywanie…" : "Zapisz zdjęcie"}
+            </button>
+          ) : null}
+        </div>
+      </section>
 
       {editing ? (
         <section className="card-quiet p-4">
@@ -324,7 +401,7 @@ export function NauczycielProfilClient({
             <Metric label="Przychód (klient)" value={formatPln(monthStats.revenue)} />
             <div>
               <p className="section-label !text-muted">Jego wypłata</p>
-              <p className="mark-highlight dash-mono mt-0.5 text-2xl font-black">
+              <p className="dash-mono text-depths mt-0.5 text-2xl font-black">
                 {formatPln(monthStats.payout)}
               </p>
               <p className="dash-sans text-muted mt-0.5 text-[10px]">
@@ -374,25 +451,20 @@ export function NauczycielProfilClient({
       <ConfirmDialog
         open={confirmArchiveOpen}
         tone="neutral"
-        title={`Zarchiwizować nauczyciela ${tutor.name}?`}
-        description="Ustawimy datę zakończenia umowy na dziś. Profil zostanie zachowany i będzie można go dalej edytować."
-        confirmLabel="Archiwizuj"
-        successMessage="Zarchiwizowano."
+        title={`Zakończyć współpracę z ${tutor.name}?`}
+        description="Ustawimy datę zakończenia umowy na dziś i zablokujemy logowanie. Profil, wypłaty i dane do PIT zostaną zachowane — będziesz mógł rozliczyć PIT na koniec roku."
+        confirmLabel="Zakończ współpracę"
+        successMessage="Współpraca zakończona."
         onConfirm={handleArchiveConfirmed}
         onSuccess={() => router.refresh()}
         onCancel={() => setConfirmArchiveOpen(false)}
       />
 
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        tone="danger"
-        title={`Usunąć konto ${tutor.name}?`}
-        description="Tej operacji nie można cofnąć — konto, dostęp i powiązane dane logowania zostaną trwale usunięte."
-        confirmLabel="Usuń konto"
-        successMessage="Konto usunięte."
-        onConfirm={handleDeleteConfirmed}
-        onSuccess={() => router.replace("/admin/nauczyciele")}
-        onCancel={() => setConfirmDeleteOpen(false)}
+      <TutorPitPanel
+        open={pitOpen}
+        onClose={() => setPitOpen(false)}
+        tutor={tutor}
+        yearSummary={pitYearSummary}
       />
     </div>
   );

@@ -27,7 +27,7 @@ export function LedgerBand({
   );
 }
 
-/** Pojedyncza kolumna paska KPI — mikro-etykieta + gigantyczna liczba mono + kolorowy underline. */
+/** Pojedyncza kolumna paska KPI — mikro-etykieta + gigantyczna liczba mono. */
 export function LedgerStat({
   label,
   tick = "neutral",
@@ -41,23 +41,14 @@ export function LedgerStat({
   size?: Size;
   children: ReactNode;
 }) {
-  const tickClass =
-    tick === "lime"
-      ? "border-lime"
-      : tick === "butter"
-        ? "border-butter"
-        : tick === "claret"
-          ? "border-claret"
-          : "border-white/20";
+  void tick;
   void ink;
   const sizeClass = size === "lg" ? "text-4xl sm:text-5xl lg:text-6xl" : "text-2xl sm:text-3xl";
 
   return (
     <div className="p-4 sm:p-5">
       <p className="dash-sans text-steel text-[10px] font-bold uppercase tracking-[0.16em]">{label}</p>
-      <p
-        className={`dash-mono mt-3 inline-block border-b-4 pb-1.5 font-bold leading-none tracking-tight text-luster ${sizeClass} ${tickClass}`}
-      >
+      <p className={`dash-mono mt-3 font-bold leading-none tracking-tight text-luster ${sizeClass}`}>
         {children}
       </p>
     </div>

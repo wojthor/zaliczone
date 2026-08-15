@@ -60,7 +60,6 @@ export function WeekNavigator({
     if (input) {
       input.blur();
     }
-    // Remount natywnego pickera — wymusza zamknięcie kalendarzyka po wyborze dnia
     setPickerKey((k) => k + 1);
   }, []);
 
@@ -94,13 +93,12 @@ export function WeekNavigator({
     (compact ? "size-7 text-sm" : "size-8 text-base");
 
   const labelClass = compact
-    ? "text-depths w-full text-center text-[0.7rem] font-extrabold tabular-nums tracking-tight whitespace-nowrap"
-    : "text-depths w-full text-center text-xs font-extrabold tabular-nums tracking-tight whitespace-nowrap";
+    ? "text-depths text-[0.7rem] font-extrabold tabular-nums tracking-tight whitespace-nowrap"
+    : "text-depths text-xs font-extrabold tabular-nums tracking-tight whitespace-nowrap";
 
-  /** Stała szerokość na najdłuższe zakresy (np. „21 wrz – 27 wrz 2026”) + zapas */
   const dateFrameClass = compact
-    ? "flex w-[12.75rem] shrink-0 items-center gap-1 rounded-app bg-mist py-1 pl-2 pr-1"
-    : "flex w-[14.5rem] shrink-0 items-center gap-1 rounded-app bg-mist py-1.5 pl-2.5 pr-1.5";
+    ? "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-app bg-mist py-1 px-2"
+    : "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-app bg-mist py-1.5 px-2.5";
 
   const todayMondayIso = toMondayIso(new Date());
   const isCurrentWeek = displayIso === todayMondayIso;
@@ -111,13 +109,9 @@ export function WeekNavigator({
     onWeekMondayIsoChange(todayMondayIso);
   }
 
-  const todayBtnClass = compact
-    ? "rounded-ledger bg-depths px-2.5 py-1 text-[0.65rem] font-extrabold text-lime"
-    : "rounded-ledger bg-depths px-3 py-1.5 text-xs font-extrabold text-lime";
-
   return (
-    <div className={`relative z-10 flex flex-col items-center gap-1 px-1 py-1 ${className ?? ""}`}>
-      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1">
+    <div className={`relative z-10 flex w-full min-w-0 max-w-full flex-col gap-1 ${className ?? ""}`}>
+      <div className="flex w-full min-w-0 max-w-full items-center gap-1.5">
         <button
           type="button"
           onClick={() => shift(-1)}
@@ -128,11 +122,11 @@ export function WeekNavigator({
           ←
         </button>
         <div className={dateFrameClass}>
-          <p className={`min-w-0 flex-1 ${labelClass}`}>{formatWeekRangeFromMondayIso(displayIso)}</p>
+          <p className={labelClass}>{formatWeekRangeFromMondayIso(displayIso)}</p>
           <button
             type="button"
             onClick={openDatePicker}
-            className="text-depths/70 hover:text-depths shrink-0 rounded-full p-1 transition hover:bg-luster touch-manipulation"
+            className="text-depths/70 hover:text-depths shrink-0 rounded-full p-0.5 transition hover:bg-luster touch-manipulation"
             aria-label="Wybierz tydzień przez konkretny dzień"
             title="Wybierz dzień — ustawimy cały tydzień"
           >
@@ -150,6 +144,20 @@ export function WeekNavigator({
             tabIndex={-1}
             aria-hidden
           />
+          {!isCurrentWeek ? (
+            <button
+              type="button"
+              onClick={goToday}
+              className={
+                compact
+                  ? "text-depths shrink-0 rounded-ledger px-1.5 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-wide hover:bg-luster"
+                  : "text-depths shrink-0 rounded-ledger px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wide hover:bg-luster"
+              }
+              title="Wróć do bieżącego tygodnia"
+            >
+              Dziś
+            </button>
+          ) : null}
         </div>
         <button
           type="button"
@@ -159,16 +167,6 @@ export function WeekNavigator({
           title="Następny tydzień"
         >
           →
-        </button>
-        <button
-          type="button"
-          onClick={goToday}
-          disabled={isCurrentWeek}
-          aria-hidden={isCurrentWeek}
-          tabIndex={isCurrentWeek ? -1 : 0}
-          className={`${todayBtnClass} shrink-0 ${isCurrentWeek ? "invisible pointer-events-none" : ""}`}
-        >
-          Dzisiaj
         </button>
       </div>
       {summary}

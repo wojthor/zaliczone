@@ -10,14 +10,143 @@ import {
   sendTutorWelcomeEmail,
 } from "@/lib/emails/send";
 import { ensureTutorRootFolder } from "@/lib/actions/documents";
+import { isDriveConfigured } from "@/lib/google-drive/client";
+import {
+  ensureTutorDriveFolder,
+  moveTutorDriveFolderToFormer,
+  renameTutorDriveFolder,
+} from "@/lib/google-drive/tutor-folders";
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { TUTOR_SHARE, bonusProgress, canCloseMonth } from "@/lib/dates";
+import { TUTOR_PHOTO } from "@/lib/tutor-photo";
+
+async function requireAdmin(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień administratora.");
+}
+
+function storagePathFromPublicUrl(url: string): string | null {
+  const marker = `/object/public/${TUTOR_PHOTO.bucket}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length).split("?")[0] ?? "");
+}
+
+/** Upload / podmiana zdjęcia nauczyciela (landing, proporcje 3:4). */
+export async function uploadTutorPhoto(
+  tutorId: string,
+  formData: FormData,
+): Promise<{ photoUrl: string }> {
+  await requireAdmin();
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Wybierz plik zdjęcia.");
+  }
+  if (!(TUTOR_PHOTO.mimeTypes as readonly string[]).includes(file.type)) {
+    throw new Error("Dozwolone formaty: JPG, PNG, WebP.");
+  }
+  if (file.size > TUTOR_PHOTO.maxBytes) {
+    throw new Error("Plik jest za duży (max 5 MB).");
+  }
+
+  const supabase = createServiceClient();
+  const { data: row } = await supabase
+    .from("profiles")
+    .select("photo_url")
+    .eq("id", tutorId)
+    .maybeSingle();
+
+  const ext =
+    file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${tutorId}/${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: upErr } = await supabase.storage
+    .from(TUTOR_PHOTO.bucket)
+    .upload(path, buffer, { contentType: file.type, upsert: true });
+  if (upErr) {
+    throw new Error(
+      upErr.message.includes("Bucket") || upErr.message.includes("not found")
+        ? "Brak bucketa Storage tutor-photos. Uruchom migrację 0013_tutor_photo.sql."
+        : upErr.message,
+    );
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(TUTOR_PHOTO.bucket).getPublicUrl(path);
+
+  const { error: dbErr } = await supabase
+    .from("profiles")
+    .update({ photo_url: publicUrl })
+    .eq("id", tutorId);
+  if (dbErr) throw dbErr;
+
+  const oldPath = row?.photo_url ? storagePathFromPublicUrl(String(row.photo_url)) : null;
+  if (oldPath && oldPath !== path) {
+    await supabase.storage.from(TUTOR_PHOTO.bucket).remove([oldPath]);
+  }
+
+  revalidatePath("/admin/nauczyciele");
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
+  revalidatePath("/");
+  return { photoUrl: publicUrl };
+}
+
+export async function clearTutorPhoto(tutorId: string): Promise<void> {
+  await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: row } = await supabase
+    .from("profiles")
+    .select("photo_url")
+    .eq("id", tutorId)
+    .maybeSingle();
+
+  const path = row?.photo_url ? storagePathFromPublicUrl(String(row.photo_url)) : null;
+  if (path) {
+    await supabase.storage.from(TUTOR_PHOTO.bucket).remove([path]);
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ photo_url: null })
+    .eq("id", tutorId);
+  if (error) throw error;
+
+  revalidatePath("/admin/nauczyciele");
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
+  revalidatePath("/");
+}
 
 export async function createTutorAccount(input: {
   email: string;
   fullName: string;
   tempPassword: string;
   activeSubjects?: string[];
+  phone?: string | null;
+  bankAccount?: string | null;
+  olxUrl?: string | null;
+  contractStart?: string | null;
+  contractEnd?: string | null;
+  pesel?: string | null;
+  birthDate?: string | null;
+  taxStreet?: string | null;
+  taxPostalCode?: string | null;
+  taxCity?: string | null;
+  taxCountry?: string | null;
+  taxOffice?: string | null;
+  nip?: string | null;
+  employmentType?: string | null;
 }) {
   const supabase = createServiceClient();
 
@@ -36,19 +165,61 @@ export async function createTutorAccount(input: {
 
   if (error || !data.user) throw error ?? new Error("Nie udało się utworzyć użytkownika.");
 
-  await supabase.from("profiles").upsert({
+  const profileRow: Record<string, unknown> = {
     id: data.user.id,
     role: "TUTOR",
     full_name: input.fullName,
     active_subjects: input.activeSubjects ?? [],
-  });
+    phone: input.phone?.trim() || null,
+    bank_account: input.bankAccount?.trim() || null,
+    olx_url: input.olxUrl?.trim() || null,
+    contract_start: input.contractStart || null,
+    contract_end: input.contractEnd || null,
+    pesel: input.pesel?.trim() || null,
+    birth_date: input.birthDate || null,
+    tax_street: input.taxStreet?.trim() || null,
+    tax_postal_code: input.taxPostalCode?.trim() || null,
+    tax_city: input.taxCity?.trim() || null,
+    tax_country: input.taxCountry?.trim() || "Polska",
+    tax_office: input.taxOffice?.trim() || null,
+    nip: input.nip?.trim() || null,
+    employment_type: input.employmentType || null,
+  };
+
+  const { error: profileError } = await supabase.from("profiles").upsert(profileRow);
+  if (profileError) {
+    const msg = `${profileError.message}`.toLowerCase();
+    if (msg.includes("column") || msg.includes("schema cache") || profileError.code === "PGRST204") {
+      // Fallback bez kolumn PIT (migracja 0010 jeszcze niezaaplikowana)
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        role: "TUTOR",
+        full_name: input.fullName,
+        active_subjects: input.activeSubjects ?? [],
+        phone: input.phone?.trim() || null,
+        bank_account: input.bankAccount?.trim() || null,
+        olx_url: input.olxUrl?.trim() || null,
+        contract_start: input.contractStart || null,
+        contract_end: input.contractEnd || null,
+      });
+    } else {
+      throw profileError;
+    }
+  }
 
   await ensureTutorRootFolder(data.user.id, input.fullName);
+
+  if (isDriveConfigured()) {
+    try {
+      await ensureTutorDriveFolder(data.user.id, input.fullName);
+    } catch (e) {
+      console.error("[drive] ensureTutorDriveFolder failed on create:", e);
+    }
+  }
 
   await sendTutorWelcomeEmail(input.email, input.fullName);
 
   revalidatePath("/admin/nauczyciele");
-  revalidatePath("/admin/dokumenty");
   return { id: data.user.id };
 }
 
@@ -65,6 +236,13 @@ export async function updateTutorProfile(
   },
 ) {
   const supabase = await createClient();
+
+  const { data: before } = await supabase
+    .from("profiles")
+    .select("full_name, drive_folder_id")
+    .eq("id", tutorId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -79,6 +257,35 @@ export async function updateTutorProfile(
     .eq("id", tutorId);
 
   if (error) throw error;
+
+  const prevName = (before?.full_name as string | null)?.trim() ?? "";
+  const nextName = input.fullName.trim();
+  const folderId = before?.drive_folder_id as string | null;
+  if (
+    isDriveConfigured() &&
+    folderId &&
+    nextName &&
+    prevName &&
+    prevName !== nextName
+  ) {
+    try {
+      await renameTutorDriveFolder(folderId, nextName);
+    } catch (e) {
+      console.error("[drive] renameTutorDriveFolder failed:", e);
+    }
+  }
+
+  if (isDriveConfigured()) {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const end = input.contractEnd || null;
+      const former = Boolean(end && end <= today);
+      await ensureTutorDriveFolder(tutorId, nextName || prevName || "Nauczyciel", { former });
+    } catch (e) {
+      console.error("[drive] ensureTutorDriveFolder failed on profile update:", e);
+    }
+  }
+
   revalidatePath("/admin/nauczyciele");
   revalidatePath(`/admin/nauczyciele/${tutorId}`);
 }
@@ -131,21 +338,157 @@ export async function savePriceTiers(
 export async function archiveTutorAccount(tutorId: string) {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("contract_end")
+    .eq("id", tutorId)
+    .maybeSingle();
+
+  // Jeśli umowa miała przyszłą datę końca — i tak kończymy dziś.
+  // Zostawiamy tylko datę wcześniejszą niż dziś (odejście już w przeszłości).
+  const existingEnd = existing?.contract_end as string | null | undefined;
+  const contractEnd = existingEnd && existingEnd < today ? existingEnd : today;
+
   const { error } = await supabase
     .from("profiles")
-    .update({ contract_end: today })
+    .update({
+      contract_end: contractEnd,
+      accepting_students: false,
+    })
     .eq("id", tutorId);
 
   if (error) throw error;
+
+  if (isDriveConfigured()) {
+    try {
+      const { data: tutor } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", tutorId)
+        .maybeSingle();
+      await moveTutorDriveFolderToFormer(
+        tutorId,
+        (tutor?.full_name as string | null) ?? undefined,
+      );
+    } catch (e) {
+      console.error("[drive] moveTutorDriveFolderToFormer failed on archive:", e);
+    }
+  }
+
+  // Blokada logowania — konto i historia zostają (potrzebne do PIT na koniec roku).
+  try {
+    const admin = createServiceClient();
+    await admin.auth.admin.updateUserById(tutorId, { ban_duration: "876000h" });
+  } catch {
+    // Auth ban opcjonalny — archiwum profilu i tak działa
+  }
+
   revalidatePath("/admin/nauczyciele");
   revalidatePath(`/admin/nauczyciele/${tutorId}`);
 }
 
+/**
+ * Soft-end: nie kasujemy konta Auth — tylko kończymy współpracę.
+ * Dane wypłat i profil zostają pod PIT-11.
+ */
 export async function deleteTutorAccount(tutorId: string) {
-  const supabase = createServiceClient();
-  const { error } = await supabase.auth.admin.deleteUser(tutorId);
-  if (error) throw error;
+  await archiveTutorAccount(tutorId);
+}
+
+export async function updateTutorPitIdentity(
+  tutorId: string,
+  input: {
+    pesel?: string | null;
+    birthDate?: string | null;
+    taxStreet?: string | null;
+    taxPostalCode?: string | null;
+    taxCity?: string | null;
+    taxCountry?: string | null;
+    taxOffice?: string | null;
+    nip?: string | null;
+    employmentType?: string | null;
+  },
+) {
+  const supabase = await createClient();
+  const payload = {
+    pesel: input.pesel?.trim() || null,
+    birth_date: input.birthDate || null,
+    tax_street: input.taxStreet?.trim() || null,
+    tax_postal_code: input.taxPostalCode?.trim() || null,
+    tax_city: input.taxCity?.trim() || null,
+    tax_country: input.taxCountry?.trim() || "Polska",
+    tax_office: input.taxOffice?.trim() || null,
+    nip: input.nip?.trim() || null,
+    employment_type: input.employmentType || null,
+  };
+
+  const { error } = await supabase.from("profiles").update(payload).eq("id", tutorId);
+  if (error) {
+    const msg = `${error.message} ${error.details ?? ""}`.toLowerCase();
+    if (msg.includes("column") || msg.includes("schema cache") || error.code === "PGRST204") {
+      throw new Error(
+        "Brak kolumn PIT w bazie. Uruchom migrację supabase/migrations/0010_tutor_pit_fields.sql w Supabase.",
+      );
+    }
+    throw error;
+  }
+
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
   revalidatePath("/admin/nauczyciele");
+}
+
+export async function updateTutorTaxYearEntry(
+  tutorId: string,
+  year: number,
+  entry: {
+    deductibleCostsPln: number;
+    taxAdvancesPln: number;
+    zusSocialPln: number;
+    zusHealthPln: number;
+    reliefYoung: boolean;
+    notes: string;
+  },
+) {
+  const supabase = await createClient();
+  const yearKey = String(year);
+
+  const { data: profile, error: readErr } = await supabase
+    .from("profiles")
+    .select("tax_year_data")
+    .eq("id", tutorId)
+    .maybeSingle();
+
+  if (readErr) {
+    const msg = `${readErr.message}`.toLowerCase();
+    if (msg.includes("column") || msg.includes("schema cache") || readErr.code === "PGRST204") {
+      throw new Error(
+        "Brak kolumn PIT w bazie. Uruchom migrację supabase/migrations/0010_tutor_pit_fields.sql w Supabase.",
+      );
+    }
+    throw readErr;
+  }
+
+  const current = (profile?.tax_year_data ?? {}) as Record<string, unknown>;
+  const next = {
+    ...current,
+    [yearKey]: {
+      deductibleCostsPln: entry.deductibleCostsPln,
+      taxAdvancesPln: entry.taxAdvancesPln,
+      zusSocialPln: entry.zusSocialPln,
+      zusHealthPln: entry.zusHealthPln,
+      reliefYoung: entry.reliefYoung,
+      notes: entry.notes,
+    },
+  };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ tax_year_data: next })
+    .eq("id", tutorId);
+
+  if (error) throw error;
+
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
 }
 
 export async function approveSubjectRequest(requestId: string, subject: string, tutorId: string) {
@@ -273,6 +616,56 @@ export async function closeMonth(monthKey: string) {
   revalidatePath("/admin/ksiegowosc");
   revalidatePath("/finanse");
   return { ok: true as const };
+}
+
+/**
+ * Nieodwracalne przełączenie NDG → JDG.
+ * Zapisuje legal_mode='JDG' oraz jdg_registration_date = dziś.
+ */
+export async function switchToJDG() {
+  const adminId = await requireAdminUserId();
+  const supabase = createServiceClient();
+  const today = new Date();
+  const isoDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const { data: existing } = await supabase
+    .from("business_settings")
+    .select("legal_mode")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (existing?.legal_mode === "JDG") {
+    throw new Error("Firma jest już na JDG — przełączenie jest nieodwracalne.");
+  }
+
+  const { error } = await supabase.from("business_settings").upsert(
+    {
+      id: 1,
+      legal_mode: "JDG",
+      jdg_registration_date: isoDate,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (
+      msg.includes("business_settings") ||
+      msg.includes("schema cache") ||
+      error.code === "42P01" ||
+      error.code === "PGRST205"
+    ) {
+      throw new Error(
+        "Tabela business_settings nie istnieje. Uruchom migrację 0011_business_settings.sql w Supabase.",
+      );
+    }
+    throw new Error(msg || "Nie udało się przełączyć na JDG.");
+  }
+
+  void adminId;
+  revalidatePath("/admin/ksiegowosc");
+  return { ok: true as const, jdgRegistrationDate: isoDate };
 }
 
 export async function markPayoutPaid(

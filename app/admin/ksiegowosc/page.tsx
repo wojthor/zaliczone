@@ -1,6 +1,12 @@
 import { KsiegowoscClient } from "./ksiegowosc-client";
 import { ADMIN_PIT_RATE } from "@/lib/dates";
-import { getAllLessonLines, getAllOperatingExpenses, getAllPayouts, getClosedMonths } from "@/lib/data/queries";
+import {
+  getAllLessonLines,
+  getAllOperatingExpenses,
+  getAllPayouts,
+  getBusinessSettings,
+  getClosedMonths,
+} from "@/lib/data/queries";
 
 function previousMonthKey(d = new Date()): string {
   const prev = new Date(d.getFullYear(), d.getMonth() - 1, 15);
@@ -21,12 +27,13 @@ export default async function KsiegowoscPage({
   const monthKey = resolveMonthKey(month);
 
   // Wszystkie lekcje (każdy status) — potrzebne do walidacji Warunku 1 kreatora zamknięcia,
-  // nie tylko VERIFIED jak wcześniej. Payouts/koszty/zamknięcia pobierane równolegle.
-  const [allLessons, payouts, closedMonths, operatingExpenses] = await Promise.all([
+  // nie tylko VERIFIED jak wcześniej. Payouts/koszty/zamknięcia/ustawienia pobierane równolegle.
+  const [allLessons, payouts, closedMonths, operatingExpenses, businessSettings] = await Promise.all([
     getAllLessonLines(),
     getAllPayouts(),
     getClosedMonths(),
     getAllOperatingExpenses(),
+    getBusinessSettings(),
   ]);
 
   const financeLines = allLessons.filter((l) => l.status === "VERIFIED");
@@ -59,6 +66,7 @@ export default async function KsiegowoscPage({
       closedMonths={closedMonths}
       operatingExpenses={operatingExpenses}
       initialMonthKey={monthKey}
+      businessSettings={businessSettings}
       monthSummary={{
         grossRevenuePln,
         payrollCostsPln,

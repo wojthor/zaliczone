@@ -36,7 +36,7 @@ export function PanelHeader({ title, action, compact, titleHref, onDark }: Panel
 
   return (
     <div
-      className={`flex items-center justify-between gap-2 border-b-2 border-paper ${compact ? "mb-2 pb-1.5" : "mb-2.5 pb-2"} ${onDark ? "border-white/10" : ""}`}
+      className={`flex items-center justify-between gap-2 ${compact ? "mb-2.5 pb-2" : "mb-3 pb-2.5"} ${onDark ? "border-b border-white/15" : "border-b border-mist"}`}
     >
       {titleNode}
       {action ? <div className="shrink-0">{action}</div> : null}

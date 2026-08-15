@@ -66,7 +66,6 @@ function collectDescendantFolderIds(folders: DocumentFolder[], rootId: string): 
 }
 
 function revalidateDocsPaths() {
-  revalidatePath("/admin/dokumenty");
   revalidatePath("/profil");
 }
 

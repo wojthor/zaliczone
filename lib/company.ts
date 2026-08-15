@@ -6,4 +6,6 @@ export const COMPANY = {
   name: "ZALICZONE",
   nip: "………………",
   address: "……………………………………",
+  email: "kontakt@zaliczone.pl",
+  phone: "+48 000 000 000",
 } as const;

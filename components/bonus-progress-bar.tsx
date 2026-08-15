@@ -32,9 +32,9 @@ export function BonusProgressBar({
             {doneLabel}/{p.threshold}h
           </span>
         </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-ledger bg-mist">
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-mist">
           <div
-            className={`h-full rounded-ledger transition-all ${p.achieved ? "bg-lime" : "bg-depths"}`}
+            className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "bg-[#000C4A]"}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -44,9 +44,9 @@ export function BonusProgressBar({
 
   return (
     <div
-      className={`rounded-app ${
-        p.achieved ? "card-feature px-2.5 text-lime" : "bg-snow text-depths"
-      } ${compact ? "p-2.5" : "p-3.5"}`}
+      className={`${
+        p.achieved ? "card-feature px-3 text-lime" : "soft-panel text-depths"
+      } ${compact ? "p-3" : "p-4"} ${className}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className={`font-extrabold ${compact ? "text-xs" : "text-sm"}`}>
@@ -57,13 +57,14 @@ export function BonusProgressBar({
             p.achieved ? "text-lime" : "text-muted"
           }`}
         >
-          {doneLabel} / {p.threshold} godz. ·{" "}
-          <span className={p.achieved ? "mark-highlight-on-dark" : undefined}>+{p.bonusPln} zł</span>
+          {doneLabel} / {p.threshold} godz. · <span>+{p.bonusPln} zł</span>
         </p>
       </div>
-      <div className={`mt-2 h-2.5 overflow-hidden rounded-ledger ${p.achieved ? "bg-white/20" : "bg-mist"}`}>
+      <div
+        className={`mt-2 h-2.5 overflow-hidden rounded-full ${p.achieved ? "bg-white/20" : "bg-mist"}`}
+      >
         <div
-          className={`h-full rounded-ledger transition-all ${p.achieved ? "bg-lime" : "bg-depths"}`}
+          className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "bg-[#000C4A]"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -72,7 +73,9 @@ export function BonusProgressBar({
           Do premii zostało <strong>{p.remaining}</strong> zatwierdzonych godzin.
         </p>
       ) : showCelebration ? (
-        <p className="mt-1.5 text-xs text-lime/90">Dodatek {p.bonusPln} zł trafia do Twojej wypłaty.</p>
+        <p className="mt-1.5 text-xs text-lime/90">
+          Dodatek {p.bonusPln} zł trafia do Twojej wypłaty.
+        </p>
       ) : null}
     </div>
   );

@@ -21,8 +21,15 @@ import type {
   Profile,
   StudentUi,
   SubjectRequest,
+  BusinessSettings,
 } from "@/lib/types/database";
 import type { CompanySalesMonth, PriceTier } from "@/lib/types/messages";
+import type {
+  TutorPitYearSummary,
+  TutorTaxYearEntry,
+  TutorYearPayoutRow,
+} from "@/lib/types/pit";
+import { EMPTY_TAX_YEAR } from "@/lib/types/pit";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 
 export async function getCurrentUserProfile(): Promise<Profile | null> {
@@ -153,6 +160,77 @@ export async function getAllTutorProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[];
 }
 
+/** Publiczna lista nauczycieli przyjmujących uczniów (landing). */
+export type PublicTutorCard = {
+  id: string;
+  name: string;
+  subjects: string[];
+  phone: string | null;
+  email: string | null;
+  olxUrl: string | null;
+  photoUrl: string | null;
+  initials: string;
+};
+
+export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, active_subjects, phone, olx_url, photo_url, accepting_students, contract_end",
+    )
+    .eq("role", "TUTOR");
+
+  let rows = data;
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("photo_url") || error.code === "PGRST204") {
+      const retry = await supabase
+        .from("profiles")
+        .select("id, full_name, active_subjects, phone, olx_url, accepting_students, contract_end")
+        .eq("role", "TUTOR");
+      if (retry.error) {
+        console.error("[getPublicTutorCards]", retry.error.message);
+        return [];
+      }
+      rows = retry.data;
+    } else {
+      console.error("[getPublicTutorCards]", error.message);
+      return [];
+    }
+  }
+
+  const emailMap = await getTutorEmailMap();
+  const today = new Date().toISOString().slice(0, 10);
+  return (rows ?? [])
+    .filter((row) => {
+      const former = Boolean(row.contract_end && String(row.contract_end) <= today);
+      const accepting = row.accepting_students !== false;
+      return !former && accepting;
+    })
+    .map((row) => {
+      const name = (row.full_name as string | null)?.trim() || "Korepetytor";
+      const initials =
+        name
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((p) => p[0]?.toUpperCase() ?? "")
+          .join("") || "?";
+      return {
+        id: row.id as string,
+        name,
+        subjects: (row.active_subjects as string[] | null) ?? [],
+        phone: (row.phone as string | null) ?? null,
+        email: emailMap.get(row.id as string) ?? null,
+        olxUrl: (row.olx_url as string | null) ?? null,
+        photoUrl: ((row as { photo_url?: string | null }).photo_url as string | null) ?? null,
+        initials,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pl"));
+}
+
 export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTutorSummary[]> {
   const supabase = await createClient();
   const tutors = await getAllTutorProfiles();
@@ -220,6 +298,18 @@ export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTu
       ewidencjaUnlockedForMonth: tutor.ewidencja_unlocked_for_month,
       payoutStatusForMonth: payout?.status ?? null,
       acceptingStudents: tutor.accepting_students !== false,
+      pesel: tutor.pesel ?? null,
+      birthDate: tutor.birth_date ?? null,
+      taxStreet: tutor.tax_street ?? null,
+      taxPostalCode: tutor.tax_postal_code ?? null,
+      taxCity: tutor.tax_city ?? null,
+      taxCountry: tutor.tax_country ?? null,
+      nip: tutor.nip ?? null,
+      taxOffice: tutor.tax_office ?? null,
+      employmentType: tutor.employment_type ?? null,
+      taxYearData: (tutor.tax_year_data as Record<string, unknown> | null) ?? null,
+      driveFolderId: tutor.drive_folder_id ?? null,
+      photoUrl: tutor.photo_url ?? null,
     };
   });
 }
@@ -320,6 +410,40 @@ export async function getClosedMonths(): Promise<string[]> {
     throw error;
   }
   return (data ?? []).map((row) => row.month as string);
+}
+
+/** Singleton trybu prawnego — fail-open → NDG gdy tabela nie istnieje / błąd odczytu. */
+export async function getBusinessSettings(): Promise<BusinessSettings> {
+  const fallback: BusinessSettings = { legalMode: "NDG", jdgRegistrationDate: null };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("business_settings")
+      .select("legal_mode, jdg_registration_date")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (error) {
+      const msg = error.message ?? "";
+      if (
+        msg.includes("business_settings") ||
+        msg.includes("schema cache") ||
+        error.code === "42P01" ||
+        error.code === "PGRST205"
+      ) {
+        return fallback;
+      }
+      return fallback;
+    }
+    if (!data) return fallback;
+    const mode = data.legal_mode === "JDG" ? "JDG" : "NDG";
+    return {
+      legalMode: mode,
+      jdgRegistrationDate: data.jdg_registration_date ? String(data.jdg_registration_date) : null,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export async function getAllOperatingExpenses(): Promise<OperatingExpense[]> {
@@ -487,4 +611,61 @@ export async function getTutorCompletedFinanceLines(tutorId: string) {
 /** @deprecated use getAllVerifiedFinanceLines */
 export async function getAllCompletedFinanceLines() {
   return getAllVerifiedFinanceLines();
+}
+
+function parseTaxYearEntry(raw: unknown): TutorTaxYearEntry {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_TAX_YEAR };
+  const o = raw as Record<string, unknown>;
+  return {
+    deductibleCostsPln: Number(o.deductibleCostsPln ?? o.deductible_costs_pln ?? 0) || 0,
+    taxAdvancesPln: Number(o.taxAdvancesPln ?? o.tax_advances_pln ?? 0) || 0,
+    zusSocialPln: Number(o.zusSocialPln ?? o.zus_social_pln ?? 0) || 0,
+    zusHealthPln: Number(o.zusHealthPln ?? o.zus_health_pln ?? 0) || 0,
+    reliefYoung: Boolean(o.reliefYoung ?? o.relief_young ?? false),
+    notes: String(o.notes ?? ""),
+  };
+}
+
+/** Roczne podsumowanie wypłat PAID + ręczne pola podatkowe z profilu (pod PIT-11). */
+export async function getTutorPitYearSummary(
+  tutorId: string,
+  year: number,
+): Promise<TutorPitYearSummary> {
+  const supabase = await createClient();
+  const yearKey = String(year);
+
+  const { data: payouts, error } = await supabase
+    .from("payouts")
+    .select("month, amount, lessons_amount, bonus_amount, lesson_count, status")
+    .eq("tutor_id", tutorId)
+    .eq("status", "PAID")
+    .gte("month", `${year}-01`)
+    .lte("month", `${year}-12`)
+    .order("month");
+
+  if (error) throw error;
+
+  const months: TutorYearPayoutRow[] = (payouts ?? []).map((p) => ({
+    month: String(p.month),
+    amount: Number(p.amount) || 0,
+    lessonsAmount: Number(p.lessons_amount) || 0,
+    bonusAmount: Number(p.bonus_amount) || 0,
+    lessonCount: Number(p.lesson_count) || 0,
+  }));
+
+  const paidIncomePln = Math.round(months.reduce((s, m) => s + m.amount, 0) * 100) / 100;
+
+  let taxEntry = { ...EMPTY_TAX_YEAR };
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", tutorId)
+    .maybeSingle();
+
+  if (!profileErr && profile) {
+    const map = ((profile as Profile).tax_year_data ?? {}) as Record<string, unknown>;
+    taxEntry = parseTaxYearEntry(map[yearKey]);
+  }
+
+  return { year, paidIncomePln, months, taxEntry };
 }

@@ -2,15 +2,34 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { closeMonth, createOperatingExpense, deleteOperatingExpense } from "@/lib/actions/admin";
+import { closeMonth, createOperatingExpense, deleteOperatingExpense, switchToJDG } from "@/lib/actions/admin";
 import { getSignedDownloadUrl } from "@/lib/actions/documents";
 import { IconLock } from "@/components/icons";
-import { ADMIN_PIT_RATE, canCloseMonth } from "@/lib/dates";
-import type { FinanceLineUi, OperatingExpense, Payout } from "@/lib/types/database";
+import { canCloseMonth } from "@/lib/dates";
+import {
+  NDG_QUARTERLY_LIMIT,
+  PIT_TAX_FREE_AMOUNT,
+  SKLADKA_ZDROWOTNA_MINIMUM,
+  VAT_ANNUAL_LIMIT,
+  ZUS_PREFERENCYJNY_SPOLECZNE,
+  ZUS_ULGA_NA_START_SPOLECZNE,
+} from "@/lib/podatki-config";
+import {
+  calendarQuarter,
+  dniPozostaleNaCeidg,
+  monthsInQuarter,
+  numerMiesiacaUlgiNaStart,
+  obliczLimitNDG,
+  obliczLimitVAT,
+  obliczSkladkeZdrowotna,
+  obliczZaliczkePIT,
+  toneForLimitPercent,
+  znajdzDatePrzekroczeniaLimitu,
+} from "@/lib/podatki";
+import type { BusinessSettings, FinanceLineUi, LegalMode, OperatingExpense, Payout } from "@/lib/types/database";
 import { FinanceTile, FinanceTilesRow } from "@/components/admin/finance-tile";
+import { QuarterlyLimitBar, VatLimitBar } from "@/components/admin/ksiegowosc/limit-bars";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
-const PIT_RATE = ADMIN_PIT_RATE;
 
 export type MonthSummary = {
   grossRevenuePln: number;
@@ -28,20 +47,44 @@ export type MonthSummary = {
 type ViewMode = "month" | "year";
 type JdgZusStage = "start" | "maly";
 
-const ZUS_OPTIONS: Record<JdgZusStage, { label: string; amountLabel: string; monthlyAmount: number; note: string }> = {
-  start: {
-    label: "Ulga na start (tylko zdrowotne)",
-    amountLabel: "~410,00 zł",
-    monthlyAmount: 410,
-    note: "Przez pierwsze 6 miesięcy firmy.",
-  },
-  maly: {
-    label: "Mały ZUS (preferencyjny)",
-    amountLabel: "~480,00 zł + składka zdrowotna",
-    monthlyAmount: 890,
-    note: "Składki społeczne w stawce preferencyjnej + ok. 410 zł zdrowotnej miesięcznie.",
-  },
-};
+function formatCurrencyPln(n: number): string {
+  return new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN" }).format(n);
+}
+
+function monthKeysInclusive(fromKey: string, toKey: string): string[] {
+  const [fy, fm] = fromKey.split("-").map(Number);
+  const [ty, tm] = toKey.split("-").map(Number);
+  const out: string[] = [];
+  let y = fy!;
+  let m = fm!;
+  while (y < ty! || (y === ty && m <= tm!)) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
+function taxableIncomeForMonth(
+  monthKey: string,
+  financeLines: FinanceLineUi[],
+  payouts: Payout[],
+  expenses: OperatingExpense[],
+): number {
+  const gross = financeLines
+    .filter((l) => l.monthKey === monthKey)
+    .reduce((s, l) => s + l.amountPln, 0);
+  const payroll = payouts
+    .filter((p) => p.month === monthKey && p.status === "PAID")
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const operating = expenses
+    .filter((e) => e.month === monthKey)
+    .reduce((s, e) => s + Number(e.amount_pln), 0);
+  return Math.max(0, Math.round((gross - payroll - operating) * 100) / 100);
+}
 
 type LedgerRow = {
   id: string;
@@ -149,6 +192,7 @@ export function KsiegowoscClient({
   operatingExpenses = [],
   initialMonthKey,
   monthSummary,
+  businessSettings,
 }: {
   financeLines: FinanceLineUi[];
   payouts: Payout[];
@@ -156,14 +200,20 @@ export function KsiegowoscClient({
   operatingExpenses?: OperatingExpense[];
   initialMonthKey: string;
   monthSummary: MonthSummary;
+  businessSettings: BusinessSettings;
 }) {
   const router = useRouter();
   const [pendingExpense, startExpense] = useTransition();
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [confirmJdgOpen, setConfirmJdgOpen] = useState(false);
   const nowKey = useMemo(() => currentMonthKey(), []);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selectedMonthKey, setSelectedMonthKey] = useState(initialMonthKey);
   const [selectedYear, setSelectedYear] = useState(() => initialMonthKey.slice(0, 4));
+  const [legalMode, setLegalMode] = useState<LegalMode>(businessSettings.legalMode);
+  const [jdgRegistrationDate, setJdgRegistrationDate] = useState<string | null>(
+    businessSettings.jdgRegistrationDate,
+  );
   const [zusStage, setZusStage] = useState<JdgZusStage>("start");
   const [bankReconciled, setBankReconciled] = useState(false);
   const [expenseFeedback, setExpenseFeedback] = useState("");
@@ -186,6 +236,21 @@ export function KsiegowoscClient({
   useEffect(() => {
     setLocalClosedMonths(closedMonths);
   }, [closedMonths]);
+
+  useEffect(() => {
+    setLegalMode(businessSettings.legalMode);
+    setJdgRegistrationDate(businessSettings.jdgRegistrationDate);
+  }, [businessSettings.legalMode, businessSettings.jdgRegistrationDate]);
+
+  // Auto-wybór etapu ZUS na podstawie daty rejestracji JDG (Ulga na start = pierwsze 6 miesięcy).
+  useEffect(() => {
+    if (legalMode !== "JDG" || !jdgRegistrationDate) {
+      setZusStage("start");
+      return;
+    }
+    const numer = numerMiesiacaUlgiNaStart(jdgRegistrationDate, selectedMonthKey);
+    setZusStage(numer != null ? "start" : "maly");
+  }, [legalMode, jdgRegistrationDate, selectedMonthKey]);
 
   const effectiveClosedMonths = localClosedMonths;
 
@@ -426,26 +491,156 @@ export function KsiegowoscClient({
     return Math.max(0, Math.round(raw * 100) / 100);
   }, [totals.gross, totals.allCosts]);
 
-  const suggestedPit = useMemo(
-    () => Math.round(taxableIncome * PIT_RATE * 100) / 100,
+  /** Dochody miesięczne od rejestracji JDG (lub od stycznia roku) — do zaliczki narastającej. */
+  const dochodyOdRejestracji = useMemo(() => {
+    const regKey = jdgRegistrationDate?.slice(0, 7);
+    const year = selectedMonthKey.slice(0, 4);
+    const fromKey =
+      legalMode === "JDG" && regKey && /^\d{4}-\d{2}$/.test(regKey)
+        ? regKey
+        : `${year}-01`;
+    const yearEnd =
+      viewMode === "year"
+        ? selectedYear === nowKey.slice(0, 4)
+          ? nowKey
+          : `${selectedYear}-12`
+        : selectedMonthKey;
+    const toKey = yearEnd < fromKey ? fromKey : yearEnd;
+    return monthKeysInclusive(fromKey, toKey).map((mk) =>
+      taxableIncomeForMonth(mk, financeLines, payouts, localExpenses),
+    );
+  }, [
+    legalMode,
+    jdgRegistrationDate,
+    selectedMonthKey,
+    selectedYear,
+    viewMode,
+    nowKey,
+    financeLines,
+    payouts,
+    localExpenses,
+  ]);
+
+  const suggestedPit = useMemo(() => {
+    if (legalMode === "NDG") return 0;
+    if (dochodyOdRejestracji.length === 0) return 0;
+    if (viewMode === "year") {
+      // Suma zaliczek za wszystkie miesiące w tablicy (rok / od rejestracji).
+      let sum = 0;
+      for (let i = 0; i < dochodyOdRejestracji.length; i++) {
+        sum = Math.round((sum + obliczZaliczkePIT(dochodyOdRejestracji, i)) * 100) / 100;
+      }
+      return sum;
+    }
+    return obliczZaliczkePIT(dochodyOdRejestracji, dochodyOdRejestracji.length - 1);
+  }, [legalMode, dochodyOdRejestracji, viewMode]);
+
+  const zdrowotnaMiesiac = useMemo(
+    () => obliczSkladkeZdrowotna(taxableIncome, SKLADKA_ZDROWOTNA_MINIMUM),
     [taxableIncome],
   );
 
-  const selectedZus = ZUS_OPTIONS[zusStage];
+  const zusSpoleczne =
+    legalMode === "NDG"
+      ? 0
+      : zusStage === "start"
+        ? ZUS_ULGA_NA_START_SPOLECZNE
+        : ZUS_PREFERENCYJNY_SPOLECZNE;
   const zusMonthsInPeriod = viewMode === "month" ? 1 : 12;
-  const zusTotal = selectedZus.monthlyAmount * zusMonthsInPeriod;
+  const summaryPit = legalMode === "NDG" ? 0 : suggestedPit;
+  const summaryZusWlasciciel = Math.round(zusSpoleczne * zusMonthsInPeriod * 100) / 100;
+  const summaryZusPracownicy = 0;
+  const summaryZdrowotna =
+    legalMode === "NDG"
+      ? 0
+      : Math.round(zdrowotnaMiesiac * zusMonthsInPeriod * 100) / 100;
+  const summaryKoszty = extraCostsSum;
+
+  const ulgaNumer = jdgRegistrationDate
+    ? numerMiesiacaUlgiNaStart(jdgRegistrationDate, selectedMonthKey)
+    : null;
 
   const netProfit = useMemo(() => {
-    const raw = totals.gross - totals.allCosts - suggestedPit - zusTotal;
+    const raw =
+      totals.gross -
+      paidPayoutsSum -
+      summaryPit -
+      summaryZusWlasciciel -
+      summaryZusPracownicy -
+      summaryZdrowotna -
+      summaryKoszty;
     return Math.round(raw * 100) / 100;
-  }, [totals.gross, totals.allCosts, suggestedPit, zusTotal]);
+  }, [
+    totals.gross,
+    paidPayoutsSum,
+    summaryPit,
+    summaryZusWlasciciel,
+    summaryZusPracownicy,
+    summaryZdrowotna,
+    summaryKoszty,
+  ]);
 
-  // Zamknięty miesiąc = zarchiwizowany rekord — ZUS zawsze „Ulga na start" (bez wyboru), niezależnie
-  // od tego, co akurat wybrane jest w kalkulatorze „Zrób to sam" dla otwartych miesięcy.
-  const closedZusTotal = ZUS_OPTIONS.start.monthlyAmount;
-  const closedNetProfit = useMemo(
-    () => Math.round((totals.gross - totals.allCosts - suggestedPit - closedZusTotal) * 100) / 100,
-    [totals.gross, totals.allCosts, suggestedPit, closedZusTotal],
+  // Zamknięty miesiąc — te same pozycje co w podsumowaniu.
+  const closedZusTotal = summaryZusWlasciciel;
+  const closedZdrowotna = summaryZdrowotna;
+  const closedNetProfit = netProfit;
+
+  // --- Limity NDG / VAT (zawsze względem bieżącego kwartału / roku kalendarzowego) ---
+  const calendarNow = useMemo(() => new Date(), []);
+  const currentYearNum = calendarNow.getFullYear();
+  const currentQuarter = calendarQuarter(calendarNow.getMonth() + 1);
+  const quarterMonthNums = monthsInQuarter(currentQuarter);
+
+  const quarterGrossByMonth = useMemo(() => {
+    return quarterMonthNums.map((m) => {
+      const key = `${currentYearNum}-${String(m).padStart(2, "0")}`;
+      return financeLines
+        .filter((l) => l.monthKey === key)
+        .reduce((s, l) => s + l.amountPln, 0);
+    });
+  }, [financeLines, quarterMonthNums, currentYearNum]);
+
+  const ndgLimit = useMemo(() => obliczLimitNDG(quarterGrossByMonth), [quarterGrossByMonth]);
+
+  const yearGrossByMonth = useMemo(() => {
+    const months: number[] = [];
+    for (let m = 1; m <= 12; m++) {
+      const key = `${currentYearNum}-${String(m).padStart(2, "0")}`;
+      months.push(
+        financeLines.filter((l) => l.monthKey === key).reduce((s, l) => s + l.amountPln, 0),
+      );
+    }
+    return months;
+  }, [financeLines, currentYearNum]);
+
+  const vatLimit = useMemo(() => obliczLimitVAT(yearGrossByMonth), [yearGrossByMonth]);
+
+  const ndgExceedDate = useMemo(() => {
+    if (!ndgLimit.przekroczono) return null;
+    const qSet = new Set(
+      quarterMonthNums.map((m) => `${currentYearNum}-${String(m).padStart(2, "0")}`),
+    );
+    const entries = financeLines
+      .filter((l) => qSet.has(l.monthKey))
+      .map((l) => ({ date: l.dateIso?.slice(0, 10) || l.date, amount: l.amountPln }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return znajdzDatePrzekroczeniaLimitu(entries, NDG_QUARTERLY_LIMIT);
+  }, [ndgLimit.przekroczono, financeLines, quarterMonthNums, currentYearNum]);
+
+  const ndgCeidgDaysLeft = ndgExceedDate ? dniPozostaleNaCeidg(ndgExceedDate) : null;
+
+  const dochodNarastajacoOdStycznia = useMemo(() => {
+    const year = selectedMonthKey.slice(0, 4);
+    const toKey = viewMode === "month" ? selectedMonthKey : `${selectedYear}-12`;
+    return monthKeysInclusive(`${year}-01`, toKey).reduce(
+      (s, mk) => s + taxableIncomeForMonth(mk, financeLines, payouts, localExpenses),
+      0,
+    );
+  }, [selectedMonthKey, selectedYear, viewMode, financeLines, payouts, localExpenses]);
+
+  const pitFreePct = Math.min(
+    100,
+    PIT_TAX_FREE_AMOUNT > 0 ? (dochodNarastajacoOdStycznia / PIT_TAX_FREE_AMOUNT) * 100 : 0,
   );
 
   const periodLabel =
@@ -478,6 +673,13 @@ export function KsiegowoscClient({
       prev.includes(selectedMonthKey) ? prev : [...prev, selectedMonthKey],
     );
     setBankReconciled(false);
+    router.refresh();
+  }
+
+  async function handleSwitchToJdg() {
+    const result = await switchToJDG();
+    setLegalMode("JDG");
+    setJdgRegistrationDate(result.jdgRegistrationDate);
     router.refresh();
   }
 
@@ -624,35 +826,148 @@ export function KsiegowoscClient({
       </div>
 
       {!isMonthClosed ? (
-        <div className="flex flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row">
-          {(
-            [
-              ["month", "Księgowość miesięczna"],
-              ["year", "Księgowość roczna"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setViewMode(id)}
-              className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-                viewMode === id ? "nav-active" : "text-muted hover:text-depths"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          <div className="flex flex-1 flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row">
+            {(
+              [
+                ["month", "Księgowość miesięczna"],
+                ["year", "Księgowość roczna"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setViewMode(id)}
+                className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
+                  viewMode === id ? "nav-active" : "text-muted hover:text-depths"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex shrink-0 flex-col gap-1">
+            <div className="flex flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row sm:min-w-[11rem]">
+              {(
+                [
+                  ["NDG", "NDG"],
+                  ["JDG", "JDG"],
+                ] as const
+              ).map(([id, label]) => {
+                const active = legalMode === id;
+                const lockedToJdg = legalMode === "JDG" && id === "NDG";
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    disabled={lockedToJdg}
+                    onClick={() => {
+                      if (id === legalMode) return;
+                      if (id === "JDG") setConfirmJdgOpen(true);
+                    }}
+                    className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
+                      active ? "nav-active" : "text-muted hover:text-depths"
+                    } disabled:cursor-not-allowed disabled:opacity-40`}
+                    title={
+                      lockedToJdg
+                        ? "Przejście na JDG jest nieodwracalne"
+                        : id === "JDG" && legalMode === "NDG"
+                          ? "Przejdź na JDG"
+                          : undefined
+                    }
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {legalMode === "NDG" ? (
+              <button
+                type="button"
+                onClick={() => setConfirmJdgOpen(true)}
+                className="text-muted hover:text-depths self-end px-1 text-[0.65rem] font-medium underline-offset-2 hover:underline"
+              >
+                Przejdź na JDG…
+              </button>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <p className="text-muted text-xs font-semibold">
+          Tryb prawny: <span className="text-depths">{legalMode}</span>
+          {legalMode === "JDG" && jdgRegistrationDate
+            ? ` · KPiR od ${formatExpenseDate(jdgRegistrationDate)}`
+            : null}
+        </p>
+      )}
+
+      {legalMode === "NDG" ? (
+        <QuarterlyLimitBar
+          label={`Limit NDG · Q${currentQuarter} ${currentYearNum}`}
+          aktualnaWartosc={ndgLimit.suma}
+          limit={NDG_QUARTERLY_LIMIT}
+          statusText={
+            ndgLimit.przekroczono
+              ? undefined
+              : toneForLimitPercent(ndgLimit.procent) === "warn"
+                ? "Zbliżasz się do limitu działalności nierejestrowanej"
+                : "W limicie działalności nierejestrowanej"
+          }
+          alertText={
+            ndgLimit.przekroczono
+              ? "Przekroczono limit działalności nierejestrowanej. Od dnia przekroczenia masz 7 dni na złożenie wniosku CEIDG-1"
+              : null
+          }
+          alertDetail={
+            ndgLimit.przekroczono && ndgExceedDate
+              ? `Przekroczono ${formatExpenseDate(ndgExceedDate)} · pozostało ${ndgCeidgDaysLeft ?? 0} dni`
+              : null
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          <p className="rounded-xl bg-snow px-4 py-3 text-sm font-medium text-depths shadow-sm ring-1 ring-panel-frame/40">
+            Prowadzisz pełną KPiR od{" "}
+            <span className="dash-mono font-bold">
+              {jdgRegistrationDate ? formatExpenseDate(jdgRegistrationDate) : "—"}
+            </span>
+            .
+          </p>
+          <VatLimitBar
+            label={`Limit zwolnienia VAT · ${currentYearNum}`}
+            aktualnaWartosc={vatLimit.suma}
+            limit={VAT_ANNUAL_LIMIT}
+            statusText={
+              vatLimit.przekroczono
+                ? undefined
+                : toneForLimitPercent(vatLimit.procent) === "warn"
+                  ? "Zbliżasz się do limitu VAT"
+                  : "W limicie zwolnienia VAT"
+            }
+            alertText={
+              vatLimit.przekroczono
+                ? "Przekroczono limit — rejestracja VAT czynny obowiązkowa"
+                : null
+            }
+          />
+        </div>
+      )}
 
       <FinanceTilesRow columns={4}>
         <FinanceTile label="Przychód" tone="navy">
           <span className="mark-highlight-on-dark">{formatPln(totals.gross)}</span>
         </FinanceTile>
         <FinanceTile label="Koszty wypłaty / wszystkie" tone="orange">
-          {formatPln(totals.tutorShare)}
-          <span className="opacity-40"> / </span>
-          {formatPln(totals.allCosts)}
+          <span>
+            {formatPln(totals.tutorShare)}
+            <span className="opacity-40"> / </span>
+            {formatPln(totals.allCosts)}
+          </span>
+          {legalMode === "NDG" ? (
+            <span className="mt-2 block text-[0.55rem] font-semibold leading-snug tracking-normal opacity-80">
+              ZUS studentów: 0 zł · PIT studentów: 0 zł (ulga dla młodych)
+            </span>
+          ) : null}
         </FinanceTile>
         <FinanceTile label="Marża agencji" tone="green">
           {formatPln(totals.agencyShare)}
@@ -1111,134 +1426,185 @@ export function KsiegowoscClient({
         <p className="text-muted mt-1 text-xs">
           Tylko to, co dotyczy Twojej firmy ·{" "}
           <span className="capitalize">{periodLabel}</span> · dane VERIFIED + wypłaty PAID
-          {viewMode === "year" ? " · ZUS × 12 miesięcy" : null}
+          {legalMode === "JDG" && viewMode === "year" ? " · ZUS × 12 miesięcy" : null}
+          {" · "}
+          <span className="font-semibold text-depths">{legalMode}</span>
         </p>
 
+        {legalMode === "NDG" ? (
+          <div className="mt-5 space-y-4">
+            <article className="card-quiet p-4">
+              <h3 className="dash-sans text-depths text-sm font-bold">Za co płacisz</h3>
+              <ul className="mt-3 space-y-3 text-sm">
+                <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="font-semibold text-depths">Podatek dochodowy</p>
+                    <p className="text-muted text-xs">PIT-36 · dopiero w zeznaniu do 30 kwietnia</p>
+                  </div>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                </li>
+                <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="font-semibold text-depths">Twój ZUS</p>
+                    <p className="text-muted text-xs">NDG — brak składek społecznych</p>
+                  </div>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                </li>
+                <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="font-semibold text-depths">Składka zdrowotna</p>
+                    <p className="text-muted text-xs">NDG — brak obowiązku</p>
+                  </div>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                </li>
+                <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="font-semibold text-depths">ZUS pracowników</p>
+                    <p className="text-muted text-xs">Studenci &lt;26 lat — zwolnienie</p>
+                  </div>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                </li>
+                <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div>
+                    <p className="font-semibold text-depths">VAT</p>
+                    <p className="text-muted text-xs">NDG nie jest podatnikiem VAT</p>
+                  </div>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                </li>
+              </ul>
+              <div className="mt-4 border-t border-panel-frame/20 pt-4">
+                <p className="text-muted mb-2 text-xs">
+                  Dochód narastająco vs kwota wolna {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}
+                </p>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="dash-mono text-sm font-bold text-depths">
+                    {formatPln(dochodNarastajacoOdStycznia)}
+                  </span>
+                  <span className="text-muted text-xs">/ {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}</span>
+                </div>
+                <div
+                  className="mt-2 h-3 overflow-hidden rounded-full bg-panel-frame/50"
+                  role="progressbar"
+                  aria-valuenow={Math.round(pitFreePct)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full rounded-full bg-lime transition-[width]"
+                    style={{ width: `${Math.min(100, pitFreePct)}%` }}
+                  />
+                </div>
+              </div>
+            </article>
+
+            <article className="card-quiet p-4">
+              <ProfitSummary
+                gross={totals.gross}
+                payouts={paidPayoutsSum}
+                pit={summaryPit}
+                zusOwn={summaryZusWlasciciel}
+                zusEmployees={summaryZusPracownicy}
+                health={summaryZdrowotna}
+                costs={summaryKoszty}
+                netProfit={netProfit}
+              />
+            </article>
+          </div>
+        ) : (
+          <>
         <div className="mt-5 space-y-4">
           <article className="card-quiet p-4">
-            <h3 className="dash-sans text-depths text-sm font-bold">1. Twój podatek dochodowy (PIT-12)</h3>
-            <ul className="mt-3 space-y-2 text-sm">
+            <h3 className="dash-sans text-depths text-sm font-bold">Za co płacisz</h3>
+            <ul className="mt-3 space-y-3 text-sm">
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="text-depths/90">Przychód (Ewidencja)</span>
-                <span className="font-bold dash-mono">{formatPln(totals.gross)}</span>
-              </li>
-              <li className="text-muted text-xs leading-snug">
-                Zwolnione z VAT na mocy art. 43 ust. 1 pkt 27 ustawy o VAT — nie doliczasz podatku VAT do lekcji.
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="text-depths/90">Koszt (Wynagrodzenia studentów)</span>
-                <span className="font-bold dash-mono text-toffee">{formatPln(paidPayoutsSum)}</span>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="text-depths/90">Koszt (Wydatki operacyjne — rachunki, faktury)</span>
-                <span className="font-bold dash-mono text-toffee">{formatPln(extraCostsSum)}</span>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-panel-frame/20 pt-2">
-                <span className="font-semibold text-depths">Dochód (Zysk)</span>
-                <span className="text-base font-black dash-mono">{formatPln(taxableIncome)}</span>
+                <div>
+                  <p className="font-semibold text-depths">Podatek dochodowy</p>
+                  <p className="text-muted text-xs">
+                    Zaliczka PIT 12%
+                    {viewMode === "month" ? " · przelew do 20. dnia kolejnego miesiąca" : " · suma zaliczek w okresie"}
+                  </p>
+                </div>
+                <span className="dash-mono text-base font-black text-depths">{formatPln(summaryPit)}</span>
               </li>
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="font-semibold text-depths">Twój podatek PIT (12%)</span>
-                <span className="text-base font-black dash-mono text-moss">{formatPln(suggestedPit)}</span>
+                <div>
+                  <p className="font-semibold text-depths">Twój ZUS</p>
+                  <p className="text-muted text-xs">
+                    Tylko składki społeczne
+                    {ulgaNumer != null
+                      ? ` · Ulga na start, miesiąc ${ulgaNumer}/6`
+                      : jdgRegistrationDate
+                        ? " · Preferencyjny (po Ulgi na start)"
+                        : ""}
+                    {viewMode === "year" ? " · × 12" : ""}
+                  </p>
+                </div>
+                <span className="dash-mono text-base font-black text-depths">
+                  {formatPln(summaryZusWlasciciel)}
+                </span>
+              </li>
+              <li>
+                <label className="grid max-w-md gap-1">
+                  <span className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">
+                    Etap ZUS
+                  </span>
+                  <select
+                    value={zusStage}
+                    onChange={(e) => setZusStage(e.target.value as JdgZusStage)}
+                    className="text-depths rounded-app border border-panel-frame/40 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="start">
+                      Ulga na start — {formatCurrencyPln(ZUS_ULGA_NA_START_SPOLECZNE)} społeczne
+                    </option>
+                    <option value="maly">
+                      Preferencyjny — {formatCurrencyPln(ZUS_PREFERENCYJNY_SPOLECZNE)} społeczne
+                    </option>
+                  </select>
+                </label>
+              </li>
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div>
+                  <p className="font-semibold text-depths">Składka zdrowotna</p>
+                  <p className="text-muted text-xs">
+                    9% dochodu, nie mniej niż {formatCurrencyPln(SKLADKA_ZDROWOTNA_MINIMUM)}
+                    {viewMode === "year" ? " · × 12" : ""}
+                  </p>
+                </div>
+                <span className="dash-mono text-base font-black text-depths">
+                  {formatPln(summaryZdrowotna)}
+                </span>
+              </li>
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div>
+                  <p className="font-semibold text-depths">ZUS pracowników</p>
+                  <p className="text-muted text-xs">Studenci &lt;26 lat — zwolnienie</p>
+                </div>
+                <span className="dash-mono text-base font-black text-depths">
+                  {formatPln(summaryZusPracownicy)}
+                </span>
+              </li>
+              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div>
+                  <p className="font-semibold text-depths">PIT pracowników</p>
+                  <p className="text-muted text-xs">Ulga dla młodych</p>
+                </div>
+                <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
               </li>
             </ul>
-            <p className="text-depths mt-3 text-xs leading-relaxed">
-              👉 <strong>Gdzie i do kiedy płacisz:</strong>{" "}
-              {viewMode === "month" ? (
-                <>
-                  Przelej tę kwotę do <strong>20. dnia kolejnego miesiąca</strong> na swój indywidualny Mikrorachunek
-                  Podatkowy w Urzędzie Skarbowym.
-                </>
-              ) : (
-                <>
-                  To szacunek za cały rok — w praktyce PIT rozliczasz miesięcznie (zaliczki) i ewentualnie w zeznaniu
-                  rocznym.
-                </>
-              )}
-            </p>
-          </article>
-
-          <article className="card-quiet p-4">
-            <h3 className="dash-sans text-depths text-sm font-bold">2. Składki i podatki za studentów (poniżej 26 lat)</h3>
-            <ul className="mt-3 space-y-2 text-sm">
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4">
-                <span className="text-depths/90">ZUS za studentów-zleceniobiorców</span>
-                <span className="font-bold dash-mono text-moss">0,00 zł</span>
-              </li>
-              <li className="text-muted text-xs">Status studenta zwalnia Cię całkowicie ze składek ZUS.</li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4">
-                <span className="text-depths/90">Podatek PIT-4 za studentów</span>
-                <span className="font-bold dash-mono text-moss">0,00 zł</span>
-              </li>
-              <li className="text-muted text-xs">Ulga dla młodych zwalnia ich z podatku — nic nie potrącasz.</li>
-            </ul>
-          </article>
-
-          <article className="card-quiet p-4">
-            <h3 className="dash-sans text-depths text-sm font-bold">3. Twój własny ZUS (właściciel JDG)</h3>
-            <label className="mt-3 grid max-w-sm gap-1">
-              <span className="text-muted text-xs font-semibold">Wybierz etap</span>
-              <select
-                value={zusStage}
-                onChange={(e) => setZusStage(e.target.value as JdgZusStage)}
-                className="text-depths rounded-app border border-panel-frame/40 bg-white px-3 py-2 text-sm"
-              >
-                <option value="start">Ulga na start — ~410,00 zł / mies.</option>
-                <option value="maly">Mały ZUS — ~480,00 zł + zdrowotna</option>
-              </select>
-            </label>
-            <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-sm font-medium text-depths">
-                {selectedZus.label}
-                {viewMode === "year" ? " · 12 miesięcy" : null}
-              </span>
-              <span className="text-base font-black dash-mono text-depths">
-                {viewMode === "year" ? formatPln(zusTotal) : selectedZus.amountLabel}
-              </span>
-            </div>
-            <p className="text-muted mt-1 text-xs">{selectedZus.note}</p>
           </article>
         </div>
 
-        <article
-          className="card-quiet mt-5 p-4"
-        >
-          <h3 className="section-label">
-            Podsumowanie — zysk po wszystkich wydatkach
-          </h3>
-          <ul className="mt-3 space-y-1.5 text-sm">
-            <li className="flex justify-between gap-4">
-              <span className="text-depths/90">Przychód (Ewidencja)</span>
-              <span className="font-semibold dash-mono">{formatPln(totals.gross)}</span>
-            </li>
-            <li className="flex justify-between gap-4 text-toffee">
-              <span>− Wynagrodzenia studentów (PAID)</span>
-              <span className="font-semibold dash-mono">{formatPln(paidPayoutsSum)}</span>
-            </li>
-            <li className="flex justify-between gap-4 text-moss">
-              <span>− Twój PIT (12%)</span>
-              <span className="font-semibold dash-mono">{formatPln(suggestedPit)}</span>
-            </li>
-            <li className="flex justify-between gap-4 text-depths">
-              <span>
-                − Twój ZUS ({selectedZus.label}
-                {viewMode === "year" ? " × 12" : ""})
-              </span>
-              <span className="font-semibold dash-mono">{formatPln(zusTotal)}</span>
-            </li>
-            <li
-              className={`flex justify-between gap-4 border-t pt-2 ${
-                netProfit < 0 ? "border-claret/40" : "border-moss/30"
-              }`}
-            >
-              <span className={`text-base font-bold ${netProfit < 0 ? "text-claret" : "text-moss"}`}>
-                {netProfit < 0 ? "Strata na rękę" : "Zostaje zysku na rękę"}
-              </span>
-              <span className="text-xl font-black dash-mono text-depths">
-                {formatPln(netProfit)}
-              </span>
-            </li>
-          </ul>
+        <article className="card-quiet mt-5 p-4">
+          <ProfitSummary
+            gross={totals.gross}
+            payouts={paidPayoutsSum}
+            pit={summaryPit}
+            zusOwn={summaryZusWlasciciel}
+            zusEmployees={summaryZusPracownicy}
+            health={summaryZdrowotna}
+            costs={summaryKoszty}
+            netProfit={netProfit}
+          />
         </article>
 
         <p className="mt-4 text-xs font-medium text-claret">
@@ -1246,6 +1612,8 @@ export function KsiegowoscClient({
             ? "Pamiętaj, aby do 25. dnia miesiąca wysłać plik JPK_V7 (KPiR) z Twojego programu księgowego!"
             : "W ciągu roku JPK_V7 wysyłasz miesięcznie — ten widok pomaga kontrolować sumy roczne."}
         </p>
+          </>
+        )}
       </section>
       ) : null}
 
@@ -1269,11 +1637,12 @@ export function KsiegowoscClient({
 
             <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
               <ClosedFigure label="Przychód" value={formatPln(totals.gross)} />
-              <ClosedFigure label="Koszty wypłat" value={formatPln(paidPayoutsSum)} />
-              <ClosedFigure label="Koszty operacyjne" value={formatPln(extraCostsSum)} />
-              <ClosedFigure label="Podstawa opodatkowania" value={formatPln(taxableIncome)} />
-              <ClosedFigure label="Twój PIT (12%)" value={formatPln(suggestedPit)} />
-              <ClosedFigure label="Twój ZUS — Ulga na start" value={ZUS_OPTIONS.start.amountLabel} />
+              <ClosedFigure label="Wypłaty" value={formatPln(paidPayoutsSum)} />
+              <ClosedFigure label="Podatek dochodowy" value={formatPln(summaryPit)} />
+              <ClosedFigure label="Twój ZUS" value={formatPln(closedZusTotal)} />
+              <ClosedFigure label="ZUS pracowników" value={formatPln(summaryZusPracownicy)} />
+              <ClosedFigure label="Zdrowotna" value={formatPln(closedZdrowotna)} />
+              <ClosedFigure label="Koszty" value={formatPln(summaryKoszty)} />
               <ClosedFigure
                 label={closedNetProfit < 0 ? "Strata na rękę" : "Zysk na rękę"}
                 value={formatPln(closedNetProfit)}
@@ -1292,7 +1661,7 @@ export function KsiegowoscClient({
               <h2 className="section-label text-base">Kreator zamknięcia miesiąca</h2>
               <p className="text-muted mt-1 text-xs capitalize">
                 {periodLabel}
-                {!canClose ? " — zamknięcie dostępne od 5. dnia następnego miesiąca." : " — spełnij warunki, aby zamknąć miesiąc."}
+                {!canClose ? " — zamknięcie dostępne od 6. dnia następnego miesiąca." : " — spełnij warunki, aby zamknąć miesiąc."}
               </p>
             </div>
 
@@ -1375,6 +1744,17 @@ export function KsiegowoscClient({
         onConfirm={handleCloseMonth}
         onCancel={() => setConfirmCloseOpen(false)}
       />
+
+      <ConfirmDialog
+        open={confirmJdgOpen}
+        tone="danger"
+        title="Przejść na JDG?"
+        description="Przełączenie z działalności nierejestrowanej (NDG) na jednoosobową działalność gospodarczą (JDG) jest nieodwracalne. Zapiszemy datę rejestracji jako dziś i od tego momentu panel będzie liczył zaliczki PIT, ZUS oraz limit VAT jak dla KPiR."
+        confirmLabel="Przejdź na JDG"
+        successMessage="Tryb prawny: JDG."
+        onConfirm={handleSwitchToJdg}
+        onCancel={() => setConfirmJdgOpen(false)}
+      />
     </div>
   );
 }
@@ -1399,5 +1779,79 @@ function ClosedFigure({
         {value}
       </p>
     </div>
+  );
+}
+
+/** Uproszczone podsumowanie P&L — te same pozycje w NDG i JDG (zera tam, gdzie nie dotyczy). */
+function ProfitSummary({
+  gross,
+  payouts,
+  pit,
+  zusOwn,
+  zusEmployees,
+  health,
+  costs,
+  netProfit,
+}: {
+  gross: number;
+  payouts: number;
+  pit: number;
+  zusOwn: number;
+  zusEmployees: number;
+  health: number;
+  costs: number;
+  netProfit: number;
+}) {
+  const row = "flex justify-between gap-4";
+  return (
+    <>
+      <h3 className="section-label">Podsumowanie</h3>
+      <ul className="mt-3 space-y-2 text-sm">
+        <li className={row}>
+          <span className="font-semibold uppercase tracking-wide text-depths">Przychód</span>
+          <span className="font-bold dash-mono text-depths">{formatPln(gross)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− Wypłaty</span>
+          <span className="font-bold dash-mono">{formatPln(payouts)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− Podatek dochodowy</span>
+          <span className="font-bold dash-mono">{formatPln(pit)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− Twój ZUS</span>
+          <span className="font-bold dash-mono">{formatPln(zusOwn)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− ZUS pracowników</span>
+          <span className="font-bold dash-mono">{formatPln(zusEmployees)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− Zdrowotna</span>
+          <span className="font-bold dash-mono">{formatPln(health)}</span>
+        </li>
+        <li className={`${row} text-toffee`}>
+          <span className="font-semibold uppercase tracking-wide">− Koszty</span>
+          <span className="font-bold dash-mono">{formatPln(costs)}</span>
+        </li>
+        <li
+          className={`${row} items-end border-t-2 border-depths/15 pt-3 ${
+            netProfit < 0 ? "border-claret/40" : "border-moss/30"
+          }`}
+        >
+          <span
+            className={`dash-sans text-lg font-black uppercase tracking-tight sm:text-xl ${
+              netProfit < 0 ? "text-claret" : "text-moss"
+            }`}
+          >
+            {netProfit < 0 ? "Strata na rękę" : "Zysk na rękę"}
+          </span>
+          <span className="dash-mono text-2xl font-black tabular-nums text-depths sm:text-3xl">
+            {formatPln(netProfit)}
+          </span>
+        </li>
+      </ul>
+    </>
   );
 }

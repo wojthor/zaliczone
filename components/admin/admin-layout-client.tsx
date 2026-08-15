@@ -11,7 +11,6 @@ import {
   IconClose,
   IconDashboard,
   IconDollar,
-  IconFolder,
   IconGuide,
   IconLogout,
   IconMenu,
@@ -35,7 +34,6 @@ const ADMIN_NAV = [
   { href: "/admin/ksiegowosc", label: "Księgowość", Icon: IconGuide },
   { href: "/admin/nauczyciele", label: "Nauczyciele", Icon: IconUsers },
   { href: "/admin/cennik", label: "Cennik i przedmioty", Icon: IconDollar },
-  { href: "/admin/dokumenty", label: "Dokumenty", Icon: IconFolder },
 ] as const;
 
 function subscribeLg(cb: () => void) {
@@ -80,13 +78,13 @@ export function AdminLayoutClient({
   const isRozliczenia = pathname === "/admin/rozliczenia";
 
   useEffect(() => {
-    if (!mobileOpen) return;
+    if (!mobileOpen || isLg) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [mobileOpen]);
+  }, [mobileOpen, isLg]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -126,21 +124,23 @@ export function AdminLayoutClient({
     </nav>
   );
 
+  const showMobileDrawer = !isLg && mobileOpen;
+
   return (
     <div className={`text-depths flex h-[calc(100dvh-0.75rem)] gap-2 ${dashboardSans.variable} ${dashboardMono.variable}`}>
-      {mobileOpen ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-depths/50 backdrop-blur-[2px] lg:hidden"
-          aria-label="Zamknij menu"
-          onClick={() => setMobileOpen(false)}
-        />
-      ) : null}
+      <button
+        type="button"
+        className="mobile-drawer-backdrop fixed inset-0 z-40 bg-depths/50 backdrop-blur-[2px] lg:hidden"
+        data-open={mobileOpen ? "true" : "false"}
+        aria-label="Zamknij menu"
+        aria-hidden={!showMobileDrawer}
+        tabIndex={showMobileDrawer ? 0 : -1}
+        onClick={() => setMobileOpen(false)}
+      />
 
       <aside
-        className={`flex h-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-app bg-[#000C4A] p-3 text-luster transition-[transform,width] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] max-lg:fixed max-lg:top-1 max-lg:bottom-1 max-lg:left-1 max-lg:z-50 max-lg:w-[min(17rem,calc(100vw-1rem))] max-lg:shadow-xl lg:static lg:translate-x-0 lg:shadow-none ${
-          mobileOpen ? "" : "max-lg:pointer-events-none max-lg:-translate-x-[calc(100%+0.5rem)]"
-        }`}
+        className="mobile-drawer-panel flex h-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-app bg-[#000C4A] p-3 text-luster max-lg:top-1 max-lg:bottom-1 max-lg:left-1 max-lg:w-[min(17rem,calc(100vw-1rem))] max-lg:shadow-xl lg:static lg:shadow-none"
+        data-mobile-open={mobileOpen ? "true" : "false"}
         style={{ width: isLg ? (effectiveCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_OPEN_W) : undefined }}
       >
         <div

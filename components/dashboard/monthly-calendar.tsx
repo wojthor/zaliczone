@@ -10,12 +10,12 @@ import {
 
 const WEEKDAYS = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"] as const;
 
-/** Te same kolory co kategorie pod „Do wypłaty” — tylko paleta Zaliczone */
+/** Kolory kropek = statusy lekcji */
 const LESSON_DOT_COLORS = {
-  PENDING_VERIFICATION: "#D5ED21",
-  VERIFIED: "#000C4A",
-  UNPAID: "#AAAAAA",
-  PLANNED: "#5F5E5A",
+  PENDING_VERIFICATION: "#000C4A",
+  VERIFIED: "#D5ED21",
+  UNPAID: "#E23B3B",
+  PLANNED: "#D4D3CE",
 } as const;
 
 function lessonDotColor(lesson: Lesson): string {
@@ -84,7 +84,7 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-app bg-snow px-2.5 pb-2.5 pt-1 ${className ?? ""}`}
+      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden soft-panel px-3 pb-3 pt-2 text-depths ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Kalendarz" compact titleHref="/terminarz" />}
       <div className="mb-2.5 flex shrink-0 justify-center px-0.5">

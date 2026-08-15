@@ -20,6 +20,21 @@ export type Profile = {
   contract_start?: string | null;
   contract_end?: string | null;
   created_at?: string;
+  /** Dane do PIT-11 (migracja 0010) */
+  pesel?: string | null;
+  birth_date?: string | null;
+  tax_street?: string | null;
+  tax_postal_code?: string | null;
+  tax_city?: string | null;
+  tax_country?: string | null;
+  tax_office?: string | null;
+  nip?: string | null;
+  employment_type?: string | null;
+  tax_year_data?: Record<string, unknown> | null;
+  /** ID folderu Google Drive nauczyciela */
+  drive_folder_id?: string | null;
+  /** Publiczne zdjęcie na landing (3:4) */
+  photo_url?: string | null;
 };
 
 export type DbStudent = {
@@ -139,6 +154,21 @@ export type AdminTutorSummary = {
   payoutStatusForMonth: PayoutStatus | null;
   /** Czy przyjmuje dodatkowych uczniów */
   acceptingStudents: boolean;
+  /** Dane PIT (opcjonalne — po migracji 0010) */
+  pesel: string | null;
+  birthDate: string | null;
+  taxStreet: string | null;
+  taxPostalCode: string | null;
+  taxCity: string | null;
+  taxCountry: string | null;
+  taxOffice: string | null;
+  nip: string | null;
+  employmentType: string | null;
+  taxYearData: Record<string, unknown> | null;
+  /** ID folderu Google Drive (null = nie zsynchronizowano) */
+  driveFolderId: string | null;
+  /** Zdjęcie na landing */
+  photoUrl: string | null;
 };
 
 /** Wydatek operacyjny (faktura / rachunek) w księgowości miesięcznej */
@@ -156,6 +186,14 @@ export type OperatingExpense = {
   attachment_path?: string | null;
   attachment_mime?: string | null;
   attachment_size_bytes?: number | null;
+};
+
+/** Singleton trybu prawnego działalności (NDG / JDG) */
+export type LegalMode = "NDG" | "JDG";
+
+export type BusinessSettings = {
+  legalMode: LegalMode;
+  jdgRegistrationDate: string | null;
 };
 
 export type DocumentFolder = {
