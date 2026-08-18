@@ -8,7 +8,7 @@ type PanelHeaderProps = {
   compact?: boolean;
   /** Tytuł jako link do pełnej podstrony (np. terminarz, kalendarz) */
   titleHref?: string;
-  /** Jasny tekst i linia — nagłówek na ciemnym tle (#000C4A) */
+  /** Jasny tekst i linia - nagłówek na ciemnym tle (#000C4A) */
   onDark?: boolean;
 };
 

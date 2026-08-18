@@ -38,7 +38,7 @@ export async function getTutorDriveFilesForViewer(
       folderId: null,
       files: [],
       errorMessage:
-        "Google Drive nie jest jeszcze podłączony. Administrator musi uzupełnić dane service account w .env.local.",
+        "Google Drive nie jest jeszcze podłączony. Koordynator musi uzupełnić dane service account w .env.local.",
     };
   }
 
@@ -92,13 +92,13 @@ export async function getTutorDriveFilesForViewer(
           configured: true,
           folderId: null,
           files: [],
-          errorMessage: "Twój folder na dysku nie jest jeszcze gotowy. Skontaktuj się z administratorem.",
+          errorMessage: "Twój folder na dysku nie jest jeszcze gotowy. Skontaktuj się z koordynatorem.",
         };
       }
     }
 
     const files = await listFilesInFolder(folderId);
-    // Nauczyciel: tylko pliki (bez podfolderów do edycji — i tak tylko podgląd)
+    // Nauczyciel: tylko pliki (bez podfolderów do edycji - i tak tylko podgląd)
     const visible =
       profile.role === "TUTOR" ? files.filter((f) => !f.isFolder) : files;
 
@@ -115,7 +115,7 @@ export async function getTutorDriveFilesForViewer(
 
 export async function ensureTutorDriveFolderAction(tutorId: string, tutorName: string) {
   const { profile } = await requireUser();
-  if (profile.role !== "ADMIN") throw new Error("Tylko admin.");
+  if (profile.role !== "ADMIN") throw new Error("Tylko koordynator.");
   if (!isDriveConfigured()) {
     throw new Error("Google Drive nie jest skonfigurowany.");
   }
@@ -127,7 +127,7 @@ export async function ensureTutorDriveFolderAction(tutorId: string, tutorName: s
 
 export async function syncAllTutorDriveFoldersAction() {
   const { profile } = await requireUser();
-  if (profile.role !== "ADMIN") throw new Error("Tylko admin.");
+  if (profile.role !== "ADMIN") throw new Error("Tylko koordynator.");
   if (!isDriveConfigured()) {
     throw new Error("Google Drive nie jest skonfigurowany.");
   }

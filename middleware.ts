@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = ["/", "/login", "/polityka-prywatnosci", "/regulamin"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/ustaw-haslo",
+  "/auth/callback",
+  "/polityka-prywatnosci",
+  "/regulamin",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -66,7 +73,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
     } catch {
-      // Supabase unreachable — allow request through; page may show its own error.
+      // Supabase unreachable - allow request through; page may show its own error.
     }
   }
 

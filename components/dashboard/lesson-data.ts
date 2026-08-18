@@ -48,5 +48,5 @@ export function lessonsOnCalendarDate(year: number, month0: number, day: number,
 export const DAY_LABELS_SHORT = ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nie"] as const;
 
 export function dayLabel(dayIndex: number): string {
-  return DAY_LABELS_SHORT[dayIndex] ?? "—";
+  return DAY_LABELS_SHORT[dayIndex] ?? "-";
 }

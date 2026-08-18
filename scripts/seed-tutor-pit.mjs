@@ -41,7 +41,7 @@ const BY_EMAIL = {
         zusSocialPln: 0,
         zusHealthPln: 0,
         reliefYoung: false,
-        notes: "Koszty 20% — uzupełnij przy rozliczeniu.",
+        notes: "Koszty 20% - uzupełnij przy rozliczeniu.",
       },
     },
   },
@@ -64,7 +64,7 @@ const BY_EMAIL = {
         zusSocialPln: 0,
         zusHealthPln: 0,
         reliefYoung: true,
-        notes: "Ulga dla młodych — sprawdź wiek na koniec roku.",
+        notes: "Ulga dla młodych - sprawdź wiek na koniec roku.",
       },
     },
   },
@@ -110,7 +110,7 @@ const BY_EMAIL = {
         zusSocialPln: 0,
         zusHealthPln: 0,
         reliefYoung: true,
-        notes: "Demo — Lamine Yamal",
+        notes: "Demo - Lamine Yamal",
       },
     },
   },
@@ -204,20 +204,20 @@ async function main() {
             tax_country: patch.tax_country,
             employment_type: patch.employment_type,
           });
-          console.log(`  ✓ ${p.full_name} — podstawowe domyślne`);
+          console.log(`  ✓ ${p.full_name} - podstawowe domyślne`);
           updated += 1;
         } else {
-          console.log(`  · ${p.full_name} — bez szablonu, pominięto`);
+          console.log(`  · ${p.full_name} - bez szablonu, pominięto`);
         }
       } else {
-        console.log(`  · ${p.full_name} — już uzupełniony / bez szablonu`);
+        console.log(`  · ${p.full_name} - już uzupełniony / bez szablonu`);
       }
       continue;
     }
 
     const merged = mergeMissing(p, defaults);
     if (!merged) {
-      console.log(`  · ${p.full_name} (${email ?? "—"}) — komplet`);
+      console.log(`  · ${p.full_name} (${email ?? "-"}) - komplet`);
       continue;
     }
 
@@ -229,7 +229,7 @@ async function main() {
     if (merged.tax_year_data) patch.tax_year_data = merged.tax_year_data;
 
     await patchProfile(p.id, patch);
-    console.log(`  ✓ ${p.full_name} (${email ?? "—"}) — uzupełniono: ${Object.keys(patch).join(", ")}`);
+    console.log(`  ✓ ${p.full_name} (${email ?? "-"}) - uzupełniono: ${Object.keys(patch).join(", ")}`);
     updated += 1;
   }
 

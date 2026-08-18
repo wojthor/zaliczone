@@ -10,19 +10,17 @@ export default async function ProfilPage() {
   if (profile.role === "ADMIN") redirect("/admin");
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const [subjectRequests, driveDocuments] = await Promise.all([
+  const [subjectRequests, driveDocuments, auth] = await Promise.all([
     getTutorSubjectRequests(profile.id),
     getTutorDriveFilesForViewer(),
+    supabase.auth.getUser(),
   ]);
+  const user = auth.data.user;
 
   return (
     <ProfilClient
       profile={profile}
-      email={user?.email ?? "—"}
+      email={user?.email ?? "-"}
       subjectRequests={subjectRequests}
       driveDocuments={driveDocuments}
     />

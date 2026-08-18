@@ -16,9 +16,9 @@ type ConfirmDialogProps = {
   successMessage?: string;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
-  /** Wywoływane natychmiast po sukcesie — np. router.refresh() / redirect, zanim dialog się zamknie. */
+  /** Wywoływane natychmiast po sukcesie - np. router.refresh() / redirect, zanim dialog się zamknie. */
   onSuccess?: () => void;
-  /** Dodatkowa treść (np. edytowalny input kwoty) między opisem a przyciskami — tylko faza „confirm”. */
+  /** Dodatkowa treść (np. edytowalny input kwoty) między opisem a przyciskami - tylko faza „confirm”. */
   children?: ReactNode;
 };
 

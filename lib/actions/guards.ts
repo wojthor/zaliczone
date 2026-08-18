@@ -7,7 +7,7 @@ export function monthKeyFromDate(dateIso: string): string {
 
 /**
  * Zabezpieczenie przed modyfikacją danych zamkniętego miesiąca.
- * Wołane na starcie każdej Server Action, która zmienia lekcje, wypłaty lub koszty —
+ * Wołane na starcie każdej Server Action, która zmienia lekcje, wypłaty lub koszty -
  * niezależnie z jakiego widoku (kalendarz, terminarz, panel admina) pochodzi akcja.
  */
 export async function assertMonthOpen(monthKey: string): Promise<void> {
@@ -22,7 +22,7 @@ export async function assertMonthOpen(monthKey: string): Promise<void> {
 
   if (error) {
     const msg = error.message ?? "";
-    // Tabela może nie istnieć przed migracją — nie blokuj UI w tym przypadku.
+    // Tabela może nie istnieć przed migracją - nie blokuj UI w tym przypadku.
     if (msg.includes("closed_months") || msg.includes("schema cache") || error.code === "42P01" || error.code === "PGRST205") {
       return;
     }
@@ -30,6 +30,6 @@ export async function assertMonthOpen(monthKey: string): Promise<void> {
   }
 
   if (data) {
-    throw new Error("Ten miesiąc jest już zamknięty - modyfikacja zabroniona");
+    throw new Error("Ten miesiąc jest już zamknięty. Nie możesz w nim nic zmieniać.");
   }
 }

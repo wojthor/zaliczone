@@ -43,14 +43,14 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (error) {
-      // Stale or invalid session — drop cookies so refresh does not loop.
+      // Stale or invalid session - drop cookies so refresh does not loop.
       clearSupabaseAuthCookies(request, supabaseResponse);
       return { supabase, user: null, supabaseResponse };
     }
 
     return { supabase, user, supabaseResponse };
   } catch {
-    // Network / DNS failure talking to Supabase — treat as logged out.
+    // Network / DNS failure talking to Supabase - treat as logged out.
     clearSupabaseAuthCookies(request, supabaseResponse);
     return { supabase, user: null, supabaseResponse };
   }

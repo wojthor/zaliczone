@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { TAG, bustTag, documentsTag } from "@/lib/cache";
 import type { DocumentFile, DocumentFolder } from "@/lib/types/database";
 
 const MIGRATION_HINT =
@@ -35,14 +36,14 @@ async function requireAdminUserId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  if (!user) throw new Error("Brak sesji - zaloguj się ponownie.");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień administratora.");
+  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień koordynatora.");
   return user.id;
 }
 
@@ -65,8 +66,11 @@ function collectDescendantFolderIds(folders: DocumentFolder[], rootId: string): 
   return [...ids];
 }
 
-function revalidateDocsPaths() {
+function revalidateDocsPaths(tutorId?: string | null) {
   revalidatePath("/profil");
+  revalidatePath("/admin/dokumenty");
+  bustTag(TAG.documents);
+  if (tutorId) bustTag(documentsTag(tutorId));
 }
 
 /** Główny folder nauczyciela (tworzony przy zakładaniu konta). */
@@ -159,7 +163,7 @@ export async function createFolder(input: {
     .single();
 
   if (error) throwDocsError(error);
-  revalidateDocsPaths();
+  revalidateDocsPaths(input.tutorId);
   return data as DocumentFolder;
 }
 
@@ -220,7 +224,7 @@ export async function uploadDocumentFile(formData: FormData) {
     throwDocsError(error);
   }
 
-  revalidateDocsPaths();
+  revalidateDocsPaths(tutorId);
   return data as DocumentFile;
 }
 
@@ -250,7 +254,7 @@ export async function deleteDocumentFile(id: string) {
   const { error } = await supabase.from("document_files").delete().eq("id", id);
   if (error) throwDocsError(error);
 
-  revalidateDocsPaths();
+  revalidateDocsPaths(file.tutor_id);
 }
 
 export async function deleteFolder(id: string) {
@@ -286,7 +290,8 @@ export async function deleteFolder(id: string) {
   const { error } = await supabase.from("document_folders").delete().eq("id", id);
   if (error) throwDocsError(error);
 
-  revalidateDocsPaths();
+  const folder = folders.find((f) => f.id === id);
+  revalidateDocsPaths(folder?.tutor_id);
 }
 
 export async function listDocumentsForAdmin(): Promise<{
@@ -317,7 +322,7 @@ export async function listDocumentsForTutor(tutorId: string): Promise<{
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  if (!user) throw new Error("Brak sesji - zaloguj się ponownie.");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -360,7 +365,7 @@ export async function getSignedDownloadUrl(storagePath: string): Promise<string>
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  if (!user) throw new Error("Brak sesji - zaloguj się ponownie.");
 
   const { data: profile } = await supabase
     .from("profiles")

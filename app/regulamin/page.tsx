@@ -22,7 +22,8 @@ export default function RegulaminPage() {
           nauczycielami określa umowa oraz ustalenia indywidualne.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-depths/90">
-          Wersja robocza — przed startem produkcyjnym wstaw pełny regulamin prawny.
+          To jest wersja robocza. Przed uruchomieniem serwisu wstaw pełny regulamin przygotowany
+          przez prawnika.
         </p>
       </main>
     </div>

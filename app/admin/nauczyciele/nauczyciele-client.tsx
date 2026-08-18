@@ -10,7 +10,6 @@ import { TutorPhotoField } from "@/components/admin/tutor-photo-field";
 import { EMPLOYMENT_TYPES } from "@/lib/types/pit";
 import type { AdminTutorSummary } from "@/lib/types/database";
 
-const PASSWORD_CHARS = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const fieldClass = "dash-sans rounded-app border border-panel-frame/40 px-3 py-2 text-sm";
 
 type CreateForm = {
@@ -53,14 +52,8 @@ const EMPTY_CREATE: CreateForm = {
   employmentType: "UMOWA_ZLECENIE",
 };
 
-function randomPassword(length = 12): string {
-  const buf = new Uint32Array(length);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, (n) => PASSWORD_CHARS[n % PASSWORD_CHARS.length]).join("");
-}
-
 function formatContractRange(start: string | null, end: string | null): string {
-  if (!start && !end) return "umowa: —";
+  if (!start && !end) return "umowa: -";
   const fmt = (iso: string) => {
     const [y, m, d] = iso.split("-");
     if (!y || !m || !d) return iso;
@@ -116,7 +109,7 @@ function TutorCard({ t, compact = false }: { t: AdminTutorSummary; compact?: boo
                       : "rounded-ledger bg-mist px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-steel"
                 }
               >
-                {isFormer(t) ? "Były pracownik" : t.acceptingStudents ? "Przyjmuje uczniów" : "Bez nowych uczniów"}
+                {isFormer(t) ? "Były pracownik" : t.acceptingStudents ? "Przyjmuje uczniów" : "Nie chce nowych uczniów"}
               </span>
             </p>
             <p className="dash-sans text-muted mt-1 truncate text-xs">
@@ -147,7 +140,7 @@ function TutorCard({ t, compact = false }: { t: AdminTutorSummary; compact?: boo
           </div>
         ) : (
           <div className="dash-sans text-muted flex-1 text-xs sm:text-center">
-            Zachowany pod rozliczenie PIT — wejdź w profil → Dane do PIT
+            Zachowany pod rozliczenie PIT - wejdź w profil → Dane do PIT
           </div>
         )}
 
@@ -173,7 +166,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<CreateForm>({ ...EMPTY_CREATE });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
+  const [creds, setCreds] = useState<{ email: string } | null>(null);
   const [error, setError] = useState("");
 
   const { active, formerByYear } = useMemo(() => {
@@ -218,14 +211,11 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
     const name = form.name.trim();
     if (!email || !name) return;
 
-    const password = randomPassword(12);
-
     startTransition(async () => {
       try {
         const created = await createTutorAccount({
           email,
           fullName: name,
-          tempPassword: password,
           activeSubjects: form.subjects,
           phone: form.phone || null,
           bankAccount: form.bank || null,
@@ -247,7 +237,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
           fd.set("photo", photoFile);
           await uploadTutorPhoto(created.id, fd);
         }
-        setCreds({ email, password });
+        setCreds({ email });
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Nie udało się dodać nauczyciela.");
@@ -261,7 +251,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
         <div>
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight">Nauczyciele</h1>
           <p className="dash-sans text-muted mt-1 text-sm">
-            Aktywna kadra i archiwum byłych pracowników. Edycja i dane do PIT — w profilu.
+            Aktywna kadra i archiwum byłych pracowników. Edycja i dane do PIT - w profilu.
           </p>
         </div>
         {tab === "active" ? (
@@ -310,8 +300,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
         <ul className="space-y-3">
           {active.length === 0 ? (
             <li className="dash-sans text-muted card-quiet p-4 text-sm">
-              Brak aktywnych nauczycieli. Dodaj pierwszego lub uruchom{" "}
-              <code className="dash-mono text-xs">pnpm seed:battle</code>.
+              Nie masz jeszcze żadnego nauczyciela. Dodaj pierwszego, żeby zacząć.
             </li>
           ) : (
             active.map((t) => <TutorCard key={t.id} t={t} />)
@@ -320,7 +309,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
       ) : (
         <div className="space-y-5">
           <p className="dash-sans text-muted text-sm">
-            Osoby po zakończeniu współpracy — zachowane pod rozliczenie PIT, pogrupowane wg roku odejścia.
+            Osoby po zakończeniu współpracy - zachowane pod rozliczenie PIT, pogrupowane wg roku odejścia.
           </p>
           {formerCount === 0 ? (
             <p className="dash-sans text-muted card-quiet p-4 text-sm">Brak byłych pracowników.</p>
@@ -356,19 +345,11 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             {creds ? (
               <div className="add-tutor-success-pop p-6">
-                <h2 className="dash-sans text-depths text-lg font-bold">Konto utworzone</h2>
-                <p className="dash-sans text-muted mt-1 text-xs">
-                  E-mail powitalny został wysłany (jeśli skonfigurowano Resend).
+                <h2 className="dash-sans text-depths text-lg font-bold">Zaproszenie wysłane</h2>
+                <p className="dash-sans text-muted mt-1 text-sm leading-relaxed">
+                  Na {creds.email} poszedł mail z linkiem do ustawienia hasła. Nauczyciel sam wejdzie
+                  do panelu - hasła tu nie pokazujemy.
                 </p>
-                <div className="card-quiet mt-4 space-y-2 p-4 text-sm">
-                  <p className="dash-sans">
-                    <span className="text-muted">E-mail:</span> <strong className="dash-mono">{creds.email}</strong>
-                  </p>
-                  <p className="dash-sans">
-                    <span className="text-muted">Hasło:</span>{" "}
-                    <strong className="dash-mono">{creds.password}</strong>
-                  </p>
-                </div>
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
@@ -382,7 +363,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                 <div className="shrink-0 border-b border-panel-frame/30 px-5 py-4">
                   <h2 className="dash-sans text-depths text-lg font-bold">Dodaj nauczyciela</h2>
                   <p className="dash-sans text-muted mt-0.5 text-xs">
-                    Podaj dane podstawowe i podatkowe — potem zobaczysz je w profilu i w „Dane do PIT”.
+                    Podaj dane podstawowe i podatkowe - potem zobaczysz je w profilu i w „Dane do PIT”.
                   </p>
                 </div>
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">

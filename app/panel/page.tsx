@@ -12,6 +12,7 @@ import {
   getTutorVerifiedFinanceLines,
   getTutorLessons,
   getTutorStudents,
+  getOpenTutorAlerts,
 } from "@/lib/data/queries";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +26,12 @@ export default async function TutorPanelPage() {
   if (!profile) redirect("/login");
   if (profile.role === "ADMIN") redirect("/admin");
 
-  const [lessons, students, financeLines, priceTiers] = await Promise.all([
+  const [lessons, students, financeLines, priceTiers, alerts] = await Promise.all([
     getTutorLessons(profile.id),
     getTutorStudents(profile.id),
     getTutorVerifiedFinanceLines(profile.id),
     getPriceTiers(),
+    getOpenTutorAlerts(profile.id),
   ]);
 
   const monthKey = currentMonthKey();
@@ -59,6 +61,7 @@ export default async function TutorPanelPage() {
       totalPayout={totalPayout}
       lessonStats={lessonStats}
       verifiedHoursThisMonth={monthHours}
+      alerts={alerts}
     />
   );
 }

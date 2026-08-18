@@ -5,8 +5,8 @@ type Ink = "depths" | "moss" | "toffee" | "claret";
 type Size = "lg" | "md";
 
 /**
- * Pas KPI — sygnaturowy element nowego kierunku wizualnego /admin/*.
- * Odwrócony (navy tło, ostre rogi) zamiast miękkiej, jasnej karty — ma być widoczny
+ * Pas KPI - sygnaturowy element nowego kierunku wizualnego /admin/*.
+ * Odwrócony (navy tło, ostre rogi) zamiast miękkiej, jasnej karty - ma być widoczny
  * „na pierwszy rzut oka”, nie tylko po przybliżeniu. Ten sam element na Głównej,
  * Wypłatach, Księgowości, Rozliczeniach.
  */
@@ -27,7 +27,7 @@ export function LedgerBand({
   );
 }
 
-/** Pojedyncza kolumna paska KPI — mikro-etykieta + gigantyczna liczba mono. */
+/** Pojedyncza kolumna paska KPI - mikro-etykieta + gigantyczna liczba mono. */
 export function LedgerStat({
   label,
   tick = "neutral",

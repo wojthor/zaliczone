@@ -12,6 +12,7 @@ export type AdminStudentRow = {
   class_level: string;
   subjects: string[];
   rate_pln: number;
+  blocked?: boolean;
 };
 
 export type CompanySalesMonth = {

@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 
 /**
  * Strumieniuje plik z Google Drive.
- * TUTOR — tylko pliki ze swojego folderu.
- * ADMIN — pliki z folderu dowolnego nauczyciela (query tutorId) lub własnego sprawdzenia parents.
+ * TUTOR - tylko pliki ze swojego folderu.
+ * ADMIN - pliki z folderu dowolnego nauczyciela (query tutorId) lub własnego sprawdzenia parents.
  */
 export async function GET(
   request: NextRequest,
@@ -76,7 +76,7 @@ export async function GET(
     const disposition =
       request.nextUrl.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
 
-    // Google Docs native types — eksport do PDF
+    // Google Docs native types - eksport do PDF
     const googleNative = meta.mimeType.startsWith("application/vnd.google-apps.");
     let nodeStream: Readable;
     let contentType = meta.mimeType;

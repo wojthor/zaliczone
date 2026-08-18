@@ -1,5 +1,5 @@
 /**
- * Battle-test seed — temporal anchor: Monday, July 13, 2026
+ * Battle-test seed - temporal anchor: Monday, July 13, 2026
  * Run: pnpm seed:battle
  *
  * Requires migration 0002_lesson_status_workflow.sql applied in Supabase.
@@ -75,7 +75,6 @@ async function upsertProfile(userId, account) {
       role: account.role,
       full_name: account.full_name,
       active_subjects: account.subjects,
-      ewidencja_unlocked_for_month: account.role === "TUTOR" ? "2026-06" : null,
     }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -133,7 +132,7 @@ function weekLessons(tutorId, studentId, subject, rate, dates, status) {
 }
 
 async function main() {
-  console.log("🌱 Battle seed — anchor: 2026-07-13\n");
+  console.log("🌱 Battle seed - anchor: 2026-07-13\n");
 
   const userIds = {};
   for (const account of ACCOUNTS) {
@@ -166,7 +165,7 @@ async function main() {
 
   const lessons = [];
 
-  // June 2026 — VERIFIED (historical, paid out)
+  // June 2026 - VERIFIED (historical, paid out)
   lessons.push(...juneLessons(userIds["teacher@zaliczone.pl"], benio[0].id, "Matematyka", 70, ["2026-06-03", "2026-06-10", "2026-06-17", "2026-06-24"]));
   lessons.push(...juneLessons(userIds["teacher@zaliczone.pl"], benio[1].id, "Fizyka", 80, ["2026-06-05", "2026-06-12", "2026-06-19"]));
   lessons.push(...juneLessons(userIds["martyna@zaliczone.pl"], martyna[0].id, "Chemia", 80, ["2026-06-04", "2026-06-11", "2026-06-18", "2026-06-25"]));
@@ -174,7 +173,7 @@ async function main() {
   lessons.push(...juneLessons(userIds["marcel@zaliczone.pl"], marcel[0].id, "Angielski", 70, ["2026-06-02", "2026-06-09", "2026-06-16", "2026-06-23", "2026-06-30"]));
   lessons.push(...juneLessons(userIds["marcel@zaliczone.pl"], marcel[1].id, "Historia", 60, ["2026-06-07", "2026-06-14", "2026-06-21"]));
 
-  // Previous week July 6–12 — admin verifies today
+  // Previous week July 6–12 - admin verifies today
   lessons.push(...weekLessons(userIds["teacher@zaliczone.pl"], benio[0].id, "Matematyka", 70, ["2026-07-07", "2026-07-09"], "PENDING_VERIFICATION"));
   lessons.push(...weekLessons(userIds["teacher@zaliczone.pl"], benio[2].id, "Matematyka", 60, ["2026-07-08"], "PENDING_VERIFICATION"));
   lessons.push(...weekLessons(userIds["martyna@zaliczone.pl"], martyna[0].id, "Chemia", 80, ["2026-07-06", "2026-07-10"], "PENDING_VERIFICATION"));
@@ -184,7 +183,7 @@ async function main() {
   lessons.push(...weekLessons(userIds["marcel@zaliczone.pl"], marcel[2].id, "Angielski", 80, ["2026-07-07", "2026-07-09"], "PENDING_VERIFICATION"));
   lessons.push(...weekLessons(userIds["marcel@zaliczone.pl"], marcel[1].id, "Historia", 60, ["2026-07-11"], "PENDING_VERIFICATION"));
 
-  // Current week July 13–19 — PLANNED
+  // Current week July 13–19 - PLANNED
   const plannedDates = ["2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17"];
   for (const [email, studs] of Object.entries(studentIds)) {
     const tutorId = userIds[email];

@@ -1,9 +1,9 @@
-/** Rodzaj współpracy — wpływa na to, czy wystawiasz PIT-11 (B2B zwykle nie). */
+/** Rodzaj współpracy - wpływa na to, czy wystawiasz PIT-11 (B2B zwykle nie). */
 export const EMPLOYMENT_TYPES = [
   { value: "UMOWA_ZLECENIE", label: "Umowa zlecenie" },
   { value: "UMOWA_O_PRACE", label: "Umowa o pracę" },
   { value: "UMOWA_DZIELO", label: "Umowa o dzieło" },
-  { value: "B2B", label: "B2B (JDG — faktura)" },
+  { value: "B2B", label: "B2B (JDG - faktura)" },
 ] as const;
 
 export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number]["value"];
@@ -18,7 +18,7 @@ export type TutorTaxYearEntry = {
   taxAdvancesPln: number;
   zusSocialPln: number;
   zusHealthPln: number;
-  /** Ulga dla młodych (do 26. r.ż.) — zwolnienie z PIT, jeśli dotyczy */
+  /** Ulga dla młodych (do 26. r.ż.) - zwolnienie z PIT, jeśli dotyczy */
   reliefYoung: boolean;
   notes: string;
 };

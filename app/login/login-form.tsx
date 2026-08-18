@@ -28,11 +28,22 @@ export default function LoginForm() {
     });
 
     if (signInError || !data.user) {
-      const message =
-        signInError?.message?.toLowerCase().includes("fetch") ||
-        signInError?.message?.toLowerCase().includes("network")
-          ? "Brak połączenia z Supabase. Sprawdź NEXT_PUBLIC_SUPABASE_URL w .env.local i czy projekt jest aktywny w panelu Supabase."
-          : (signInError?.message ?? "Nie udało się zalogować.");
+      if (signInError) {
+        console.error("Błąd logowania:", signInError.message);
+      }
+      const raw = signInError?.message?.toLowerCase() ?? "";
+      const isNetwork =
+        raw.includes("fetch") || raw.includes("network") || raw.includes("failed to fetch");
+      const isBadCredentials =
+        raw.includes("invalid login") ||
+        raw.includes("invalid credentials") ||
+        raw.includes("wrong password") ||
+        raw.includes("user not found");
+      const message = isNetwork
+        ? "Nie możemy się teraz połączyć. Spróbuj ponownie za minutę - jeśli dalej nie działa, napisz do nas."
+        : isBadCredentials
+          ? "Zły e-mail albo hasło. Spróbuj jeszcze raz."
+          : "Nie udało się zalogować. Spróbuj jeszcze raz.";
       setError(message);
       setLoading(false);
       return;
@@ -76,8 +87,8 @@ export default function LoginForm() {
         >
           Zaliczone
         </p>
-        <p className="dash-sans mt-4 text-center text-lg font-bold tracking-tight text-snow">
-          PANEL KOREPETYTORA
+        <p className="dash-sans mt-4 text-center text-lg font-bold uppercase tracking-tight text-snow">
+          Panel korepetytora
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10 grid gap-5">

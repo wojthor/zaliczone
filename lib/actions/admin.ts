@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import {
-  sendCennikUpdateEmail,
-  sendEwidencjaRequestEmail,
   sendPayoutConfirmationEmail,
   sendTutorWelcomeEmail,
 } from "@/lib/emails/send";
@@ -19,19 +17,28 @@ import {
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { TUTOR_SHARE, bonusProgress, canCloseMonth } from "@/lib/dates";
 import { TUTOR_PHOTO } from "@/lib/tutor-photo";
+import {
+  TAG,
+  bustLessonAndBonus,
+  bustTag,
+  financeTag,
+  payoutsTag,
+  staleTag,
+  subjectsTag,
+} from "@/lib/cache";
 
 async function requireAdmin(): Promise<void> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  if (!user) throw new Error("Brak sesji - zaloguj się ponownie.");
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień administratora.");
+  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień koordynatora.");
 }
 
 function storagePathFromPublicUrl(url: string): string | null {
@@ -131,7 +138,6 @@ export async function clearTutorPhoto(tutorId: string): Promise<void> {
 export async function createTutorAccount(input: {
   email: string;
   fullName: string;
-  tempPassword: string;
   activeSubjects?: string[];
   phone?: string | null;
   bankAccount?: string | null;
@@ -149,6 +155,7 @@ export async function createTutorAccount(input: {
   employmentType?: string | null;
 }) {
   const supabase = createServiceClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const { data: list } = await supabase.auth.admin.listUsers();
   const existing = list?.users.find((u) => u.email === input.email);
@@ -156,17 +163,30 @@ export async function createTutorAccount(input: {
     throw new Error("Ten adres e-mail jest już zajęty.");
   }
 
-  const { data, error } = await supabase.auth.admin.createUser({
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: "invite",
     email: input.email,
-    password: input.tempPassword,
-    email_confirm: true,
-    user_metadata: { role: "TUTOR", full_name: input.fullName },
+    options: {
+      data: { role: "TUTOR", full_name: input.fullName },
+      redirectTo: `${appUrl}/auth/callback?next=/ustaw-haslo`,
+    },
   });
 
-  if (error || !data.user) throw error ?? new Error("Nie udało się utworzyć użytkownika.");
+  if (linkError || !linkData.user) {
+    throw linkError ?? new Error("Nie udało się wygenerować zaproszenia.");
+  }
+
+  const userId = linkData.user.id;
+  const hashedToken = linkData.properties?.hashed_token;
+  const inviteUrl = hashedToken
+    ? `${appUrl}/auth/callback?token_hash=${encodeURIComponent(hashedToken)}&type=invite&next=/ustaw-haslo`
+    : linkData.properties?.action_link;
+  if (!inviteUrl) {
+    throw new Error("Brak linku zaproszenia z Supabase.");
+  }
 
   const profileRow: Record<string, unknown> = {
-    id: data.user.id,
+    id: userId,
     role: "TUTOR",
     full_name: input.fullName,
     active_subjects: input.activeSubjects ?? [],
@@ -192,7 +212,7 @@ export async function createTutorAccount(input: {
     if (msg.includes("column") || msg.includes("schema cache") || profileError.code === "PGRST204") {
       // Fallback bez kolumn PIT (migracja 0010 jeszcze niezaaplikowana)
       await supabase.from("profiles").upsert({
-        id: data.user.id,
+        id: userId,
         role: "TUTOR",
         full_name: input.fullName,
         active_subjects: input.activeSubjects ?? [],
@@ -207,20 +227,20 @@ export async function createTutorAccount(input: {
     }
   }
 
-  await ensureTutorRootFolder(data.user.id, input.fullName);
+  await ensureTutorRootFolder(userId, input.fullName);
 
   if (isDriveConfigured()) {
     try {
-      await ensureTutorDriveFolder(data.user.id, input.fullName);
+      await ensureTutorDriveFolder(userId, input.fullName);
     } catch (e) {
       console.error("[drive] ensureTutorDriveFolder failed on create:", e);
     }
   }
 
-  await sendTutorWelcomeEmail(input.email, input.fullName);
+  await sendTutorWelcomeEmail(input.email, input.fullName, inviteUrl);
 
   revalidatePath("/admin/nauczyciele");
-  return { id: data.user.id };
+  return { id: userId };
 }
 
 export async function updateTutorProfile(
@@ -286,8 +306,12 @@ export async function updateTutorProfile(
     }
   }
 
+  bustTag(subjectsTag(tutorId));
   revalidatePath("/admin/nauczyciele");
   revalidatePath(`/admin/nauczyciele/${tutorId}`);
+  revalidatePath("/terminarz");
+  revalidatePath("/uczniowie");
+  revalidatePath("/profil");
 }
 
 export async function updateTutorContactFields(
@@ -331,7 +355,10 @@ export async function savePriceTiers(
   const { error } = await supabase.from("price_tiers").insert(insertRows);
   if (error) throw error;
 
+  bustTag(TAG.cennik);
   revalidatePath("/admin/cennik");
+  revalidatePath("/finanse");
+  revalidatePath("/panel");
   revalidatePath("/profil");
 }
 
@@ -344,7 +371,7 @@ export async function archiveTutorAccount(tutorId: string) {
     .eq("id", tutorId)
     .maybeSingle();
 
-  // Jeśli umowa miała przyszłą datę końca — i tak kończymy dziś.
+  // Jeśli umowa miała przyszłą datę końca - i tak kończymy dziś.
   // Zostawiamy tylko datę wcześniejszą niż dziś (odejście już w przeszłości).
   const existingEnd = existing?.contract_end as string | null | undefined;
   const contractEnd = existingEnd && existingEnd < today ? existingEnd : today;
@@ -375,12 +402,12 @@ export async function archiveTutorAccount(tutorId: string) {
     }
   }
 
-  // Blokada logowania — konto i historia zostają (potrzebne do PIT na koniec roku).
+  // Blokada logowania - konto i historia zostają (potrzebne do PIT na koniec roku).
   try {
     const admin = createServiceClient();
     await admin.auth.admin.updateUserById(tutorId, { ban_duration: "876000h" });
   } catch {
-    // Auth ban opcjonalny — archiwum profilu i tak działa
+    // Auth ban opcjonalny - archiwum profilu i tak działa
   }
 
   revalidatePath("/admin/nauczyciele");
@@ -388,7 +415,7 @@ export async function archiveTutorAccount(tutorId: string) {
 }
 
 /**
- * Soft-end: nie kasujemy konta Auth — tylko kończymy współpracę.
+ * Soft-end: nie kasujemy konta Auth - tylko kończymy współpracę.
  * Dane wypłat i profil zostają pod PIT-11.
  */
 export async function deleteTutorAccount(tutorId: string) {
@@ -506,46 +533,34 @@ export async function approveSubjectRequest(requestId: string, subject: string, 
   await supabase.from("subject_requests").update({ status: "APPROVED" }).eq("id", requestId);
   await supabase.from("profiles").update({ active_subjects: merged }).eq("id", tutorId);
 
+  bustTag(subjectsTag(tutorId));
+  bustTag(TAG.cennik);
   revalidatePath("/admin/cennik");
   revalidatePath("/profil");
+  revalidatePath("/terminarz");
+  revalidatePath("/uczniowie");
 }
 
 export async function rejectSubjectRequest(requestId: string) {
   const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("subject_requests")
+    .select("tutor_id")
+    .eq("id", requestId)
+    .maybeSingle();
   const { error } = await supabase
     .from("subject_requests")
     .update({ status: "REJECTED" })
     .eq("id", requestId);
 
   if (error) throw error;
+  if (existing?.tutor_id) bustTag(subjectsTag(existing.tutor_id));
   revalidatePath("/admin/cennik");
-}
-
-export async function requestEwidencjaForMonth(month: string) {
-  const supabase = createServiceClient();
-  const tutors = await supabase.from("profiles").select("id, full_name").eq("role", "TUTOR");
-
-  const emails: string[] = [];
-  for (const tutor of tutors.data ?? []) {
-    await supabase
-      .from("profiles")
-      .update({ ewidencja_unlocked_for_month: month })
-      .eq("id", tutor.id);
-
-    const { data: user } = await supabase.auth.admin.getUserById(tutor.id);
-    if (user.user?.email) {
-      emails.push(user.user.email);
-      await sendEwidencjaRequestEmail(user.user.email, month);
-    }
-  }
-
-  revalidatePath("/admin/wyplaty");
-  revalidatePath("/finanse");
-  return { count: emails.length };
+  revalidatePath("/profil");
 }
 
 /**
- * Rewalidacja warunków zamknięcia miesiąca po stronie serwera — nie ufa checkboxom z UI.
+ * Rewalidacja warunków zamknięcia miesiąca po stronie serwera - nie ufa checkboxom z UI.
  * Warunek 1: żadna lekcja w miesiącu nie ma statusu PLANNED/PENDING_VERIFICATION.
  * Warunek 2: wszystkie payouts za dany miesiąc mają status PAID.
  */
@@ -560,7 +575,7 @@ async function assertMonthCloseable(monthKey: string, supabase: ReturnType<typeo
     .in("status", ["PLANNED", "PENDING_VERIFICATION"]);
   if (lessonsCheck.error) throw new Error(lessonsCheck.error.message);
   if ((lessonsCheck.count ?? 0) > 0) {
-    throw new Error("Warunek 1 nie jest spełniony — są lekcje ze statusem PLANNED lub PENDING_VERIFICATION.");
+    throw new Error("Warunek 1 nie jest spełniony - są lekcje ze statusem PLANNED lub PENDING_VERIFICATION.");
   }
 
   const payoutsCheck = await supabase
@@ -570,7 +585,7 @@ async function assertMonthCloseable(monthKey: string, supabase: ReturnType<typeo
     .neq("status", "PAID");
   if (payoutsCheck.error) throw new Error(payoutsCheck.error.message);
   if ((payoutsCheck.count ?? 0) > 0) {
-    throw new Error("Warunek 2 nie jest spełniony — są wypłaty, które nie mają statusu PAID.");
+    throw new Error("Warunek 2 nie jest spełniony - są wypłaty, które nie mają statusu PAID.");
   }
 }
 
@@ -582,7 +597,7 @@ export async function closeMonth(monthKey: string) {
   }
   if (!canCloseMonth(monthKey)) {
     throw new Error(
-      "Za wcześnie na zamknięcie tego miesiąca — sprawdź DATES.monthClose.earliestDayOfNextMonth.",
+      "Za wcześnie na zamknięcie tego miesiąca - sprawdź DATES.monthClose.earliestDayOfNextMonth.",
     );
   }
 
@@ -615,6 +630,10 @@ export async function closeMonth(monthKey: string) {
 
   revalidatePath("/admin/ksiegowosc");
   revalidatePath("/finanse");
+  bustTag(TAG.finance);
+  bustTag(TAG.accounting);
+  bustTag(financeTag(monthKey));
+  staleTag(TAG.dashboardStats);
   return { ok: true as const };
 }
 
@@ -635,7 +654,7 @@ export async function switchToJDG() {
     .maybeSingle();
 
   if (existing?.legal_mode === "JDG") {
-    throw new Error("Firma jest już na JDG — przełączenie jest nieodwracalne.");
+    throw new Error("Firma jest już na JDG - przełączenie jest nieodwracalne.");
   }
 
   const { error } = await supabase.from("business_settings").upsert(
@@ -750,6 +769,8 @@ export async function markPayoutPaid(
   }
 
   revalidatePath("/admin/wyplaty");
+  bustTag(payoutsTag(month));
+  bustTag(financeTag(month));
 }
 
 export async function unmarkPayoutPaid(tutorId: string, month: string) {
@@ -767,6 +788,8 @@ export async function unmarkPayoutPaid(tutorId: string, month: string) {
   revalidatePath("/admin/wyplaty");
   revalidatePath("/admin/ksiegowosc");
   revalidatePath("/finanse");
+  bustTag(payoutsTag(month));
+  bustTag(financeTag(month));
 }
 
 function nextMonthStartIso(monthKey: string): string {
@@ -780,14 +803,14 @@ async function requireAdminUserId(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Brak sesji — zaloguj się ponownie.");
+  if (!user) throw new Error("Brak sesji - zaloguj się ponownie.");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień administratora.");
+  if (profile?.role !== "ADMIN") throw new Error("Brak uprawnień koordynatora.");
   return user.id;
 }
 
@@ -797,10 +820,14 @@ export async function adminVerifyLesson(
   paymentMethod?: string,
 ) {
   await requireAdminUserId();
-  // Service role — omija edge-case RLS (update 0 wierszy bez błędu)
+  // Service role - omija edge-case RLS (update 0 wierszy bez błędu)
   const supabase = createServiceClient();
 
-  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("date, tutor_id, student_id")
+    .eq("id", lessonId)
+    .maybeSingle();
   if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
 
   let { data, error } = await supabase
@@ -839,18 +866,33 @@ export async function adminVerifyLesson(
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Nie znaleziono lekcji do zatwierdzenia.");
 
+  if (existing?.student_id) {
+    const { syncUnpaidStreakAlert } = await import("@/lib/actions/alerts");
+    await syncUnpaidStreakAlert(existing.student_id);
+  }
+
+  if (existing?.tutor_id) {
+    bustLessonAndBonus(existing.tutor_id, existing.date ? monthKeyFromDate(existing.date) : undefined);
+  }
+  staleTag(TAG.dashboardStats);
   revalidatePath("/admin/rozliczenia");
   revalidatePath("/admin/ksiegowosc");
   revalidatePath("/admin/wyplaty");
   revalidatePath("/finanse");
   revalidatePath("/terminarz");
+  revalidatePath("/admin/premie");
+  revalidatePath("/panel");
 }
 
 export async function adminRejectLessonPayment(lessonId: string) {
   await requireAdminUserId();
   const supabase = createServiceClient();
 
-  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("date, tutor_id, student_id")
+    .eq("id", lessonId)
+    .maybeSingle();
   if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
 
   let { data, error } = await supabase
@@ -874,23 +916,19 @@ export async function adminRejectLessonPayment(lessonId: string) {
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Nie znaleziono lekcji.");
 
-  revalidatePath("/admin/rozliczenia");
-  revalidatePath("/terminarz");
-}
-
-export async function notifyCennikUpdate() {
-  const supabase = createServiceClient();
-  const { data: tutors } = await supabase.from("profiles").select("id").eq("role", "TUTOR");
-  const emails: string[] = [];
-
-  for (const t of tutors ?? []) {
-    const { data: user } = await supabase.auth.admin.getUserById(t.id);
-    if (user.user?.email) emails.push(user.user.email);
+  if (existing?.student_id) {
+    const { syncUnpaidStreakAlert } = await import("@/lib/actions/alerts");
+    await syncUnpaidStreakAlert(existing.student_id);
   }
 
-  if (emails.length > 0) await sendCennikUpdateEmail(emails);
-
-  return { count: emails.length };
+  if (existing?.tutor_id) {
+    bustLessonAndBonus(existing.tutor_id, existing.date ? monthKeyFromDate(existing.date) : undefined);
+  }
+  staleTag(TAG.dashboardStats);
+  revalidatePath("/admin/rozliczenia");
+  revalidatePath("/terminarz");
+  revalidatePath("/admin/premie");
+  revalidatePath("/panel");
 }
 
 export type OperatingExpenseInput = {
@@ -1016,6 +1054,7 @@ export async function createOperatingExpense(formData: FormData) {
   }
 
   revalidatePath("/admin/ksiegowosc");
+  bustTag(TAG.accounting);
   return data;
 }
 
@@ -1050,4 +1089,5 @@ export async function deleteOperatingExpense(id: string) {
   }
 
   revalidatePath("/admin/ksiegowosc");
+  bustTag(TAG.accounting);
 }

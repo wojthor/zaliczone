@@ -25,7 +25,7 @@ function isMarketingPath(pathname: string): boolean {
 
 export function AppRoot({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isLogin = pathname === "/login";
+  const isLogin = pathname === "/login" || pathname === "/ustaw-haslo" || pathname.startsWith("/auth/");
   const isAdmin = pathname.startsWith("/admin");
   const isPrintDoc = isPrintDocumentPath(pathname);
   const isMarketing = isMarketingPath(pathname);

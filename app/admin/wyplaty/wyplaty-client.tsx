@@ -263,7 +263,6 @@ export function WyplatyClient({
                 {rollups.map((row, i) => {
                   const isPaid = row.payoutStatus === "PAID";
                   const account = row.bankAccount?.trim() || null;
-                  const rail = isPaid ? "status-rail-verified" : "status-rail-pending";
                   return (
                     <tr
                       key={row.tutorId}
@@ -276,7 +275,7 @@ export function WyplatyClient({
                       }`}
                     >
                       <td className={`${td} dash-mono text-muted text-center tabular-nums`}>{i + 1}</td>
-                      <td className={`${td} status-rail ${rail} dash-sans font-semibold text-depths`}>
+                      <td className={`${td} dash-sans font-semibold text-depths`}>
                         {row.tutorName}
                       </td>
                       <td className={td}>
@@ -302,7 +301,7 @@ export function WyplatyClient({
                           row.bonusPln > 0 ? "text-moss" : "text-muted"
                         }`}
                       >
-                        {row.bonusPln > 0 ? formatMoney(row.bonusPln) : "—"}
+                        {row.bonusPln > 0 ? formatMoney(row.bonusPln) : "-"}
                       </td>
                       <td className={`${td} dash-mono text-right font-bold tabular-nums text-depths`}>
                         {formatMoney(row.tutorPayoutPln)}
@@ -345,7 +344,7 @@ export function WyplatyClient({
         title={confirmRow ? `Zatwierdź przelew dla ${confirmRow.tutorName}` : ""}
         description={
           confirmRow
-            ? `Za ${monthLabel}. Wyliczona kwota to ${formatMoney(confirmRow.tutorPayoutPln)} — możesz ją skorygować poniżej. Upewnij się, że przelew już wyszedł z banku.`
+            ? `Za ${monthLabel}. Wyliczyliśmy ${formatMoney(confirmRow.tutorPayoutPln)}, możesz to poprawić poniżej. Zaznacz to dopiero, gdy przelew faktycznie wyszedł z banku.`
             : undefined
         }
         confirmLabel="Zatwierdź przelew"

@@ -13,7 +13,7 @@ function formatPln(n: number): string {
 }
 
 function formatDatePl(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
@@ -27,7 +27,7 @@ function monthLabel(monthKey: string): string {
 }
 
 function employmentLabel(value: string | null | undefined): string {
-  return EMPLOYMENT_TYPES.find((t) => t.value === value)?.label ?? "—";
+  return EMPLOYMENT_TYPES.find((t) => t.value === value)?.label ?? "-";
 }
 
 type IdentityDraft = {
@@ -57,7 +57,7 @@ function identityFromTutor(tutor: AdminTutorSummary): IdentityDraft {
 }
 
 /**
- * Panel PIT — domyślnie sztywne informacje; edycja + jeden zapis.
+ * Panel PIT - domyślnie sztywne informacje; edycja + jeden zapis.
  * Przychody z wypłat PAID aktualizują się automatycznie z kolejnymi miesiącami.
  */
 export function TutorPitPanel({
@@ -156,7 +156,7 @@ export function TutorPitPanel({
       <div className="confirm-dialog-in relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-app border border-panel-frame/40 bg-snow sm:rounded-app">
         <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-panel-frame/30 px-4 py-3.5 sm:px-5">
           <div>
-            <h2 className="dash-sans text-depths text-lg font-bold">Dane do PIT — {tutor.name}</h2>
+            <h2 className="dash-sans text-depths text-lg font-bold">Dane do PIT - {tutor.name}</h2>
             <p className="dash-sans text-muted mt-0.5 text-xs">
               Informacje pod PIT-11. Przychody z wypłat aktualizują się wraz z kolejnymi miesiącami.
             </p>
@@ -197,7 +197,7 @@ export function TutorPitPanel({
 
           {isB2b ? (
             <p className="dash-sans rounded-app border border-butter/50 bg-butter/30 px-3 py-2 text-xs leading-relaxed text-depths">
-              Współpraca B2B — zwykle <strong>nie wystawiasz PIT-11</strong>. Poniższe wypłaty służą kontroli kosztów.
+              Współpraca B2B - zwykle <strong>nie wystawiasz PIT-11</strong>. Poniższe wypłaty służą kontroli kosztów.
             </p>
           ) : (
             <p className="dash-sans text-muted text-xs leading-relaxed">
@@ -210,17 +210,17 @@ export function TutorPitPanel({
             <h3 className="section-label">Dane podatkowe</h3>
             {!editing ? (
               <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Info label="PESEL" value={identity.pesel || "—"} mono />
+                <Info label="PESEL" value={identity.pesel || "-"} mono />
                 <Info label="Data urodzenia" value={formatDatePl(identity.birthDate || null)} mono />
                 <Info label="Rodzaj współpracy" value={employmentLabel(identity.employmentType)} />
-                <Info label="NIP" value={identity.nip || "—"} mono />
-                <Info label="Urząd skarbowy" value={identity.taxOffice || "—"} className="sm:col-span-2" />
+                <Info label="NIP" value={identity.nip || "-"} mono />
+                <Info label="Urząd skarbowy" value={identity.taxOffice || "-"} className="sm:col-span-2" />
                 <Info
                   label="Adres zamieszkania"
                   value={
                     [identity.taxStreet, [identity.taxPostalCode, identity.taxCity].filter(Boolean).join(" "), identity.taxCountry]
                       .filter(Boolean)
-                      .join(", ") || "—"
+                      .join(", ") || "-"
                   }
                   className="sm:col-span-2"
                 />
@@ -351,7 +351,7 @@ export function TutorPitPanel({
                   {months.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="dash-sans text-muted px-3 py-3 text-xs">
-                        Brak wypłat PAID w {year} — pojawią się automatycznie po oznaczeniu wypłat.
+                        Brak wypłat PAID w {year} - pojawią się automatycznie po oznaczeniu wypłat.
                       </td>
                     </tr>
                   ) : (
@@ -383,7 +383,7 @@ export function TutorPitPanel({
                 <Info label="ZUS społeczne" value={formatPln(tax.zusSocialPln)} mono />
                 <Info label="Składka zdrowotna" value={formatPln(tax.zusHealthPln)} mono />
                 <Info label="Ulga dla młodych" value={tax.reliefYoung ? "Tak" : "Nie"} />
-                <Info label="Notatki" value={tax.notes || "—"} className="sm:col-span-2" />
+                <Info label="Notatki" value={tax.notes || "-"} className="sm:col-span-2" />
               </dl>
             ) : (
               <div className="mt-3 grid gap-2.5 sm:grid-cols-2">

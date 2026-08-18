@@ -1,8 +1,8 @@
-# Panel księgowości admina — pełny raport (wersja przywrócona)
+# Panel księgowości admina - pełny raport (wersja przywrócona)
 
 Dokument opisuje **poprzedni / aktualnie przywrócony** panel `/admin/ksiegowosc` (ewidencja sprzedaży bezrachunkowej + koszty operacyjne + kalkulator PIT/ZUS + zamknięcie miesiąca).
 
-**Nie dotyczy** eksperymentalnego rewrite’u NDG/JDG (mocki, `obliczZaliczkePIT`, dashboardy limitów) — ten rewrite został cofnięty.
+**Nie dotyczy** eksperymentalnego rewrite’u NDG/JDG (mocki, `obliczZaliczkePIT`, dashboardy limitów) - ten rewrite został cofnięty.
 
 Stan odniesienia: `app/admin/ksiegowosc/page.tsx` + `ksiegowosc-client.tsx` (~1400 LOC).
 
@@ -12,11 +12,11 @@ Stan odniesienia: `app/admin/ksiegowosc/page.tsx` + `ksiegowosc-client.tsx` (~14
 
 Panel to **adminowe centrum miesięcznej i rocznej księgowości JDG** w ZALICZONE:
 
-- **Ewidencja sprzedaży bezrachunkowej** — wyłącznie lekcje ze statusem `VERIFIED`.
-- **Zestawienie kosztów** — rachunki/faktury operacyjne (CRUD) oraz w trybie rocznym także wypłaty PAID + premie.
-- **KPI finansowe** — przychód, koszty, marża, liczba lekcji.
-- **Kalkulator „Rozliczenia — Zrób to sam”** — szacunek PIT 12%, ZUS właściciela, zysk „na rękę”.
-- **Kreator zamknięcia miesiąca** — archiwizacja w `closed_months` z blokadą dalszych zmian w tym miesiącu.
+- **Ewidencja sprzedaży bezrachunkowej** - wyłącznie lekcje ze statusem `VERIFIED`.
+- **Zestawienie kosztów** - rachunki/faktury operacyjne (CRUD) oraz w trybie rocznym także wypłaty PAID + premie.
+- **KPI finansowe** - przychód, koszty, marża, liczba lekcji.
+- **Kalkulator „Rozliczenia - Zrób to sam”** - szacunek PIT 12%, ZUS właściciela, zysk „na rękę”.
+- **Kreator zamknięcia miesiąca** - archiwizacja w `closed_months` z blokadą dalszych zmian w tym miesiącu.
 
 Miejsce w cyklu admina (dashboard / kalendarz operacyjny):
 
@@ -26,7 +26,7 @@ Miejsce w cyklu admina (dashboard / kalendarz operacyjny):
 | ~16. | Weryfikacja finansów |
 | ~20. | Zaliczka PIT (JDG) |
 
-Sam panel **nie** linkuje do `/admin/wyplaty` ani `/admin/rozliczenia` — zależność jest odwrotna: najpierw weryfikacja lekcji i wypłaty, potem księgowość.
+Sam panel **nie** linkuje do `/admin/wyplaty` ani `/admin/rozliczenia` - zależność jest odwrotna: najpierw weryfikacja lekcji i wypłaty, potem księgowość.
 
 ---
 
@@ -58,8 +58,8 @@ Widoki PDF / druku:
 
 | Token | Hex | Rola w panelu |
 |-------|-----|----------------|
-| `depths` / `royal` | `#000C4A` | granat — CTA, tile navy/green |
-| `lime` | `#D5ED21` | limonka — aktywna zakładka, tekst na granacie |
+| `depths` / `royal` | `#000C4A` | granat - CTA, tile navy/green |
+| `lime` | `#D5ED21` | limonka - aktywna zakładka, tekst na granacie |
 | `soft-lime` / `butter` | `#DFFD6F` | badge „zamknięty”, etykiety na navy |
 | `paper` | `#F6F5F0` | tła sekcji, sticky thead |
 | `snow` | `#FFFFFF` | karty, tabele |
@@ -71,13 +71,13 @@ Widoki PDF / druku:
 
 ### Typografia
 
-- **`dash-sans`** (Space Grotesk w layoutcie admina) — nagłówki (`Księgowość`, sekcje kalkulatora).
-- **`dash-mono`** (IBM Plex Mono) — kwoty, Lp., daty w tabelach (`tabular-nums`).
+- **`dash-sans`** (Space Grotesk w layoutcie admina) - nagłówki (`Księgowość`, sekcje kalkulatora).
+- **`dash-mono`** (IBM Plex Mono) - kwoty, Lp., daty w tabelach (`tabular-nums`).
 
 ### Komponenty UI
 
-- **`FinanceTile` / `FinanceTilesRow`** — 4 kafelki KPI.
-- **`LedgerStat` / `LedgerBand`** — w design systemie admina istnieją, **w tym panelu nie są używane**.
+- **`FinanceTile` / `FinanceTilesRow`** - 4 kafelki KPI.
+- **`LedgerStat` / `LedgerBand`** - w design systemie admina istnieją, **w tym panelu nie są używane**.
 
 | Tone `FinanceTile` | Tło | Label | Value |
 |--------------------|-----|-------|-------|
@@ -93,15 +93,15 @@ Inne detale:
 - przyciski PDF: `bg-[#000C4A] text-lime`
 - zebra wierszy: `bg-snow even:bg-paper/80`
 
-### UI zamkniętego miesiąca — „ukończony etap”
+### UI zamkniętego miesiąca - „ukończony etap”
 
 Gdy wybrany miesiąc jest w `closed_months`:
 
 - Badge **„Miesiąc zamknięty”**.
 - **Ukryte** przełączniki „Księgowość miesięczna / roczna”.
 - **Ukryte** sekcje: tabelaryczne podsumowanie oraz „Zrób to sam”.
-- Banner kosztów: **„Miesiąc zamknięty — dodawanie i usuwanie kosztów jest zablokowane.”**
-- Sekcja z ikoną kłódki: **„Miesiąc zamknięty — ukończony etap”** + siatka `ClosedFigure`:
+- Banner kosztów: **„Miesiąc zamknięty - dodawanie i usuwanie kosztów jest zablokowane.”**
+- Sekcja z ikoną kłódki: **„Miesiąc zamknięty - ukończony etap”** + siatka `ClosedFigure`:
   - przychód
   - koszty wypłat / operacyjne
   - podstawa opodatkowania
@@ -112,17 +112,17 @@ Gdy wybrany miesiąc jest w `closed_months`:
 
 ---
 
-## 4. Tryb miesięczny — metryki i formuły
+## 4. Tryb miesięczny - metryki i formuły
 
 Źródło KPI w kafelkach: **client** (linie `VERIFIED` + payouts `PAID` + `operating_expenses`).  
 Server `monthSummary` w `page.tsx` służy głównie do **Warunku 1/2** kreatora i spójnych liczb PIT.
 
 ### Kafelki (`FinanceTilesRow`)
 
-1. **Przychód** — `Σ amountPln` linii VERIFIED miesiąca  
-2. **Koszty wypłaty / wszystkie** — `paidPayoutsSum` / `allCosts`  
-3. **Marża agencji** — `gross − allCosts` (może być ujemna)  
-4. **Lekcje VERIFIED** — liczba linii  
+1. **Przychód** - `Σ amountPln` linii VERIFIED miesiąca  
+2. **Koszty wypłaty / wszystkie** - `paidPayoutsSum` / `allCosts`  
+3. **Marża agencji** - `gross − allCosts` (może być ujemna)  
+4. **Lekcje VERIFIED** - liczba linii  
 
 ### Formuły
 
@@ -160,7 +160,7 @@ Lista: Lp., Data, Numer, Nazwa, Wystawca, Kwota, Załącznik, Usuń.
 
 ---
 
-## 5. Tryb roczny — funkcjonalność
+## 5. Tryb roczny - funkcjonalność
 
 Dostępny tylko gdy wybrany miesiąc **nie** jest zamknięty (przy zamkniętym toggle znika).
 
@@ -177,7 +177,7 @@ Wiersze kosztów rocznych obejmują miesiące od stycznia do bieżącego (dla ro
 
 ---
 
-## 6. Kalkulator „Rozliczenia — Zrób to sam”
+## 6. Kalkulator „Rozliczenia - Zrób to sam”
 
 Widoczny przy **otwartym** miesiącu (oraz w trybie roku).
 
@@ -206,8 +206,8 @@ Termin (miesiąc): przelew do **20. dnia kolejnego miesiąca** na Mikrorachunek 
 
 Select UI:
 
-- **„Ulga na start — ~410,00 zł / mies.”**
-- **„Mały ZUS — ~480,00 zł + zdrowotna”**
+- **„Ulga na start - ~410,00 zł / mies.”**
+- **„Mały ZUS - ~480,00 zł + zdrowotna”**
 
 ### Podsumowanie zysku
 
@@ -217,13 +217,13 @@ Formuła używa `allCosts` (odejmuje też koszty operacyjne), mimo że w tej li�
 
 Przypomnienie: **JPK_V7 do 25. dnia miesiąca** (tryb miesięczny).
 
-### Zamknięty miesiąc — ZUS na sztywno
+### Zamknięty miesiąc - ZUS na sztywno
 
 Komentarz w kodzie: zamknięty miesiąc = zawsze **Ulga na start** (410), bez selecta; `closedNetProfit` z `closedZusTotal = 410`.
 
 ---
 
-## 7. Koszty operacyjne — CRUD
+## 7. Koszty operacyjne - CRUD
 
 | Operacja | Action | Warunki |
 |----------|--------|---------|
@@ -242,9 +242,9 @@ UI: „Dodano wydatek.” / „Usunięto wydatek.”; załącznik przez `getSign
 
 ### Warunki w UI (kreator)
 
-1. **Warunek 1** — brak lekcji `PLANNED` / `PENDING_VERIFICATION` (etykieta: VERIFIED lub UNPAID).  
-2. **Warunek 2** — wszystkie wypłaty miesiąca mają status `PAID`.  
-3. **Warunek 3** — checkbox **„potwierdzam zgodność salda z kontem bankowym”** (tylko UI — **nie** rewalidowany na serwerze).
+1. **Warunek 1** - brak lekcji `PLANNED` / `PENDING_VERIFICATION` (etykieta: VERIFIED lub UNPAID).  
+2. **Warunek 2** - wszystkie wypłaty miesiąca mają status `PAID`.  
+3. **Warunek 3** - checkbox **„potwierdzam zgodność salda z kontem bankowym”** (tylko UI - **nie** rewalidowany na serwerze).
 
 Przycisk **„Zamknij miesiąc”** wymaga: `canCloseMonth` ∧ wszystkie 3 warunki.  
 `ConfirmDialog`: ostrzeżenie o nieodwracalności z poziomu UI.
@@ -256,7 +256,7 @@ DATES.monthClose.earliestDayOfNextMonth = 6
 canCloseMonth(monthKey) // today >= 6. dzień miesiąca następnego po monthKey
 ```
 
-Tekst UI mówi czasem **„od 5. dnia następnego miesiąca”** — **rozjazd z kodem (dzień 6)**.  
+Tekst UI mówi czasem **„od 5. dnia następnego miesiąca”** - **rozjazd z kodem (dzień 6)**.  
 Target operacyjny w `DATES`: ok. **15.** dnia następnego miesiąca.
 
 ### Serwer `closeMonth` (`lib/actions/admin.ts`)
@@ -264,7 +264,7 @@ Target operacyjny w `DATES`: ok. **15.** dnia następnego miesiąca.
 1. `requireAdminUserId`
 2. Format `YYYY-MM`
 3. `canCloseMonth`
-4. **`assertMonthCloseable`** — rewalidacja Warunku 1 i 2 w DB (nie ufa checkboxom)
+4. **`assertMonthCloseable`** - rewalidacja Warunku 1 i 2 w DB (nie ufa checkboxom)
 5. `upsert` do `closed_months` (`month`, `closed_by`, `closed_at`)
 6. `revalidatePath("/admin/ksiegowosc")`, `revalidatePath("/finanse")`
 
@@ -294,7 +294,7 @@ Brak tabeli / błąd odczytu `closed_months` → fail-open (nie blokuje).
 
 ### Ewidencja sprzedaży (`/ewidencja`)
 
-**Miesiąc — kolumny:** Lp. · Data sprzedaży · Data wpływu · Metoda płatności · Nazwa usługi · Nabywca · Brutto · Kwota narastająco.  
+**Miesiąc - kolumny:** Lp. · Data sprzedaży · Data wpływu · Metoda płatności · Nazwa usługi · Nabywca · Brutto · Kwota narastająco.  
 Footer: **„Suma przychodów w okresie”**.  
 Nagłówek: **„Ewidencja sprzedaży bezrachunkowej”** + dane firmy (placeholdery NIP/adres) + podpis.
 

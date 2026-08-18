@@ -9,8 +9,9 @@ import { GuideShortcutPanel } from "@/components/dashboard/guide-shortcut-panel"
 import { StudentsPanel } from "@/components/students-panel";
 import { WeeklySchedule } from "@/components/dashboard/weekly-schedule";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
+import { AlertsBanner } from "@/components/alerts/alerts-banner";
 import type { Lesson } from "@/components/dashboard/lesson-data";
-import type { StudentUi } from "@/lib/types/database";
+import type { AppAlert, StudentUi } from "@/lib/types/database";
 
 type DashboardLayoutProps = {
   lessons: Lesson[];
@@ -18,6 +19,7 @@ type DashboardLayoutProps = {
   totalPayout: number;
   lessonStats: LessonSummaryStats;
   verifiedHoursThisMonth: number;
+  alerts?: AppAlert[];
 };
 
 export function DashboardLayout({
@@ -26,9 +28,11 @@ export function DashboardLayout({
   totalPayout,
   lessonStats,
   verifiedHoursThisMonth,
+  alerts = [],
 }: DashboardLayoutProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
+      {alerts.length > 0 ? <AlertsBanner alerts={alerts} role="TUTOR" /> : null}
       <BonusProgressBar hoursDone={verifiedHoursThisMonth} compact showCelebration />
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
         <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">

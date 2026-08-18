@@ -1,4 +1,4 @@
-/** ISO week helpers — Monday as week start */
+/** ISO week helpers - Monday as week start */
 
 export function toMondayIso(d: Date): string {
   const m = startOfWeekMonday(d);

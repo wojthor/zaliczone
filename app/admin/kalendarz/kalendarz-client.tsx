@@ -13,8 +13,7 @@ const NEW_EMPLOYEE_ITEMS: ChecklistItem[] = [
 ];
 
 const PAYOUT_ITEMS: ChecklistItem[] = [
-  { id: "po-1", label: "Wyślij prośbę o ewidencję (przycisk na Wypłatach)" },
-  { id: "po-2", label: "Odbierz podpisany skan PDF od tutora" },
+  { id: "po-1", label: "Odbierz podpisany skan PDF od tutora" },
   { id: "po-3", label: "Wykonaj przelew wychodzący w banku" },
   { id: "po-4", label: "Odznacz jako „WYPŁACONE” w systemie" },
 ];
@@ -47,7 +46,6 @@ const SUBTASKS_KEY = "zaliczone-admin-deadlines-subtasks";
 type Subtask = { id: string; label: string; done: boolean };
 
 const MONTHLY_CYCLE: Array<{ id: string; day: number; label: string; href: string }> = [
-  { id: "ewidencja-mail", day: 1, label: "Mail o ewidencjach", href: "/admin/wyplaty" },
   { id: "ewidencja-deadline", day: 3, label: "Ewidencje podpisane (do)", href: "/admin/wyplaty" },
   { id: "rachunek-send", day: 3, label: "Wysyłka rachunków do podpisania", href: "/admin/wyplaty" },
   { id: "rachunek-deadline", day: 5, label: "Rachunki podpisane (do)", href: "/admin/wyplaty" },
@@ -503,7 +501,7 @@ function ProgressCard({
         </div>
         <ul className="space-y-1">
           {subtasks.length === 0 ? (
-            <li className="dash-sans text-muted text-[11px]">Rozpisz kroki — po odhaczeniu wszystkich pytanie trafi do Zrobione.</li>
+            <li className="dash-sans text-muted text-[11px]">Rozpisz kroki - po odhaczeniu wszystkich pytanie trafi do Zrobione.</li>
           ) : (
             subtasks.map((s) => (
               <li key={s.id} className="flex items-start gap-2 rounded-app bg-white/60 px-2 py-1.5">
@@ -781,7 +779,7 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
         });
       }
     } else {
-      // Systemowy termin → własna kopia z edycją; oryginał zostaje w pytaniach tylko jeśli nie był ruszany —
+      // Systemowy termin → własna kopia z edycją; oryginał zostaje w pytaniach tylko jeśli nie był ruszany -
       // zastępujemy: ukrywamy oryginał jako done i dodajemy custom w todo.
       const clone: CustomDeadlineStored = {
         id: `edit-${existing.id}-${Date.now()}`,
@@ -1046,7 +1044,7 @@ export function KalendarzClient({ deadlines }: { deadlines: DeadlineItem[] }) {
           />
           <ChecklistCard
             title="Proces wypłat"
-            subtitle="Cykl na koniec miesiąca — od ewidencji po przelew."
+            subtitle="Cykl na koniec miesiąca - od ewidencji po przelew."
             items={PAYOUT_ITEMS}
             storageKey="zaliczone-admin-checklist-payouts"
             accent="butter"

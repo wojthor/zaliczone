@@ -292,24 +292,6 @@
   }
 }
 
-.status-rail {
-  border-left-width: 6px;
-  border-left-style: solid;
-}
-.status-rail-verified {
-  border-left-color: var(--color-status-verified);
-}
-.status-rail-pending {
-  border-left-color: var(--color-status-pending);
-  background-color: color-mix(in srgb, var(--color-status-pending) 12%, transparent);
-}
-.status-rail-unpaid {
-  border-left-color: var(--color-status-unpaid);
-}
-.status-rail-neutral {
-  border-left-color: var(--color-status-planned);
-}
-
 .sidebar-tooltip {
   position: absolute;
   left: calc(100% + 0.5rem);

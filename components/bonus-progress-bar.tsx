@@ -43,34 +43,24 @@ export function BonusProgressBar({
   }
 
   return (
-    <div
-      className={`${
-        p.achieved ? "card-feature px-3 text-lime" : "soft-panel text-depths"
-      } ${compact ? "p-3" : "p-4"} ${className}`}
-    >
+    <div className={`card-feature px-3 text-lime ${compact ? "p-3" : "p-4"} ${className}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className={`font-extrabold ${compact ? "text-xs" : "text-sm"}`}>
           {p.achieved ? "Premia osiągnięta!" : "Premia miesięczna"}
         </p>
-        <p
-          className={`font-bold tabular-nums ${compact ? "text-[0.65rem]" : "text-xs"} ${
-            p.achieved ? "text-lime" : "text-muted"
-          }`}
-        >
+        <p className={`font-bold tabular-nums text-lime/80 ${compact ? "text-[0.65rem]" : "text-xs"}`}>
           {doneLabel} / {p.threshold} godz. · <span>+{p.bonusPln} zł</span>
         </p>
       </div>
-      <div
-        className={`mt-2 h-2.5 overflow-hidden rounded-full ${p.achieved ? "bg-white/20" : "bg-mist"}`}
-      >
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/20">
         <div
-          className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "bg-[#000C4A]"}`}
+          className="h-full rounded-full bg-lime transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
       {!p.achieved ? (
-        <p className={`mt-1.5 ${compact ? "text-[0.6rem]" : "text-xs"} text-muted`}>
-          Do premii zostało <strong>{p.remaining}</strong> zatwierdzonych godzin.
+        <p className={`mt-1.5 text-lime/80 ${compact ? "text-[0.6rem]" : "text-xs"}`}>
+          Do premii zostało <strong className="text-lime">{p.remaining}</strong> zatwierdzonych godzin.
         </p>
       ) : showCelebration ? (
         <p className="mt-1.5 text-xs text-lime/90">

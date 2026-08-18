@@ -26,7 +26,7 @@ export default async function KsiegowoscPage({
   const { month } = await searchParams;
   const monthKey = resolveMonthKey(month);
 
-  // Wszystkie lekcje (każdy status) — potrzebne do walidacji Warunku 1 kreatora zamknięcia,
+  // Wszystkie lekcje (każdy status) - potrzebne do walidacji Warunku 1 kreatora zamknięcia,
   // nie tylko VERIFIED jak wcześniej. Payouts/koszty/zamknięcia/ustawienia pobierane równolegle.
   const [allLessons, payouts, closedMonths, operatingExpenses, businessSettings] = await Promise.all([
     getAllLessonLines(),
@@ -38,7 +38,7 @@ export default async function KsiegowoscPage({
 
   const financeLines = allLessons.filter((l) => l.status === "VERIFIED");
 
-  // Agregacje miesiąca wybranego przez ?month= — liczone server-side.
+  // Agregacje miesiąca wybranego przez ?month= - liczone server-side.
   const monthVerifiedLines = financeLines.filter((l) => l.monthKey === monthKey);
   const monthLessons = allLessons.filter((l) => l.monthKey === monthKey);
   const monthPayouts = payouts.filter((p) => p.month === monthKey);
@@ -55,7 +55,7 @@ export default async function KsiegowoscPage({
   const estimatedPitPln = Math.round(taxableIncomePln * ADMIN_PIT_RATE * 100) / 100;
   const netProfitPln = Math.round((taxableIncomePln - estimatedPitPln) * 100) / 100;
 
-  // Warunki kreatora zamknięcia — te same reguły, którymi closeMonth() rewalidauje na serwerze.
+  // Warunki kreatora zamknięcia - te same reguły, którymi closeMonth() rewalidauje na serwerze.
   const lessonsReady = !monthLessons.some((l) => l.status === "PLANNED" || l.status === "PENDING_VERIFICATION");
   const payoutsReady = monthPayouts.every((p) => p.status === "PAID");
 

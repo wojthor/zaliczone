@@ -38,9 +38,9 @@ export type MonthSummary = {
   taxableIncomePln: number;
   estimatedPitPln: number;
   netProfitPln: number;
-  /** Warunek 1 — brak lekcji PLANNED/PENDING_VERIFICATION w miesiącu (rewalidowane na serwerze przy zamknięciu). */
+  /** Warunek 1 - brak lekcji PLANNED/PENDING_VERIFICATION w miesiącu (rewalidowane na serwerze przy zamknięciu). */
   lessonsReady: boolean;
-  /** Warunek 2 — wszystkie payouts miesiąca mają status PAID (rewalidowane na serwerze przy zamknięciu). */
+  /** Warunek 2 - wszystkie payouts miesiąca mają status PAID (rewalidowane na serwerze przy zamknięciu). */
   payoutsReady: boolean;
 };
 
@@ -491,7 +491,7 @@ export function KsiegowoscClient({
     return Math.max(0, Math.round(raw * 100) / 100);
   }, [totals.gross, totals.allCosts]);
 
-  /** Dochody miesięczne od rejestracji JDG (lub od stycznia roku) — do zaliczki narastającej. */
+  /** Dochody miesięczne od rejestracji JDG (lub od stycznia roku) - do zaliczki narastającej. */
   const dochodyOdRejestracji = useMemo(() => {
     const regKey = jdgRegistrationDate?.slice(0, 7);
     const year = selectedMonthKey.slice(0, 4);
@@ -580,7 +580,7 @@ export function KsiegowoscClient({
     summaryKoszty,
   ]);
 
-  // Zamknięty miesiąc — te same pozycje co w podsumowaniu.
+  // Zamknięty miesiąc - te same pozycje co w podsumowaniu.
   const closedZusTotal = summaryZusWlasciciel;
   const closedZdrowotna = summaryZdrowotna;
   const closedNetProfit = netProfit;
@@ -647,7 +647,7 @@ export function KsiegowoscClient({
     viewMode === "month" ? formatMonthLongPl(selectedMonthKey) : `Rok ${selectedYear}`;
   const isMonthClosed = viewMode === "month" && effectiveClosedMonths.includes(selectedMonthKey);
   const canClose = viewMode === "month" && canCloseMonth(selectedMonthKey);
-  // monthSummary jest liczony server-side dla initialMonthKey — jeśli użytkownik właśnie
+  // monthSummary jest liczony server-side dla initialMonthKey - jeśli użytkownik właśnie
   // zmienił miesiąc (nawigacja w toku), traktujemy warunki jako niespełnione ostrożnie.
   const summaryMatchesSelection = selectedMonthKey === initialMonthKey;
   const lessonsReady = summaryMatchesSelection && monthSummary.lessonsReady;
@@ -778,7 +778,7 @@ export function KsiegowoscClient({
             ) : null}
           </div>
           <p className="text-muted mt-0.5 text-[0.7rem] capitalize leading-snug sm:text-xs">
-            {periodLabel} — ewidencja sprzedaży bezrachunkowej (tylko VERIFIED).
+            {periodLabel} - ewidencja sprzedaży bezrachunkowej (tylko VERIFIED).
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-end gap-2 sm:justify-end">
@@ -929,7 +929,7 @@ export function KsiegowoscClient({
           <p className="rounded-xl bg-snow px-4 py-3 text-sm font-medium text-depths shadow-sm ring-1 ring-panel-frame/40">
             Prowadzisz pełną KPiR od{" "}
             <span className="dash-mono font-bold">
-              {jdgRegistrationDate ? formatExpenseDate(jdgRegistrationDate) : "—"}
+              {jdgRegistrationDate ? formatExpenseDate(jdgRegistrationDate) : "-"}
             </span>
             .
           </p>
@@ -946,7 +946,7 @@ export function KsiegowoscClient({
             }
             alertText={
               vatLimit.przekroczono
-                ? "Przekroczono limit — rejestracja VAT czynny obowiązkowa"
+                ? "Przekroczono limit - rejestracja VAT czynny obowiązkowa"
                 : null
             }
           />
@@ -1087,8 +1087,8 @@ export function KsiegowoscClient({
         <div className="mb-3">
           <p className="text-muted text-xs capitalize">
             {viewMode === "year"
-              ? `${periodLabel} — wypłaty, premie i koszty dodatkowe z ewidencji miesięcznej`
-              : `${periodLabel} — rachunki i faktury (koszty realne poza wypłatami tutorów)`}
+              ? `${periodLabel} - wypłaty, premie i koszty dodatkowe z ewidencji miesięcznej`
+              : `${periodLabel} - rachunki i faktury (koszty realne poza wypłatami tutorów)`}
           </p>
         </div>
 
@@ -1096,7 +1096,7 @@ export function KsiegowoscClient({
           <>
             {isMonthClosed ? (
               <p className="dash-sans text-toffee mb-3 rounded-ledger border border-toffee/30 bg-butter/20 px-3 py-2 text-xs font-semibold">
-                Miesiąc zamknięty — dodawanie i usuwanie kosztów jest zablokowane.
+                Miesiąc zamknięty - dodawanie i usuwanie kosztów jest zablokowane.
               </p>
             ) : (
             <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto rounded-app bg-snow p-2">
@@ -1205,7 +1205,7 @@ export function KsiegowoscClient({
               Lista kosztów · według daty
             </h3>
             {expensesForPeriod.length === 0 ? (
-              <p className="text-muted py-3 text-xs">Brak kosztów w tym miesiącu — dodaj powyżej.</p>
+              <p className="text-muted py-3 text-xs">Brak kosztów w tym miesiącu - dodaj powyżej.</p>
             ) : (
               <div className="mt-2 max-h-[min(16rem,36vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
                 <table className="w-full min-w-176 border-collapse">
@@ -1226,7 +1226,7 @@ export function KsiegowoscClient({
                       <tr key={e.id} className={rowZebra}>
                         <td className={`${td} dash-mono text-muted`}>{i + 1}</td>
                         <td className={`${td} dash-mono`}>{formatExpenseDate(e.invoice_date)}</td>
-                        <td className={`${td} font-medium`}>{e.document_number || "—"}</td>
+                        <td className={`${td} font-medium`}>{e.document_number || "-"}</td>
                         <td className={`${td} font-medium`}>{e.expense_name}</td>
                         <td className={td}>{e.issuer_name}</td>
                         <td className={`${td} text-right font-bold dash-mono text-toffee`}>
@@ -1244,7 +1244,7 @@ export function KsiegowoscClient({
                               {e.attachment_name ? truncateFileName(e.attachment_name) : "Pobierz"}
                             </button>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="text-muted">-</span>
                           )}
                         </td>
                         <td className={td}>
@@ -1258,7 +1258,7 @@ export function KsiegowoscClient({
                               Usuń
                             </button>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="text-muted">-</span>
                           )}
                         </td>
                       </tr>
@@ -1270,7 +1270,7 @@ export function KsiegowoscClient({
           </>
         ) : yearCostRows.length === 0 ? (
           <p className="text-muted py-3 text-xs">
-            Brak kosztów w tym roku — pojawią się po wypłatach i kosztach z widoku miesięcznego.
+            Brak kosztów w tym roku - pojawią się po wypłatach i kosztach z widoku miesięcznego.
           </p>
         ) : (
           <div className="max-h-[min(20rem,42vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
@@ -1396,8 +1396,8 @@ export function KsiegowoscClient({
                     <td className={`${td} text-right font-bold dash-mono text-moss`}>
                       {formatPln(yearSummaryTotals.margin)}
                     </td>
-                    <td className={`${td} text-right dash-mono text-muted`}>—</td>
-                    <td className={`${td} text-right dash-mono text-muted`}>—</td>
+                    <td className={`${td} text-right dash-mono text-muted`}>-</td>
+                    <td className={`${td} text-right dash-mono text-muted`}>-</td>
                     <td className={`${td} text-right font-bold dash-mono`}>
                       {yearSummaryTotals.lessonCount}
                     </td>
@@ -1422,7 +1422,7 @@ export function KsiegowoscClient({
 
       {!isMonthClosed ? (
       <section className="rounded-app bg-snow p-4 sm:p-5">
-        <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia — Zrób to sam</h2>
+        <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia - Zrób to sam</h2>
         <p className="text-muted mt-1 text-xs">
           Tylko to, co dotyczy Twojej firmy ·{" "}
           <span className="capitalize">{periodLabel}</span> · dane VERIFIED + wypłaty PAID
@@ -1446,21 +1446,21 @@ export function KsiegowoscClient({
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">Twój ZUS</p>
-                    <p className="text-muted text-xs">NDG — brak składek społecznych</p>
+                    <p className="text-muted text-xs">NDG - brak składek społecznych</p>
                   </div>
                   <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">Składka zdrowotna</p>
-                    <p className="text-muted text-xs">NDG — brak obowiązku</p>
+                    <p className="text-muted text-xs">NDG - brak obowiązku</p>
                   </div>
                   <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">ZUS pracowników</p>
-                    <p className="text-muted text-xs">Studenci &lt;26 lat — zwolnienie</p>
+                    <p className="text-muted text-xs">Studenci &lt;26 lat - zwolnienie</p>
                   </div>
                   <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
                 </li>
@@ -1554,10 +1554,10 @@ export function KsiegowoscClient({
                     className="text-depths rounded-app border border-panel-frame/40 bg-white px-3 py-2 text-sm"
                   >
                     <option value="start">
-                      Ulga na start — {formatCurrencyPln(ZUS_ULGA_NA_START_SPOLECZNE)} społeczne
+                      Ulga na start - {formatCurrencyPln(ZUS_ULGA_NA_START_SPOLECZNE)} społeczne
                     </option>
                     <option value="maly">
-                      Preferencyjny — {formatCurrencyPln(ZUS_PREFERENCYJNY_SPOLECZNE)} społeczne
+                      Preferencyjny - {formatCurrencyPln(ZUS_PREFERENCYJNY_SPOLECZNE)} społeczne
                     </option>
                   </select>
                 </label>
@@ -1577,7 +1577,7 @@ export function KsiegowoscClient({
               <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <div>
                   <p className="font-semibold text-depths">ZUS pracowników</p>
-                  <p className="text-muted text-xs">Studenci &lt;26 lat — zwolnienie</p>
+                  <p className="text-muted text-xs">Studenci &lt;26 lat - zwolnienie</p>
                 </div>
                 <span className="dash-mono text-base font-black text-depths">
                   {formatPln(summaryZusPracownicy)}
@@ -1610,7 +1610,7 @@ export function KsiegowoscClient({
         <p className="mt-4 text-xs font-medium text-claret">
           {viewMode === "month"
             ? "Pamiętaj, aby do 25. dnia miesiąca wysłać plik JPK_V7 (KPiR) z Twojego programu księgowego!"
-            : "W ciągu roku JPK_V7 wysyłasz miesięcznie — ten widok pomaga kontrolować sumy roczne."}
+            : "W ciągu roku JPK_V7 wysyłasz miesięcznie - ten widok pomaga kontrolować sumy roczne."}
         </p>
           </>
         )}
@@ -1626,10 +1626,10 @@ export function KsiegowoscClient({
               </span>
               <div>
                 <p className="section-label text-base !tracking-wide">
-                  Miesiąc zamknięty — ukończony etap
+                  Miesiąc zamknięty - ukończony etap
                 </p>
                 <p className="text-muted mt-0.5 text-xs capitalize">
-                  {periodLabel} — rozliczenie zakończone i zarchiwizowane. Poniższe liczby są ostateczne i
+                  {periodLabel} - rozliczenie zakończone i zarchiwizowane. Poniższe liczby są ostateczne i
                   niemodyfikowalne.
                 </p>
               </div>
@@ -1661,7 +1661,7 @@ export function KsiegowoscClient({
               <h2 className="section-label text-base">Kreator zamknięcia miesiąca</h2>
               <p className="text-muted mt-1 text-xs capitalize">
                 {periodLabel}
-                {!canClose ? " — zamknięcie dostępne od 6. dnia następnego miesiąca." : " — spełnij warunki, aby zamknąć miesiąc."}
+                {!canClose ? " - zamknięcie dostępne od 6. dnia następnego miesiąca." : " - spełnij warunki, aby zamknąć miesiąc."}
               </p>
             </div>
 
@@ -1673,7 +1673,7 @@ export function KsiegowoscClient({
               >
                 <span className="dash-mono text-xs font-bold">{lessonsReady ? "✓" : "✗"}</span>
                 <span className="font-medium">
-                  Warunek 1 — wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji)
+                  Warunek 1 - wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji)
                 </span>
               </li>
               <li
@@ -1682,7 +1682,7 @@ export function KsiegowoscClient({
                 }`}
               >
                 <span className="dash-mono text-xs font-bold">{payoutsReady ? "✓" : "✗"}</span>
-                <span className="font-medium">Warunek 2 — wszystkie wypłaty tutorów mają status PAID</span>
+                <span className="font-medium">Warunek 2 - wszystkie wypłaty tutorów mają status PAID</span>
               </li>
               <li>
                 <label className="flex cursor-pointer items-center gap-2 rounded-ledger border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-paper">
@@ -1692,7 +1692,7 @@ export function KsiegowoscClient({
                     onChange={() => setBankReconciled((v) => !v)}
                     disabled={!canClose}
                   />
-                  <span className="font-medium">Warunek 3 — potwierdzam zgodność salda z kontem bankowym</span>
+                  <span className="font-medium">Warunek 3 - potwierdzam zgodność salda z kontem bankowym</span>
                 </label>
               </li>
             </ul>
@@ -1713,7 +1713,7 @@ export function KsiegowoscClient({
         <section className="rounded-app bg-snow p-4 sm:p-5">
           <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Zamknięcia w roku {selectedYear}</h2>
           <p className="text-muted mt-1 text-xs">
-            Zamknięcie dotyczy zawsze konkretnego miesiąca — tu widzisz statusy. Przełącz na widok miesięczny, aby
+            Zamknięcie dotyczy zawsze konkretnego miesiąca - tu widzisz statusy. Przełącz na widok miesięczny, aby
             zamknąć wybrany miesiąc.
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1738,7 +1738,7 @@ export function KsiegowoscClient({
         open={confirmCloseOpen}
         tone="positive"
         title={`Zamknąć ${periodLabel}?`}
-        description="Miesiąc zostanie oznaczony jako zamknięty — dodawanie/usuwanie kosztów oraz edycja lekcji, wypłat i wydatków za ten miesiąc będzie zablokowana. Tej operacji nie można cofnąć z UI."
+        description="Miesiąc zostanie oznaczony jako zamknięty - dodawanie/usuwanie kosztów oraz edycja lekcji, wypłat i wydatków za ten miesiąc będzie zablokowana. Tej operacji nie można cofnąć z UI."
         confirmLabel="Zamknij miesiąc"
         successMessage="Miesiąc został zamknięty."
         onConfirm={handleCloseMonth}
@@ -1759,7 +1759,7 @@ export function KsiegowoscClient({
   );
 }
 
-/** Pozycja w statycznym, archiwalnym podsumowaniu zamkniętego miesiąca — bez interakcji. */
+/** Pozycja w statycznym, archiwalnym podsumowaniu zamkniętego miesiąca - bez interakcji. */
 function ClosedFigure({
   label,
   value,
@@ -1782,7 +1782,7 @@ function ClosedFigure({
   );
 }
 
-/** Uproszczone podsumowanie P&L — te same pozycje w NDG i JDG (zera tam, gdzie nie dotyczy). */
+/** Uproszczone podsumowanie P&L - te same pozycje w NDG i JDG (zera tam, gdzie nie dotyczy). */
 function ProfitSummary({
   gross,
   payouts,

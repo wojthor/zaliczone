@@ -1,6 +1,6 @@
 /**
  * Centralny plik dat i terminów logiki biznesowej ZALICZONE.
- * Tu ustawiasz wszystkie „do kiedy” / „od kiedy” / progi — reszta aplikacji czyta stąd.
+ * Tu ustawiasz wszystkie „do kiedy” / „od kiedy” / progi - reszta aplikacji czyta stąd.
  *
  * Format miesięcy: "YYYY-MM"
  * Format dni w miesiącu: liczby 1–31
@@ -9,23 +9,22 @@
 /** Udział nauczyciela w stawce klienta (0.7 = 70%) */
 export const TUTOR_SHARE = 0.7;
 
-/** Stawka PIT skali (I próg) — kanoniczna wartość w `lib/podatki-config.ts`. */
+/** Stawka PIT skali (I próg) - kanoniczna wartość w `lib/podatki-config.ts`. */
 export { ADMIN_PIT_RATE } from "@/lib/podatki-config";
 
 export const DATES = {
   /**
-   * Ewidencja godzin — deadline dla nauczyciela.
-   * Do 3. dnia nowego miesiąca (za miesiąc poprzedni).
-   * 1. dnia — mail przypominający o podpisanych ewidencjach.
+   * Ewidencja godzin za miesiąc M:
+   * PDF do wygenerowania od `unlockDayOfNextMonth` kolejnego miesiąca,
+   * podpisany skan do `deadlineDayOfNextMonth`.
    */
   ewidencja: {
-    reminderDayOfNextMonth: 1,
+    unlockDayOfNextMonth: 1,
     deadlineDayOfNextMonth: 3,
-    requestAvailableFromDay: 1,
   },
 
   /**
-   * Rachunki do podpisania — wysyłka do nauczycieli 3. dnia,
+   * Rachunki do podpisania - wysyłka do nauczycieli 3. dnia,
    * zwrot podpisanych do 5. dnia (po przesłaniu ewidencji).
    */
   rachunek: {
@@ -34,14 +33,14 @@ export const DATES = {
   },
 
   /**
-   * Weryfikacja zgodności podpisanych dokumentów z systemem — po 5. dniu.
+   * Weryfikacja zgodności podpisanych dokumentów z systemem - po 5. dniu.
    */
   verification: {
     fromDayOfNextMonth: 6,
   },
 
   /**
-   * Wypłaty nauczycieli — przelew i odznaczenie „WYPŁACONE” do 10. dnia.
+   * Wypłaty nauczycieli - przelew i odznaczenie „WYPŁACONE” do 10. dnia.
    */
   payout: {
     availableFromDay: 6,
@@ -49,7 +48,7 @@ export const DATES = {
   },
 
   /**
-   * Zamknięcie miesiąca w księgowości — najlepiej do 15. dnia:
+   * Zamknięcie miesiąca w księgowości - najlepiej do 15. dnia:
    * generacja księgowości, koszty (wypłaty na miesiąc bieżący) + podpisane rachunki.
    */
   monthClose: {
@@ -58,14 +57,14 @@ export const DATES = {
   },
 
   /**
-   * Weryfikacja finansów (limity, koszty) — po zamknięciu miesiąca.
+   * Weryfikacja finansów (limity, koszty) - po zamknięciu miesiąca.
    */
   financeReview: {
     dayOfNextMonth: 16,
   },
 
   /**
-   * Podatki (np. zaliczka PIT na JDG) — do 20. dnia.
+   * Podatki (np. zaliczka PIT na JDG) - do 20. dnia.
    */
   taxes: {
     deadlineDayOfNextMonth: 20,
@@ -75,19 +74,19 @@ export const DATES = {
    * Terminy roczne (po zamknięciu roku kalendarzowego).
    */
   yearEnd: {
-    /** Zestawienie kosztów — do 15 stycznia */
+    /** Zestawienie kosztów - do 15 stycznia */
     costSummaryDay: 15,
-    /** PIT-11 do US — do końca stycznia */
+    /** PIT-11 do US - do końca stycznia */
     pit11ToUsMonth: 1,
-    /** Maile z PIT do nauczycieli — do końca lutego */
+    /** Maile z PIT do nauczycieli - do końca lutego */
     pitToTeachersMonth: 2,
-    /** PIT-36 właściciela — do końca kwietnia */
+    /** PIT-36 właściciela - do końca kwietnia */
     pit36Month: 4,
   },
 
   /**
    * Premia miesięczna dla nauczyciela.
-   * Po osiągnięciu `hoursThreshold` godzin lekcji VERIFIED w miesiącu — dodatek `bonusPln` do wypłaty.
+   * Po osiągnięciu `hoursThreshold` godzin lekcji VERIFIED w miesiącu - dodatek `bonusPln` do wypłaty.
    */
   bonus: {
     hoursThreshold: 40,
@@ -103,6 +102,22 @@ export const DATES = {
 } as const;
 
 export type DatesConfig = typeof DATES;
+
+/** Dzień, od którego nauczyciel może wygenerować PDF za `monthKey` (np. 2026-06 → 2026-07-01). */
+export function ewidencjaUnlockDate(monthKey: string): Date {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y!, m!, DATES.ewidencja.unlockDayOfNextMonth, 0, 0, 0, 0);
+}
+
+/** Czy dziś (albo podana data) jest już dniem odblokowania PDF za miesiąc M. */
+export function isEwidencjaPdfAvailable(monthKey: string, today = new Date()): boolean {
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return start >= ewidencjaUnlockDate(monthKey);
+}
+
+export function ewidencjaAvailableFromHint(monthLabel: string): string {
+  return `Ewidencja za ${monthLabel} będzie dostępna od ${DATES.ewidencja.unlockDayOfNextMonth}. dnia kolejnego miesiąca`;
+}
 
 /** Deadline ewidencji za dany miesiąc (np. 2026-06 → 2026-07-03). */
 export function ewidencjaDeadlineIso(monthKey: string): string {
@@ -148,7 +163,7 @@ function formatDayLongPl(y: number, monthIndex0: number, day: number): string {
 }
 
 /**
- * Terminy „do kiedy" dla bieżącego cyklu — używane w zakładce Przewodnik i jej skrócie
+ * Terminy „do kiedy" dla bieżącego cyklu - używane w zakładce Przewodnik i jej skrócie
  * na dashboardzie tutora. Jedno miejsce liczenia, żeby oba widoki zawsze się zgadzały.
  */
 export function guideDeadlines(now = new Date()): {

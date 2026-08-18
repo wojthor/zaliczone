@@ -54,7 +54,7 @@ function expandLessonToHourRows(line: FinanceLineUi): Array<{
   const totalMinutes = minutesFromLine(line);
   const fullHours = Math.floor(totalMinutes / 60);
   const remainder = totalMinutes % 60;
-  const classLevel = (line.classLevel ?? "").trim() || "—";
+  const classLevel = (line.classLevel ?? "").trim() || "-";
   const activityType = (line.subject ?? "").trim() || "Zajęcia dydaktyczne";
   const dateIso = line.dateIso || `${line.monthKey}-01`;
   const base = { dateIso, classLevel, activityType };
@@ -100,7 +100,7 @@ export function EwidencjaPrintView({
 
   return (
     <div className="min-h-dvh bg-[#F0EFEA] text-black print:bg-white print:p-0">
-      {/* Pasek akcji — tylko ekran */}
+      {/* Pasek akcji - tylko ekran */}
       <div className="sticky top-0 z-20 border-b border-black/10 bg-[#F0EFEA]/95 backdrop-blur-sm print:hidden">
         <div className="mx-auto flex max-w-4xl items-center gap-2 px-3 py-2.5 sm:px-6">
           <Link
@@ -152,7 +152,7 @@ export function EwidencjaPrintView({
             </p>
           </section>
 
-          {/* Podsumowanie godzin — widoczne na mobile */}
+          {/* Podsumowanie godzin - widoczne na mobile */}
           <div className="mt-4 flex items-center justify-between rounded-lg bg-[#000C4A] px-3.5 py-3 text-white md:hidden print:hidden">
             <span className="text-xs font-semibold uppercase tracking-wide text-white/70">
               Razem godzin
@@ -162,7 +162,7 @@ export function EwidencjaPrintView({
             </span>
           </div>
 
-          {/* Karty — mobile / tablet portrait */}
+          {/* Karty - mobile / tablet portrait */}
           <ul className="mt-4 space-y-2 md:hidden print:hidden">
             {rows.length === 0 ? (
               <li className="rounded-lg border border-dashed border-neutral-300 px-3 py-8 text-center text-sm text-neutral-500">
@@ -196,7 +196,7 @@ export function EwidencjaPrintView({
             )}
           </ul>
 
-          {/* Tabela — desktop ekran + zawsze druk */}
+          {/* Tabela - desktop ekran + zawsze druk */}
           <div className="mt-6 hidden overflow-x-auto md:block print:mt-6 print:block print:overflow-visible">
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -276,10 +276,9 @@ export function EwidencjaPrintView({
           </section>
 
           <p className="mt-6 text-[11px] leading-relaxed text-neutral-600 sm:mt-8 print:mt-8">
-            Dokument wygenerowany w systemie ZALICZONE na podstawie lekcji o statusie VERIFIED. Każda
-            godzina dydaktyczna stanowi osobny wiersz. Poziom nauczania pochodzi z kartoteki ucznia;
-            forma zajęć dydaktycznych odpowiada przedmiotowi lekcji. Wydrukuj, podpisz i przekaż
-            skan do placówki.
+            Liczymy tu tylko lekcje, które koordynator już zatwierdził. Każda godzina to osobny
+            wiersz w tabeli. Poziom bierzemy z karty ucznia, przedmiot - z samej lekcji. Wydrukuj,
+            podpisz i wyślij skan koordynatorowi.
           </p>
         </article>
       </div>

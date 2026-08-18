@@ -11,7 +11,6 @@ export type Profile = {
   role: UserRole;
   full_name: string | null;
   active_subjects: string[];
-  ewidencja_unlocked_for_month: string | null;
   /** Czy nauczyciel chce przyjmować dodatkowych uczniów */
   accepting_students?: boolean;
   phone?: string | null;
@@ -45,6 +44,41 @@ export type DbStudent = {
   class_level: string;
   rate_pln: number;
   created_at: string;
+  blocked?: boolean;
+  blocked_at?: string | null;
+  blocked_reason?: string | null;
+};
+
+export type AlertKind = "UNPAID_STREAK" | "STOP_TEACHING" | "STUDENT_BLOCKED";
+export type AlertAudience = "ADMIN" | "TUTOR";
+
+export type AppAlert = {
+  id: string;
+  kind: AlertKind;
+  audience: AlertAudience;
+  tutorId: string | null;
+  tutorName: string | null;
+  studentId: string | null;
+  studentName: string | null;
+  title: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+  resolvedAt: string | null;
+};
+
+export type NotificationKind = "EWIDENCJA_REQUEST" | "CENNIK_UPDATE" | "PAYOUT" | "INFO";
+
+export type AppNotification = {
+  id: string;
+  audience: AlertAudience;
+  tutorId: string | null;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  href: string | null;
+  createdAt: string;
+  readAt: string | null;
 };
 
 export type DbLesson = {
@@ -105,12 +139,13 @@ export type StudentUi = {
   ratePerHourPln: number;
   nextLesson: string;
   createdAtTs: number;
+  blocked: boolean;
 };
 
 export type FinanceLineUi = {
   id: string;
   studentName: string;
-  /** Id ucznia — unikalne zliczanie w zestawieniach */
+  /** Id ucznia - unikalne zliczanie w zestawieniach */
   studentId: string;
   /** Poziom / klasa ucznia (nabywcy) */
   classLevel: string | null;
@@ -118,20 +153,20 @@ export type FinanceLineUi = {
   amountPln: number;
   /** Czas lekcji w minutach */
   durationMinutes: number;
-  /** dd.mm — wyświetlanie */
+  /** dd.mm - wyświetlanie */
   date: string;
-  /** YYYY-MM-DD — filtrowanie tygodni / sortowanie */
+  /** YYYY-MM-DD - filtrowanie tygodni / sortowanie */
   dateIso: string;
   monthKey: string;
   status: LessonStatus;
   tutorId: string;
   tutorName: string;
   subject: string;
-  /** dd.mm — data wpływu na konto */
+  /** dd.mm - data wpływu na konto */
   paymentReceivedAt: string | null;
-  /** YYYY-MM-DD — do pól date w UI */
+  /** YYYY-MM-DD - do pól date w UI */
   paymentReceivedAtIso: string | null;
-  /** Metoda płatności — ustawiana przy zatwierdzeniu (zob. lib/payment-methods.ts) */
+  /** Metoda płatności - ustawiana przy zatwierdzeniu (zob. lib/payment-methods.ts) */
   paymentMethod: string | null;
 };
 
@@ -150,11 +185,10 @@ export type AdminTutorSummary = {
   pendingPln: number;
   paidPln: number;
   subjects: string[];
-  ewidencjaUnlockedForMonth: string | null;
   payoutStatusForMonth: PayoutStatus | null;
   /** Czy przyjmuje dodatkowych uczniów */
   acceptingStudents: boolean;
-  /** Dane PIT (opcjonalne — po migracji 0010) */
+  /** Dane PIT (opcjonalne - po migracji 0010) */
   pesel: string | null;
   birthDate: string | null;
   taxStreet: string | null;

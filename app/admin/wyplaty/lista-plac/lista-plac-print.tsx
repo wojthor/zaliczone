@@ -28,7 +28,7 @@ export function ListaPlacPrintView({
   return (
     <div className="min-h-screen bg-white p-6 text-black print:p-4">
       <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
-        <p className="text-sm text-neutral-600">Lista płac — drukuj lub zapisz jako PDF.</p>
+        <p className="text-sm text-neutral-600">Lista płac - drukuj lub zapisz jako PDF.</p>
         <button
           type="button"
           onClick={() => window.print()}
@@ -82,7 +82,7 @@ export function ListaPlacPrintView({
                 <td className="border border-black px-2 py-1.5 text-center">{i + 1}</td>
                 <td className="border border-black px-2 py-1.5 font-medium">{row.tutorName}</td>
                 <td className="border border-black px-2 py-1.5 font-mono text-xs">
-                  {row.bankAccount || "—"}
+                  {row.bankAccount || "-"}
                 </td>
                 <td className="border border-black px-2 py-1.5 text-right tabular-nums">
                   {row.lessonCount}

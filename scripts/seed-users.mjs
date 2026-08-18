@@ -1,6 +1,6 @@
 /**
  * Seed Supabase Auth users + profiles.
- * Uses REST/Auth Admin API (no WebSocket — works on Node 21).
+ * Uses REST/Auth Admin API (no WebSocket - works on Node 21).
  *
  * Run: pnpm seed
  */
@@ -82,7 +82,7 @@ async function seedAccount(account) {
 
   if (existing) {
     await upsertProfile(existing.id, account.role, account.full_name);
-    console.log(`✓ ${account.email} — profile updated (${account.role})`);
+    console.log(`✓ ${account.email} - profile updated (${account.role})`);
     return existing.id;
   }
 
@@ -91,7 +91,7 @@ async function seedAccount(account) {
   if (!userId) throw new Error(`No user id returned for ${account.email}`);
 
   await upsertProfile(userId, account.role, account.full_name);
-  console.log(`✓ ${account.email} — created (${account.role})`);
+  console.log(`✓ ${account.email} - created (${account.role})`);
   return userId;
 }
 

@@ -17,6 +17,7 @@ import {
 } from "@/lib/date/week-utils";
 import { isLessonLocked } from "@/lib/data/mappers";
 import { tutorToggleLessonVerification } from "@/lib/actions/lessons";
+import { Spinner, useToast } from "@/components/ui/toast";
 
 function IconCheck(props: { className?: string }) {
   return (
@@ -30,7 +31,7 @@ type WeeklyScheduleProps = {
   lessons?: Lesson[];
   hideHeader?: boolean;
   className?: string;
-  /** Poniedziałek tygodnia (YYYY-MM-DD) — tryb kontrolowany */
+  /** Poniedziałek tygodnia (YYYY-MM-DD) - tryb kontrolowany */
   weekMondayIso?: string;
   onWeekMondayIsoChange?: (weekMondayIso: string) => void;
   /** @deprecated użyj weekMondayIso */
@@ -124,6 +125,9 @@ export function WeeklySchedule({
   onWeekStartChange,
 }: WeeklyScheduleProps) {
   const router = useRouter();
+  const toast = useToast();
+  const [statusById, setStatusById] = useState<Record<string, LessonStatus>>({});
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const [displayWeekMondayIso, setDisplayWeekMondayIso] = useState(() =>
     controlledWeekMondayIso ??
       (controlledWeekStart ? toMondayIso(controlledWeekStart) : toMondayIso(new Date())),
@@ -179,11 +183,41 @@ export function WeeklySchedule({
 
   const todayKey = dateKeyFromYMD(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
 
+  useEffect(() => {
+    setStatusById((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const lesson of lessons) {
+        const server = lessonStatus(lesson);
+        if (next[lesson.id] === server) {
+          delete next[lesson.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [lessons]);
+
   async function handleToggle(lesson: Lesson) {
-    const status = lessonStatus(lesson);
-    if (isLessonLocked(status)) return;
-    await tutorToggleLessonVerification(lesson.id, status);
-    router.refresh();
+    const status = statusById[lesson.id] ?? lessonStatus(lesson);
+    if (isLessonLocked(status) || pendingId === lesson.id) return;
+    const optimistic = status === "PLANNED" || status === "UNPAID" ? "PENDING_VERIFICATION" : "PLANNED";
+    setPendingId(lesson.id);
+    setStatusById((prev) => ({ ...prev, [lesson.id]: optimistic }));
+    try {
+      const next = await tutorToggleLessonVerification(lesson.id);
+      setStatusById((prev) => ({ ...prev, [lesson.id]: next }));
+      router.refresh();
+    } catch (e) {
+      setStatusById((prev) => {
+        const copy = { ...prev };
+        delete copy[lesson.id];
+        return copy;
+      });
+      toast.error("Nie udało się zaliczyć lekcji", e instanceof Error ? e.message : "Spróbuj jeszcze raz.");
+    } finally {
+      setPendingId(null);
+    }
   }
 
   const grid = (
@@ -227,8 +261,9 @@ export function WeeklySchedule({
                 ) : (
                   (byDay[dayIndex] ?? []).map((lesson) => {
                     const dateKey = lesson.date ?? dateKeyByDayIndex[dayIndex]!;
-                    const status = lessonStatus(lesson);
+                    const status = statusById[lesson.id] ?? lessonStatus(lesson);
                     const locked = isLessonLocked(status);
+                    const busy = pendingId === lesson.id;
                     const colors = textClasses(status);
                     return (
                       <div
@@ -257,14 +292,14 @@ export function WeeklySchedule({
                           </p>
                           {status === "UNPAID" ? (
                             <p className="mt-0.5 text-center text-[0.5rem] font-extrabold uppercase leading-tight text-white/90">
-                              Brak wpłaty — interweniuj
+                              Brak wpłaty - interweniuj
                             </p>
                           ) : null}
                         </div>
                         <button
                           type="button"
                           onClick={() => handleToggle(lesson)}
-                          disabled={locked}
+                          disabled={locked || busy}
                           aria-pressed={status === "PENDING_VERIFICATION" || status === "VERIFIED"}
                           aria-label={
                             locked
@@ -277,7 +312,9 @@ export function WeeklySchedule({
                           }
                           className={`mt-auto flex w-full shrink-0 items-center justify-center gap-1 rounded-ledger py-1 text-[0.6rem] font-extrabold ${actionButtonClasses(status, locked)}`}
                         >
-                          {status === "VERIFIED" || status === "PENDING_VERIFICATION" ? (
+                          {busy ? (
+                            <Spinner className="h-3 w-3" />
+                          ) : status === "VERIFIED" || status === "PENDING_VERIFICATION" ? (
                             <IconCheck className="h-4 w-4 shrink-0" />
                           ) : null}
                           <span>{actionLabel(status)}</span>

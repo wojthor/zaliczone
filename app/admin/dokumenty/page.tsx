@@ -1,6 +1,12 @@
-import { redirect } from "next/navigation";
+import { DokumentyClient } from "./dokumenty-client";
+import { getAllTutorProfiles, getDocumentTree } from "@/lib/data/queries";
 
-/** Admin przegląda i zarządza plikami bezpośrednio na Dysku Google. */
-export default function AdminDokumentyPage() {
-  redirect("/admin");
+export default async function AdminDokumentyPage() {
+  const [tree, tutors] = await Promise.all([getDocumentTree(), getAllTutorProfiles()]);
+  return (
+    <DokumentyClient
+      tree={tree}
+      tutors={tutors.map((t) => ({ id: t.id, name: t.full_name ?? "Nauczyciel" }))}
+    />
+  );
 }

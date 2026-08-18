@@ -1,15 +1,45 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { isLessonLocked } from "@/lib/data/mappers";
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { lessonTimesOverlap, normalizeLessonTime } from "@/lib/lessons/time-overlap";
+import { bustLessonAndBonus, revalidateLessonPages } from "@/lib/cache";
 import type { LessonStatus } from "@/lib/types/database";
+
+function revalidateLessonViews(teacherId: string, month?: string | null) {
+  bustLessonAndBonus(teacherId, month);
+  revalidateLessonPages();
+}
+
+function todayIsoKey(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw" }).format(d);
+}
+
+function assertLessonDateNotPast(dateIso: string, action: "usuwać" | "edytować") {
+  if (dateIso < todayIsoKey()) {
+    throw new Error(`Nie możesz ${action} zajęć, które już się odbyły.`);
+  }
+}
+
+async function assertTutorMayTeachSubject(tutorId: string, subject: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("active_subjects")
+    .eq("id", tutorId)
+    .maybeSingle();
+  if (error) throw error;
+  const allowed = data?.active_subjects ?? [];
+  if (!subject.trim() || !allowed.includes(subject)) {
+    throw new Error("Możesz ustawić tylko przedmiot, do którego masz uprawnienia.");
+  }
+}
 
 /**
  * Mutacje lekcji jako Server Actions (przeniesione z lib/data/mutations.ts, które wołały
- * Supabase bezpośrednio z klienta). Każda funkcja sprawdza assertMonthOpen na starcie —
+ * Supabase bezpośrednio z klienta). Każda funkcja sprawdza assertMonthOpen na starcie -
  * to samo zabezpieczenie działa niezależnie od widoku (kalendarz, terminarz, panel admina).
  */
 
@@ -19,7 +49,7 @@ type InsertLessonInput = {
   dates: string[];
   start: string;
   end: string;
-  /** Wspólne ID serii — ustawiane przy cyklicznym dodawaniu */
+  /** Wspólne ID serii - ustawiane przy cyklicznym dodawaniu */
   seriesId?: string | null;
 };
 
@@ -77,11 +107,21 @@ export async function insertLessons(input: InsertLessonInput) {
     await assertMonthOpen(monthKeyFromDate(date));
   }
 
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayKey = todayIsoKey();
   const past = input.dates.find((d) => d < todayKey);
   if (past) {
     throw new Error("Nie możesz dodawać lekcji na dzień wcześniejszy niż dziś.");
+  }
+
+  await assertTutorMayTeachSubject(user.id, input.subject);
+
+  const { data: studentRow } = await supabase
+    .from("students")
+    .select("blocked")
+    .eq("id", input.studentId)
+    .maybeSingle();
+  if (studentRow?.blocked) {
+    throw new Error("Ten uczeń jest zablokowany - nie możesz dodać lekcji.");
   }
 
   await assertNoTutorTimeConflict({
@@ -121,7 +161,7 @@ export async function insertLessons(input: InsertLessonInput) {
   }
 
   if (error) throw error;
-  revalidatePath("/", "layout");
+  revalidateLessonViews(user.id);
   return data;
 }
 
@@ -151,14 +191,13 @@ export async function updateLesson(
   if (existing.status !== "PLANNED") {
     throw new Error("Możesz edytować tylko lekcje ze statusem zaplanowana.");
   }
-  if (existing.date) await assertMonthOpen(monthKeyFromDate(existing.date));
-  await assertMonthOpen(monthKeyFromDate(input.date));
-
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  if (input.date < todayKey) {
-    throw new Error("Nie możesz ustawić lekcji na dzień wcześniejszy niż dziś.");
+  if (existing.date) {
+    await assertMonthOpen(monthKeyFromDate(existing.date));
+    assertLessonDateNotPast(existing.date, "edytować");
   }
+  await assertMonthOpen(monthKeyFromDate(input.date));
+  assertLessonDateNotPast(input.date, "edytować");
+  await assertTutorMayTeachSubject(user.id, input.subject);
 
   await assertNoTutorTimeConflict({
     tutorId: user.id,
@@ -180,7 +219,7 @@ export async function updateLesson(
     .eq("id", lessonId);
 
   if (error) throw error;
-  revalidatePath("/", "layout");
+  revalidateLessonViews(user.id);
 }
 
 export async function deleteLesson(lessonId: string) {
@@ -200,16 +239,19 @@ export async function deleteLesson(lessonId: string) {
   if (existing.status !== "PLANNED") {
     throw new Error("Możesz usuwać tylko lekcje ze statusem zaplanowana.");
   }
-  if (existing.date) await assertMonthOpen(monthKeyFromDate(existing.date));
+  if (existing.date) {
+    await assertMonthOpen(monthKeyFromDate(existing.date));
+    assertLessonDateNotPast(existing.date, "usuwać");
+  }
 
   const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  revalidateLessonViews(user.id);
 }
 
 /**
  * Usuwa lekcję oraz wszystkie późniejsze z tej samej serii (date >= fromDate).
- * Jeśli brak series_id — usuwa tylko wskazaną lekcję.
+ * Jeśli brak series_id - usuwa tylko wskazaną lekcję.
  * Tylko status PLANNED.
  */
 export async function deleteLessonAndRemainingInSeries(lessonId: string) {
@@ -233,11 +275,12 @@ export async function deleteLessonAndRemainingInSeries(lessonId: string) {
   }
 
   await assertMonthOpen(monthKeyFromDate(existing.date));
+  assertLessonDateNotPast(existing.date, "usuwać");
 
   if (!existing.series_id) {
     const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
     if (error) throw error;
-    revalidatePath("/", "layout");
+    revalidateLessonViews(user.id);
     return { deleted: 1 };
   }
 
@@ -254,16 +297,17 @@ export async function deleteLessonAndRemainingInSeries(lessonId: string) {
   const ids = (siblings ?? []).map((s) => s.id);
   for (const row of siblings ?? []) {
     await assertMonthOpen(monthKeyFromDate(row.date));
+    assertLessonDateNotPast(row.date, "usuwać");
   }
 
   if (ids.length === 0) {
-    revalidatePath("/", "layout");
+    revalidateLessonViews(user.id);
     return { deleted: 0 };
   }
 
   const { error } = await supabase.from("lessons").delete().in("id", ids);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  revalidateLessonViews(user.id);
   return { deleted: ids.length };
 }
 
@@ -290,6 +334,7 @@ export async function deleteLessonsByIds(lessonIds: string[]) {
 
   for (const row of rows ?? []) {
     await assertMonthOpen(monthKeyFromDate(row.date));
+    assertLessonDateNotPast(row.date, "usuwać");
   }
 
   const ids = (rows ?? []).map((r) => r.id);
@@ -299,35 +344,59 @@ export async function deleteLessonsByIds(lessonIds: string[]) {
 
   const { error } = await supabase.from("lessons").delete().in("id", ids);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  revalidateLessonViews(user.id);
   return { deleted: ids.length };
 }
 
-/** Tutor workflow: submit / undo / resubmit after UNPAID */
-export async function setLessonStatus(lessonId: string, status: LessonStatus) {
-  const supabase = await createClient();
-  const { data: existing } = await supabase.from("lessons").select("date").eq("id", lessonId).maybeSingle();
-  if (existing?.date) await assertMonthOpen(monthKeyFromDate(existing.date));
-
-  const { error } = await supabase.from("lessons").update({ status }).eq("id", lessonId);
-  if (error) throw error;
-  revalidatePath("/", "layout");
+function nextTutorStatus(current: LessonStatus): LessonStatus {
+  if (current === "PLANNED") return "PENDING_VERIFICATION";
+  if (current === "PENDING_VERIFICATION") return "PLANNED";
+  if (current === "UNPAID") return "PENDING_VERIFICATION";
+  return current;
 }
 
-export async function tutorToggleLessonVerification(
-  lessonId: string,
-  currentStatus: LessonStatus,
-): Promise<LessonStatus> {
+/** Tutor workflow: submit / undo / resubmit after UNPAID */
+export async function tutorToggleLessonVerification(lessonId: string): Promise<LessonStatus> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Brak sesji.");
+
+  // Service role - ten sam edge-case co przy zatwierdzaniu przez koordynatora:
+  // RLS potrafi zwrócić sukces przy 0 zaktualizowanych wierszach.
+  const service = createServiceClient();
+  const { data: existing, error: fetchError } = await service
+    .from("lessons")
+    .select("id, date, status, tutor_id")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error("Nie znaleziono lekcji.");
+  if (existing.tutor_id !== user.id) throw new Error("Brak uprawnień.");
+
+  const currentStatus = existing.status as LessonStatus;
   if (isLessonLocked(currentStatus)) {
-    throw new Error("Lekcja zatwierdzona — nie można cofnąć.");
+    throw new Error("Lekcja zatwierdzona - nie można cofnąć.");
   }
 
-  let next: LessonStatus;
-  if (currentStatus === "PLANNED") next = "PENDING_VERIFICATION";
-  else if (currentStatus === "PENDING_VERIFICATION") next = "PLANNED";
-  else if (currentStatus === "UNPAID") next = "PENDING_VERIFICATION";
-  else next = currentStatus;
+  const next = nextTutorStatus(currentStatus);
+  if (next === currentStatus) {
+    throw new Error("Tego statusu nie da się zmienić.");
+  }
 
-  await setLessonStatus(lessonId, next);
+  if (existing.date) await assertMonthOpen(monthKeyFromDate(existing.date));
+
+  const { data, error } = await service
+    .from("lessons")
+    .update({ status: next })
+    .eq("id", lessonId)
+    .eq("tutor_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Nie udało się zapisać statusu lekcji.");
+
+  revalidateLessonViews(user.id, existing.date ? monthKeyFromDate(existing.date) : undefined);
   return next;
 }

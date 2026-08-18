@@ -18,8 +18,8 @@ function round2(n: number): number {
  * KROK 1: podatek_narastająco = max(0, dochód_narastająco × 0.12 − 300 × liczba_miesięcy)
  * KROK 2: zaliczka_tego_miesiąca = max(0, podatek_narastająco − suma_zaliczek_już_zapłaconych)
  *
- * @param dochodyMiesieczneOdRejestracji — dochody miesięczne po kolei od miesiąca rejestracji JDG
- * @param miesiacBiezacy — indeks 0-based w tablicy powyżej (miesiąc, dla którego liczysz zaliczkę)
+ * @param dochodyMiesieczneOdRejestracji - dochody miesięczne po kolei od miesiąca rejestracji JDG
+ * @param miesiacBiezacy - indeks 0-based w tablicy powyżej (miesiąc, dla którego liczysz zaliczkę)
  */
 export function obliczZaliczkePIT(
   dochodyMiesieczneOdRejestracji: number[],

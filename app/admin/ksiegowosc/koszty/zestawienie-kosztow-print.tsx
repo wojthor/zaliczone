@@ -118,7 +118,7 @@ export function ZestawienieKosztowPrintView({
       <div className="min-h-screen bg-white p-6 text-black print:p-4">
         <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
           <p className="text-sm text-neutral-600">
-            Zestawienie kosztów roczne — drukuj / zapisz PDF.
+            Zestawienie kosztów roczne - drukuj / zapisz PDF.
           </p>
           <button
             type="button"
@@ -131,7 +131,7 @@ export function ZestawienieKosztowPrintView({
 
         <header className="border-b-2 border-black pb-3">
           <h1 className="text-xl font-bold uppercase tracking-wide">
-            Zestawienie kosztów — podział miesięczny
+            Zestawienie kosztów - podział miesięczny
           </h1>
           <p className="mt-1 text-sm capitalize">{displayPeriod}</p>
         </header>
@@ -240,7 +240,7 @@ export function ZestawienieKosztowPrintView({
     <div className="min-h-screen bg-white p-6 text-black print:p-4">
       <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
         <p className="text-sm text-neutral-600">
-          Zestawienie kosztów — drukuj / zapisz PDF.
+          Zestawienie kosztów - drukuj / zapisz PDF.
         </p>
         <button
           type="button"
@@ -254,7 +254,7 @@ export function ZestawienieKosztowPrintView({
       <header className="border-b-2 border-black pb-3">
         <h1 className="text-xl font-bold uppercase tracking-wide">Zestawienie kosztów</h1>
         <p className="mt-1 text-sm capitalize">
-          {displayPeriod} — rachunki i faktury (poza wypłatami tutorów)
+          {displayPeriod} - rachunki i faktury (poza wypłatami tutorów)
         </p>
       </header>
 
@@ -307,7 +307,7 @@ export function ZestawienieKosztowPrintView({
                 <td className="border border-black px-1.5 py-1.5 tabular-nums">
                   {formatExpenseDate(e.invoice_date)}
                 </td>
-                <td className="border border-black px-1.5 py-1.5">{e.document_number || "—"}</td>
+                <td className="border border-black px-1.5 py-1.5">{e.document_number || "-"}</td>
                 <td className="border border-black px-1.5 py-1.5 font-medium">{e.expense_name}</td>
                 <td className="border border-black px-1.5 py-1.5">{e.issuer_name}</td>
                 <td className="border border-black px-1.5 py-1.5 text-right font-semibold tabular-nums">

@@ -134,18 +134,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className={RAIL}>
-          <button
-            type="button"
-            title="Wyloguj"
-            aria-label="Wyloguj"
-            onClick={() => {
-              closeMobile();
-              void handleLogout();
-            }}
-            className={iconBtn(false)}
-          >
-            <IconLogout className="h-[1.15rem] w-[1.15rem]" strokeWidth={2.1} />
-          </button>
           <Link
             href="/profil"
             title="Profil"
@@ -159,6 +147,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <IconUser className="h-4 w-4" strokeWidth={2.25} />
           </Link>
+          <button
+            type="button"
+            title="Wyloguj"
+            aria-label="Wyloguj"
+            onClick={() => {
+              closeMobile();
+              void handleLogout();
+            }}
+            className={iconBtn(false)}
+          >
+            <IconLogout className="h-[1.15rem] w-[1.15rem]" strokeWidth={2.1} />
+          </button>
         </div>
       </div>
     </>

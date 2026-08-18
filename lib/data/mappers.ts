@@ -110,15 +110,16 @@ export function dbStudentToUi(
     name: student.name,
     initials: initialsFromName(student.name),
     subjectsLine: student.subjects.join(", "),
-    phone: "—",
-    email: "—",
+    phone: "-",
+    email: "-",
     guardian: "Rodzic / opiekun",
     classLabel: student.class_level,
-    schoolClass: "—",
-    notes: "—",
+    schoolClass: "-",
+    notes: "-",
     ratePerHourPln: Number(student.rate_pln),
     nextLesson: nextLessonLabel,
     createdAtTs: new Date(student.created_at).getTime(),
+    blocked: student.blocked === true,
   };
 }
 

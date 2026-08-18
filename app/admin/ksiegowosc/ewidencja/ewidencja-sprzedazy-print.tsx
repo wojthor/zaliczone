@@ -3,7 +3,7 @@
 import type { FinanceLineUi } from "@/lib/types/database";
 
 /**
- * Ewidencja sprzedaży — miesięczna (pozycje) lub roczna (zestawienie miesięcy).
+ * Ewidencja sprzedaży - miesięczna (pozycje) lub roczna (zestawienie miesięcy).
  */
 
 function formatMonthLongPl(monthKey: string): string {
@@ -64,7 +64,7 @@ export function EwidencjaSprzedazyPrintView({
       <div className="min-h-screen bg-white p-6 text-black print:p-4">
         <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
           <p className="text-sm text-neutral-600">
-            Ewidencja roczna — zestawienie miesięcy. Drukuj / zapisz PDF.
+            Ewidencja roczna - zestawienie miesięcy. Drukuj / zapisz PDF.
           </p>
           <button
             type="button"
@@ -77,9 +77,9 @@ export function EwidencjaSprzedazyPrintView({
 
         <header className="border-b-2 border-black pb-3">
           <h1 className="text-xl font-bold uppercase tracking-wide">
-            Ewidencja sprzedaży bezrachunkowej — zestawienie roczne
+            Ewidencja sprzedaży bezrachunkowej - zestawienie roczne
           </h1>
-          <p className="mt-1 text-sm capitalize">{displayPeriod} — tylko VERIFIED</p>
+          <p className="mt-1 text-sm capitalize">{displayPeriod} - tylko VERIFIED</p>
         </header>
 
         <section className="mt-4 grid gap-1 text-sm sm:grid-cols-2">
@@ -171,7 +171,7 @@ export function EwidencjaSprzedazyPrintView({
     <div className="min-h-screen bg-white p-6 text-black print:p-4">
       <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
         <p className="text-sm text-neutral-600">
-          Ewidencja sprzedaży — drukuj / zapisz PDF (zbroszuruuj, ponumeruj strony).
+          Ewidencja sprzedaży - drukuj / zapisz PDF (zbroszuruuj, ponumeruj strony).
         </p>
         <button
           type="button"
@@ -186,7 +186,7 @@ export function EwidencjaSprzedazyPrintView({
         <h1 className="text-xl font-bold uppercase tracking-wide">
           Ewidencja sprzedaży bezrachunkowej
         </h1>
-        <p className="mt-1 text-sm capitalize">{displayPeriod} — tylko VERIFIED</p>
+        <p className="mt-1 text-sm capitalize">{displayPeriod} - tylko VERIFIED</p>
       </header>
 
       <section className="mt-4 grid gap-1 text-sm sm:grid-cols-2">
@@ -249,7 +249,7 @@ export function EwidencjaSprzedazyPrintView({
                     <td className="border border-black px-1.5 py-1.5 tabular-nums">
                       {line.paymentReceivedAt ?? line.date}
                     </td>
-                    <td className="border border-black px-1.5 py-1.5">{line.paymentMethod ?? "—"}</td>
+                    <td className="border border-black px-1.5 py-1.5">{line.paymentMethod ?? "-"}</td>
                     <td className="border border-black px-1.5 py-1.5">{serviceName(line)}</td>
                     <td className="border border-black px-1.5 py-1.5">{line.studentName}</td>
                     <td className="border border-black px-1.5 py-1.5 text-right font-semibold tabular-nums">

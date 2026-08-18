@@ -3,7 +3,7 @@
 import { SUBJECTS } from "@/lib/subjects";
 
 /**
- * Multi-select przedmiotów jako siatka checkboxów-plakietek — zamiast wpisywania
+ * Multi-select przedmiotów jako siatka checkboxów-plakietek - zamiast wpisywania
  * nazw przedmiotów po przecinku. Używane w formularzu tworzenia i edycji nauczyciela.
  */
 export function SubjectMultiSelect({

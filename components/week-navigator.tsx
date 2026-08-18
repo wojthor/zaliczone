@@ -21,9 +21,9 @@ type WeekNavigatorProps = {
   onWeekMondayIsoChange: (next: string) => void;
   className?: string;
   summary?: ReactNode;
-  /** @deprecated nieużywane — zostawione dla kompatybilności */
+  /** @deprecated nieużywane - zostawione dla kompatybilności */
   prevLabel?: string;
-  /** @deprecated nieużywane — zostawione dla kompatybilności */
+  /** @deprecated nieużywane - zostawione dla kompatybilności */
   nextLabel?: string;
   compact?: boolean;
 };
@@ -128,7 +128,7 @@ export function WeekNavigator({
             onClick={openDatePicker}
             className="text-depths/70 hover:text-depths shrink-0 rounded-full p-0.5 transition hover:bg-luster touch-manipulation"
             aria-label="Wybierz tydzień przez konkretny dzień"
-            title="Wybierz dzień — ustawimy cały tydzień"
+            title="Wybierz dzień - ustawimy cały tydzień"
           >
             <IconCalendar className={compact ? "size-3.5" : "size-4"} />
           </button>

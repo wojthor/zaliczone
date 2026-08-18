@@ -1,6 +1,6 @@
 -- Dane identyfikacyjne i podatkowe nauczyciela (pod PIT-11 / rozliczenie roczne).
 -- Uruchom ręcznie w SQL Editorze Supabase.
--- Nie wpływa na migracje 0006–0009 — tylko dopina kolumny do profiles (IF NOT EXISTS).
+-- Nie wpływa na migracje 0006–0009 - tylko dopina kolumny do profiles (IF NOT EXISTS).
 
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS pesel text,

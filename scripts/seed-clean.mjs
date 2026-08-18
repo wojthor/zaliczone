@@ -1,5 +1,5 @@
 /**
- * Wyczyść wszystkie dane demo — zostaw tylko admin + Benio Beniowski (bez lekcji, uczniów itd.)
+ * Wyczyść wszystkie dane demo - zostaw tylko admin + Benio Beniowski (bez lekcji, uczniów itd.)
  * Run: pnpm seed:clean
  */
 
@@ -20,7 +20,6 @@ const ACCOUNTS = [
     role: "ADMIN",
     full_name: "Administrator",
     active_subjects: [],
-    ewidencja_unlocked_for_month: null,
   },
   {
     email: "teacher@zaliczone.pl",
@@ -28,7 +27,6 @@ const ACCOUNTS = [
     role: "TUTOR",
     full_name: "Benio Beniowski",
     active_subjects: ["Matematyka", "Fizyka"],
-    ewidencja_unlocked_for_month: null,
   },
 ];
 
@@ -84,7 +82,6 @@ async function upsertProfile(userId, account) {
       role: account.role,
       full_name: account.full_name,
       active_subjects: account.active_subjects,
-      ewidencja_unlocked_for_month: account.ewidencja_unlocked_for_month,
       phone: null,
       bank_account: null,
       olx_url: null,
@@ -94,7 +91,7 @@ async function upsertProfile(userId, account) {
 }
 
 async function main() {
-  console.log("🧹 Czyszczenie bazy — zostają admin + Benio (pusto)\n");
+  console.log("🧹 Czyszczenie bazy - zostają admin + Benio (pusto)\n");
 
   console.log("Usuwanie danych operacyjnych…");
   await restDelete("message_recipients", "id=not.is.null");
@@ -103,7 +100,7 @@ async function main() {
   await restDelete("payouts", "id=not.is.null");
   await restDelete("subject_requests", "id=not.is.null");
   await restDelete("students", "id=not.is.null");
-  console.log("✓ Lekcje, uczniowie, wypłaty, wiadomości — usunięte");
+  console.log("✓ Lekcje, uczniowie, wypłaty, wiadomości - usunięte");
 
   const users = await listUsers();
   for (const user of users) {

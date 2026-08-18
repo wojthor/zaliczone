@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   approveSubjectRequest,
-  notifyCennikUpdate,
   rejectSubjectRequest,
   savePriceTiers,
 } from "@/lib/actions/admin";
+import { Spinner, useToast } from "@/components/ui/toast";
 import type { SubjectRequest } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 
@@ -37,45 +37,80 @@ export function CennikClient({
   initialTiers: PriceTier[];
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const [acting, setActing] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>(() => tiersToRows(initialTiers));
   const [draftRows, setDraftRows] = useState<Row[]>(() => tiersToRows(initialTiers));
   const [open, setOpen] = useState(false);
   const [requests, setRequests] = useState(pendingRequests);
 
   const handleApprove = (req: SubjectRequest) => {
+    setActing(`approve-${req.id}`);
     startTransition(async () => {
-      await approveSubjectRequest(req.id, req.subject, req.tutor_id);
-      setRequests((prev) => prev.filter((r) => r.id !== req.id));
-      router.refresh();
+      try {
+        await approveSubjectRequest(req.id, req.subject, req.tutor_id);
+        setRequests((prev) => prev.filter((r) => r.id !== req.id));
+        toast.success("Zatwierdzono przedmiot", req.subject);
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          "Nie udało się zatwierdzić",
+          e instanceof Error ? e.message : "Spróbuj jeszcze raz.",
+        );
+      } finally {
+        setActing(null);
+      }
     });
   };
 
   const handleReject = (id: string) => {
+    const subject = requests.find((r) => r.id === id)?.subject;
+    setActing(`reject-${id}`);
     startTransition(async () => {
-      await rejectSubjectRequest(id);
-      setRequests((prev) => prev.filter((r) => r.id !== id));
-      router.refresh();
+      try {
+        await rejectSubjectRequest(id);
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+        toast.success("Odrzucono wniosek", subject);
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          "Nie udało się odrzucić",
+          e instanceof Error ? e.message : "Spróbuj jeszcze raz.",
+        );
+      } finally {
+        setActing(null);
+      }
     });
   };
 
   const handleSaveCennik = () => {
     const cleaned = draftRows.filter((r) => r.label.trim());
     if (cleaned.length === 0) return;
-    setRows(cleaned);
-    setOpen(false);
+    setActing("save");
     startTransition(async () => {
-      await savePriceTiers(
-        cleaned.map((r, i) => ({
-          id: r.id,
-          label: r.label,
-          client: r.client,
-          worker: r.worker,
-          sortOrder: i,
-        })),
-      );
-      await notifyCennikUpdate();
-      router.refresh();
+      try {
+        await savePriceTiers(
+          cleaned.map((r, i) => ({
+            id: r.id,
+            label: r.label,
+            client: r.client,
+            worker: r.worker,
+            sortOrder: i,
+          })),
+        );
+        setRows(cleaned);
+        setOpen(false);
+        toast.success("Zapisano cennik", "Stawki są już widoczne u nauczycieli.");
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          "Nie udało się zapisać cennika",
+          e instanceof Error ? e.message : "Spróbuj jeszcze raz.",
+        );
+      } finally {
+        setActing(null);
+      }
     });
   };
 
@@ -93,7 +128,7 @@ export function CennikClient({
         <div>
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight">Cennik i przedmioty</h1>
           <p className="dash-sans text-muted mt-1 text-sm">
-            Cennik zapisywany w bazie. Po zapisie tutorzy dostają powiadomienie w skrzynce wewnętrznej.
+            Cennik zapisujemy od razu. Nauczyciele zobaczą nowe stawki w Finansach.
           </p>
         </div>
         <button
@@ -150,17 +185,19 @@ export function CennikClient({
                     <button
                       type="button"
                       disabled={pending}
-                      className="badge-done disabled:opacity-60"
+                      className="badge-done inline-flex items-center gap-1 disabled:opacity-60"
                       onClick={() => handleApprove(p)}
                     >
+                      {acting === `approve-${p.id}` ? <Spinner className="h-3 w-3" /> : null}
                       Zatwierdź
                     </button>
                     <button
                       type="button"
                       disabled={pending}
-                      className="rounded-ledger bg-mist px-2.5 py-1 text-[11px] font-bold text-steel disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-ledger bg-mist px-2.5 py-1 text-[11px] font-bold text-steel disabled:opacity-60"
                       onClick={() => handleReject(p.id)}
                     >
+                      {acting === `reject-${p.id}` ? <Spinner className="h-3 w-3" /> : null}
                       Odrzuć
                     </button>
                   </div>
@@ -284,9 +321,10 @@ export function CennikClient({
                   type="button"
                   onClick={handleSaveCennik}
                   disabled={pending}
-                  className="dash-sans btn-block bg-[#000C4A] px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-60 touch-manipulation"
+                  className="dash-sans btn-block inline-flex items-center justify-center gap-1.5 bg-[#000C4A] px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-60 touch-manipulation"
                 >
-                  Zapisz i powiadom
+                  {acting === "save" ? <Spinner className="h-3 w-3" /> : null}
+                  Zapisz
                 </button>
               </div>
             </div>

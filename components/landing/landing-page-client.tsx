@@ -24,7 +24,7 @@ type TutorWithPhoto = PublicTutorCard & {
   email?: string | null;
 };
 
-/** Stockowe portrety (Unsplash) — podgląd kafelków do czasu własnych zdjęć. */
+/** Stockowe portrety (Unsplash) - podgląd kafelków do czasu własnych zdjęć. */
 const STOCK_PHOTOS = [
   "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=900&q=80",
   "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=900&q=80",
@@ -44,7 +44,7 @@ function stockPhotoFor(id: string, index: number): string {
   return STOCK_PHOTOS[(hash + index) % STOCK_PHOTOS.length]!;
 }
 
-/** Demo — zawsze widać kogoś na liście (dopóki nie ma zdjęć / pełnych profili). */
+/** Demo - zawsze widać kogoś na liście (dopóki nie ma zdjęć / pełnych profili). */
 const DEMO_TUTORS: TutorWithPhoto[] = [
   {
     id: "demo-1",
@@ -215,12 +215,15 @@ function StarRow({ count = 5 }: { count?: number }) {
   );
 }
 
+/** Opinie w panelu „O nas”. Na razie schowane - dane i markup zostają. */
+const SHOW_TESTIMONIALS = false;
+
 const TESTIMONIALS = [
   {
     name: "Kasia",
     role: "mama ucznia",
     stars: 5,
-    text: "Syn w końcu lubi matematykę — po trzech miesiącach sam siada do zadań.",
+    text: "Syn w końcu lubi matematykę - po trzech miesiącach sam siada do zadań.",
   },
   {
     name: "Michał",
@@ -452,22 +455,16 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                 onClick={openMatch}
                 className="text-sm font-bold text-luster/80 underline decoration-white/30 underline-offset-4 transition hover:text-lime"
               >
-                ← Strona Główna
+                ← Strona główna
               </button>
               <h2 className="dash-sans mt-4 text-3xl font-bold tracking-tight text-snow sm:text-4xl md:text-5xl">
                 O nas
               </h2>
               <p className="mt-4 text-base leading-relaxed text-luster/80 sm:text-lg">
-                ZALICZONE łączy uczniów z korepetytorami. Uczymy konkretnie, pilnujemy terminów —
-                Ty skupiasz się na nauce albo na prowadzeniu zajęć.
+                ZALICZONE łączy uczniów z korepetytorami. My pilnujemy terminów i rozliczeń, Ty
+                zajmujesz się nauką albo uczeniem.
               </p>
               <div className="mt-5 flex flex-col items-center gap-1.5 text-sm sm:text-base lg:items-start">
-                <a
-                  href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
-                  className="font-semibold text-snow transition hover:text-lime"
-                >
-                  {COMPANY.phone}
-                </a>
                 <a
                   href={`mailto:${COMPANY.email}`}
                   className="font-semibold text-lime break-all transition hover:underline"
@@ -477,22 +474,24 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
               </div>
             </div>
 
-            <ul className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-              {TESTIMONIALS.map((item, i) => (
-                <li
-                  key={item.name}
-                  className="animate-[matchCardIn_0.55s_ease-out] border border-white/12 bg-white/[0.06] p-4"
-                  style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
-                >
-                  <StarRow count={item.stars} />
-                  <p className="mt-2.5 text-sm leading-snug text-snow/90">„{item.text}”</p>
-                  <p className="mt-3 text-xs font-bold text-lime/85">
-                    {item.name}
-                    <span className="font-medium text-luster/60"> · {item.role}</span>
-                  </p>
-                </li>
-              ))}
-            </ul>
+            {SHOW_TESTIMONIALS ? (
+              <ul className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                {TESTIMONIALS.map((item, i) => (
+                  <li
+                    key={item.name}
+                    className="animate-[matchCardIn_0.55s_ease-out] border border-white/12 bg-white/[0.06] p-4"
+                    style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
+                  >
+                    <StarRow count={item.stars} />
+                    <p className="mt-2.5 text-sm leading-snug text-snow/90">„{item.text}”</p>
+                    <p className="mt-3 text-xs font-bold text-lime/85">
+                      {item.name}
+                      <span className="font-medium text-luster/60"> · {item.role}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ) : (
           <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
@@ -506,7 +505,7 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                 Szukasz korepetycji?
               </h1>
               <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-luster/80 lg:mx-0 sm:text-lg">
-                Dobierz poziom, przedmiot i dni — pokażemy dostępnych nauczycieli ZALICZONE.
+                Wybierz poziom, przedmiot i dni, kiedy możesz się uczyć. Pokażemy, kto jest wolny.
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap lg:justify-start">
@@ -618,8 +617,8 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                     </p>
                     <ul className="space-y-2.5 text-base leading-relaxed text-snow/90 sm:text-lg">
                       {[
-                        "elastyczne godziny — sam ustalasz, kiedy prowadzisz zajęcia",
-                        "40–60 zł/h + premie (w zależności od poziomu)",
+                        "elastyczne godziny - sam ustalasz, kiedy prowadzisz zajęcia",
+                        "40-60 zł/h + premie (w zależności od poziomu)",
                         "dostęp do panelu korepetytora (terminarz, rozliczenia, ewidencja)",
                       ].map((item) => (
                         <li key={item} className="flex gap-2.5">
@@ -634,14 +633,11 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
 
                   <div>
                     <a
-                      href={`mailto:${COMPANY.email}?subject=${encodeURIComponent("Rekrutacja — chcę udzielać korepetycji")}`}
+                      href={`mailto:${COMPANY.email}?subject=${encodeURIComponent("Rekrutacja - chcę udzielać korepetycji")}`}
                       className="inline-flex w-full items-center justify-center rounded-full bg-lime px-6 py-3.5 text-sm font-extrabold uppercase tracking-wide text-depths transition hover:brightness-105 sm:w-auto"
                     >
-                      Aplikuj mailowo
+                      Aplikuj
                     </a>
-                    <p className="mt-3 text-sm text-luster/75">
-                      Napisz na {COMPANY.email} — odezwiemy się z kolejnymi krokami.
-                    </p>
                   </div>
                 </div>
               )}
@@ -651,46 +647,45 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
       </section>
 
       <footer id="kontakt" className="scroll-mt-8 border-t border-mist bg-paper px-4 py-10 text-depths sm:px-6">
-        <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-[1.2fr_1fr_auto] sm:items-start">
+        <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-3 sm:items-center">
           <div>
             <p className={`${logoFont.className} text-xl font-extrabold italic uppercase text-[#000C4A]`}>
               Zaliczone
             </p>
-            <p className="mt-2 text-xs text-steel">NIP {COMPANY.nip}</p>
-            <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
-              Korepetycje z jasnymi zasadami — łączymy uczniów z nauczycielami ZALICZONE.
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
+              Korepetycje z jasnymi zasadami. Łączymy uczniów z nauczycielami.
             </p>
           </div>
 
           <div className="space-y-2 text-sm">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-steel">Kontakt</p>
+            <p className="font-semibold text-[#000C4A]">{COMPANY.owner}</p>
+            <p className="text-[#000C4A]">{COMPANY.address}</p>
+          </div>
+
+          <div className="space-y-2 text-sm sm:text-right">
             <a
               href={`mailto:${COMPANY.email}`}
               className="block font-semibold text-[#000C4A] break-all hover:text-[#000C4A]/80"
             >
               {COMPANY.email}
             </a>
-            <a
-              href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
-              className="block font-semibold text-[#000C4A] hover:text-[#000C4A]/80"
-            >
-              {COMPANY.phone}
-            </a>
-            <p className="font-semibold text-[#000C4A]">{COMPANY.address}</p>
           </div>
+        </div>
 
-          <div className="flex flex-col gap-2 text-xs font-semibold text-[#000C4A] sm:items-end">
+        <div className="mx-auto mt-8 flex max-w-6xl flex-col items-center gap-2 border-t border-mist pt-6 text-center sm:flex-row sm:justify-between sm:text-left">
+          <p className="text-xs font-semibold text-[#000C4A]">
             <Link href="/polityka-prywatnosci" className="hover:underline">
               Polityka prywatności
             </Link>
+            <span className="mx-2 font-medium text-steel">|</span>
             <Link href="/regulamin" className="hover:underline">
               Regulamin
             </Link>
-          </div>
+          </p>
+          <p className="text-[11px] text-steel">
+            © {new Date().getFullYear()} {COMPANY.name}. Wszelkie prawa zastrzeżone.
+          </p>
         </div>
-        <p className="mx-auto mt-8 max-w-6xl text-[11px] text-steel">
-          © {new Date().getFullYear()} {COMPANY.name}. Wszelkie prawa zastrzeżone.
-        </p>
       </footer>
     </div>
   );

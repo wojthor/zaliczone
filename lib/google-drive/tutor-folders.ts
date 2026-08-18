@@ -53,7 +53,7 @@ async function createChildFolder(parentId: string, name: string): Promise<string
   return created.data.id;
 }
 
-/** Folder „byli pracownicy” — env, wyszukiwanie po nazwie, albo child `nauczyciele/`. */
+/** Folder „byli pracownicy” - env, wyszukiwanie po nazwie, albo child `nauczyciele/`. */
 export async function getFormerTeachersFolderId(): Promise<string> {
   const fromEnv = process.env.GOOGLE_DRIVE_FORMER_TEACHERS_FOLDER_ID?.trim();
   if (fromEnv) return fromEnv;
@@ -77,7 +77,7 @@ export async function getFormerTeachersFolderId(): Promise<string> {
   const nestedExisting = candidates.find((f) => (f.parents ?? []).includes(teachersFolderId));
   if (nestedExisting?.id) return nestedExisting.id;
 
-  // 2) Sibling obok nauczyciele — tylko gdy SA widzi parenta
+  // 2) Sibling obok nauczyciele - tylko gdy SA widzi parenta
   try {
     const meta = await drive.files.get({
       fileId: teachersFolderId,
@@ -91,7 +91,7 @@ export async function getFormerTeachersFolderId(): Promise<string> {
       return createChildFolder(parentId, FORMER_FOLDER_NAME);
     }
   } catch {
-    /* shared folder bez parentów — fallback poniżej */
+    /* shared folder bez parentów - fallback poniżej */
   }
 
   // 3) Fallback: nauczyciele/byli pracownicy (działa przy samym share folderu nauczyciele)
@@ -203,7 +203,7 @@ export async function assertFileInFolder(fileId: string, folderId: string): Prom
 /**
  * Tworzy / podpina folder Drive.
  * Aktywni → `nauczyciele/`, byli → `byli pracownicy/`.
- * Jeśli folder już istnieje w złym katalogu — przenosi.
+ * Jeśli folder już istnieje w złym katalogu - przenosi.
  */
 export async function ensureTutorDriveFolder(
   tutorId: string,
@@ -276,7 +276,7 @@ export async function ensureTutorDriveFolder(
   return { folderId, created, moved };
 }
 
-/** Po zakończeniu współpracy — przenieś folder do „byli pracownicy”. */
+/** Po zakończeniu współpracy - przenieś folder do „byli pracownicy”. */
 export async function moveTutorDriveFolderToFormer(
   tutorId: string,
   tutorName?: string,

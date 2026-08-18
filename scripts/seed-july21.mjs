@@ -2,7 +2,7 @@
  * Seed na dzień 21 lipca 2026 (środek miesiąca).
  *
  * - Czerwiec 2026: wszystkie lekcje VERIFIED, wypłaty PAID, miesiąc zamknięty
- * - Lipiec 2026: w toku — mix VERIFIED / PENDING_VERIFICATION / PLANNED
+ * - Lipiec 2026: w toku - mix VERIFIED / PENDING_VERIFICATION / PLANNED
  * - Brak lekcji UNPAID
  *
  * Run: pnpm seed:july21
@@ -112,7 +112,6 @@ async function upsertProfile(userId, account) {
       role: account.role,
       full_name: account.full_name,
       active_subjects: account.subjects,
-      ewidencja_unlocked_for_month: null,
       phone: account.phone,
       bank_account: account.bank_account,
       contract_start: account.role === "TUTOR" ? "2026-03-01" : null,
@@ -180,7 +179,7 @@ function L(tutorId, studentId, subject, rate, date, start, end, status, paymentM
 }
 
 async function main() {
-  console.log(`🌱 Seed — kotwica czasowa: ${ANCHOR} (środek lipca)\n`);
+  console.log(`🌱 Seed - kotwica czasowa: ${ANCHOR} (środek lipca)\n`);
 
   const userIds = {};
   for (const account of ACCOUNTS) {
@@ -223,7 +222,7 @@ async function main() {
 
   const lessons = [];
 
-  // ── CZERWIEC 2026 — zamknięty, wszystko VERIFIED ──────────────────────────
+  // ── CZERWIEC 2026 - zamknięty, wszystko VERIFIED ──────────────────────────
   const juneBenio = [
     ["2026-06-02", "16:00", "17:00", 0, "Matematyka"],
     ["2026-06-03", "17:00", "18:00", 1, "Fizyka"],
@@ -283,7 +282,7 @@ async function main() {
     lessons.push(L(tMarcel, s.id, subject, s.rate_pln, date, start, end, "VERIFIED", "przelew"));
   }
 
-  // ── LIPIEC 2026 — w toku (stan na 21.07) ──────────────────────────────────
+  // ── LIPIEC 2026 - w toku (stan na 21.07) ──────────────────────────────────
   // 1–11 VII: większość już VERIFIED (wcześniejsze tygodnie)
   const julyVerified = [
     [tBenio, benio, "2026-07-01", "16:00", "17:00", 0, "Matematyka"],
@@ -398,14 +397,14 @@ async function main() {
       payment_received_at: row.date,
     });
     if (!ok) {
-      console.log("ℹ payment_received_at niedostępne — pomijam");
+      console.log("ℹ payment_received_at niedostępne - pomijam");
       break;
     }
     paymentPatched += 1;
   }
   if (paymentPatched) console.log(`✓ payment_received_at ustawione dla ${paymentPatched} lekcji`);
 
-  // Wypłaty za czerwiec — PAID (wypłacone na początku lipca)
+  // Wypłaty za czerwiec - PAID (wypłacone na początku lipca)
   const payouts = [];
   for (const email of ["teacher@zaliczone.pl", "martyna@zaliczone.pl", "marcel@zaliczone.pl"]) {
     const tutorId = userIds[email];
@@ -476,7 +475,7 @@ async function main() {
       month: "2026-07",
       invoice_date: "2026-07-08",
       document_number: "FV/7/2026/01",
-      expense_name: "Księgowość — abonament",
+      expense_name: "Księgowość - abonament",
       issuer_name: "Biuro Rachunkowe Alfa",
       amount_pln: 400.0,
       created_by: userIds["admin@zaliczone.pl"],
@@ -511,7 +510,7 @@ async function main() {
     july: lessons.filter((l) => l.date.startsWith("2026-07")).length,
   };
 
-  console.log("\n✅ Seed gotowy — stan na 21.07.2026");
+  console.log("\n✅ Seed gotowy - stan na 21.07.2026");
   console.log(`  Czerwiec: ${counts.june} lekcji VERIFIED · wypłaty PAID · miesiąc ZAMKNIĘTY`);
   console.log(
     `  Lipiec: ${counts.july} lekcji · ${counts.VERIFIED - counts.june} VERIFIED · ${counts.PENDING_VERIFICATION} do zatwierdzenia · ${counts.PLANNED} zaplanowanych · 0 UNPAID`,

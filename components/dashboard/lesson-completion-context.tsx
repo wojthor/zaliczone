@@ -14,7 +14,7 @@ function storageKey(dateKey: string, lessonId: string): string {
   return `${dateKey}#${lessonId}`;
 }
 
-/** Poniedziałek tygodnia zawierającego `ref` (lokalny kalendarz, południe — mniej problemów ze strefą). */
+/** Poniedziałek tygodnia zawierającego `ref` (lokalny kalendarz, południe - mniej problemów ze strefą). */
 export function mondayOfWeekContaining(ref: Date): Date {
   const y = ref.getFullYear();
   const m = ref.getMonth();

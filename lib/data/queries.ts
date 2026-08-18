@@ -1,5 +1,17 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
+import {
+  bonusTag,
+  financeTag,
+  lessonsTag,
+  documentsTag,
+  notificationsTag,
+  studentsTag,
+  subjectsTag,
+  TAG,
+} from "@/lib/cache";
 import {
   dbLessonToFinanceLine,
   dbLessonToUi,
@@ -22,6 +34,8 @@ import type {
   StudentUi,
   SubjectRequest,
   BusinessSettings,
+  AppAlert,
+  AppNotification,
 } from "@/lib/types/database";
 import type { CompanySalesMonth, PriceTier } from "@/lib/types/messages";
 import type {
@@ -32,7 +46,7 @@ import type {
 import { EMPTY_TAX_YEAR } from "@/lib/types/pit";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 
-export async function getCurrentUserProfile(): Promise<Profile | null> {
+export const getCurrentUserProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,10 +55,10 @@ export async function getCurrentUserProfile(): Promise<Profile | null> {
 
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
   return data as Profile | null;
-}
+});
 
-export async function getTutorStudents(tutorId: string): Promise<StudentUi[]> {
-  const supabase = await createClient();
+async function fetchTutorStudents(tutorId: string): Promise<StudentUi[]> {
+  const supabase = createServiceClient();
   const { data: students, error } = await supabase
     .from("students")
     .select("*")
@@ -64,6 +78,14 @@ export async function getTutorStudents(tutorId: string): Promise<StudentUi[]> {
   );
 }
 
+export async function getTutorStudents(tutorId: string): Promise<StudentUi[]> {
+  return unstable_cache(
+    async () => fetchTutorStudents(tutorId),
+    ["tutor-students", tutorId],
+    { tags: [studentsTag(tutorId), lessonsTag(tutorId)], revalidate: false },
+  )();
+}
+
 export async function getTutorLessons(tutorId: string): Promise<Lesson[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -81,23 +103,34 @@ export async function getTutorLessons(tutorId: string): Promise<Lesson[]> {
 }
 
 export async function getTutorVerifiedFinanceLines(tutorId: string): Promise<FinanceLineUi[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lessons")
-    .select("*, students(name, class_level, rate_pln), profiles!lessons_tutor_id_fkey(full_name)")
-    .eq("tutor_id", tutorId)
-    .eq("status", "VERIFIED")
-    .order("date", { ascending: false });
+  const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("lessons")
+        .select("*, students(name, class_level, rate_pln), profiles!lessons_tutor_id_fkey(full_name)")
+        .eq("tutor_id", tutorId)
+        .eq("status", "VERIFIED")
+        .order("date", { ascending: false });
 
-  if (error) throw error;
+      if (error) throw error;
 
-  return ((data ?? []) as DbLessonWithRelations[])
-    .map(dbLessonToFinanceLine)
-    .filter((line): line is FinanceLineUi => line !== null);
+      return ((data ?? []) as DbLessonWithRelations[])
+        .map(dbLessonToFinanceLine)
+        .filter((line): line is FinanceLineUi => line !== null);
+    },
+    ["tutor-verified-finance", tutorId, monthKey],
+    {
+      tags: [lessonsTag(tutorId), bonusTag(tutorId), financeTag(monthKey), TAG.finance],
+      revalidate: 30,
+    },
+  )();
 }
 
-export async function getLessonsByStatus(statuses: LessonStatus[]): Promise<FinanceLineUi[]> {
-  const supabase = await createClient();
+const getLessonsByStatusCached = cache(async (statusKey: string): Promise<FinanceLineUi[]> => {
+  const statuses = statusKey.split(",") as LessonStatus[];
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("lessons")
     .select("*, students(name, class_level, rate_pln), profiles!lessons_tutor_id_fkey(full_name)")
@@ -109,6 +142,10 @@ export async function getLessonsByStatus(statuses: LessonStatus[]): Promise<Fina
   return ((data ?? []) as DbLessonWithRelations[])
     .map(dbLessonToFinanceLine)
     .filter((line): line is FinanceLineUi => line !== null);
+});
+
+export async function getLessonsByStatus(statuses: LessonStatus[]): Promise<FinanceLineUi[]> {
+  return getLessonsByStatusCached([...statuses].sort().join(","));
 }
 
 export async function getAllVerifiedFinanceLines(): Promise<FinanceLineUi[]> {
@@ -123,11 +160,44 @@ export async function getUnpaidFinanceLines(): Promise<FinanceLineUi[]> {
   return getLessonsByStatus(["UNPAID"]);
 }
 
+/** KPI Głównej koordynatora — 60s + tag; Zalicz/wpłata i tak bustuje `lessons`. */
+export async function getCachedCoordinatorDashboardLines() {
+  return unstable_cache(
+    async () => {
+      const [pending, unpaid, verified] = await Promise.all([
+        getLessonsByStatus(["PENDING_VERIFICATION"]),
+        getLessonsByStatus(["UNPAID"]),
+        getLessonsByStatus(["VERIFIED"]),
+      ]);
+      return { pending, unpaid, verified };
+    },
+    ["coordinator-dashboard-lines"],
+    { tags: [TAG.dashboardStats, TAG.lessons], revalidate: 60 },
+  )();
+}
+
+export async function getCachedActiveSubjects(tutorId: string): Promise<string[]> {
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("active_subjects")
+        .eq("id", tutorId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.active_subjects as string[] | null) ?? [];
+    },
+    ["active-subjects", tutorId],
+    { tags: [subjectsTag(tutorId)], revalidate: false },
+  )();
+}
+
 export async function getPendingAndUnpaidLines(): Promise<FinanceLineUi[]> {
   return getLessonsByStatus(["PENDING_VERIFICATION", "UNPAID"]);
 }
 
-/** Wszystkie lekcje niezależnie od statusu — używane do walidacji zamknięcia miesiąca. */
+/** Wszystkie lekcje niezależnie od statusu - używane do walidacji zamknięcia miesiąca. */
 export async function getAllLessonLines(): Promise<FinanceLineUi[]> {
   return getLessonsByStatus(["PLANNED", "PENDING_VERIFICATION", "VERIFIED", "UNPAID"]);
 }
@@ -160,7 +230,102 @@ export async function getAllTutorProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[];
 }
 
-/** Publiczna lista nauczycieli przyjmujących uczniów (landing). */
+async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]> {
+  const supabase = createServiceClient();
+  const [tutorsRes, financeLines, pendingLines, emailMap, studentCounts, allSubjects, payouts] =
+    await Promise.all([
+      supabase.from("profiles").select("*").eq("role", "TUTOR").order("full_name"),
+      getAllVerifiedFinanceLines(),
+      getPendingAndUnpaidLines(),
+      getTutorEmailMap(),
+      supabase.from("students").select("tutor_id"),
+      supabase.from("students").select("tutor_id, subjects"),
+      supabase.from("payouts").select("*").eq("month", mk),
+    ]);
+
+  if (tutorsRes.error) throw tutorsRes.error;
+  const tutors = (tutorsRes.data ?? []) as Profile[];
+
+  const studentsByTutor = new Map<string, number>();
+  for (const row of studentCounts.data ?? []) {
+    studentsByTutor.set(row.tutor_id, (studentsByTutor.get(row.tutor_id) ?? 0) + 1);
+  }
+
+  const subjectsByTutor = new Map<string, Set<string>>();
+  for (const row of allSubjects.data ?? []) {
+    const set = subjectsByTutor.get(row.tutor_id) ?? new Set<string>();
+    for (const subject of row.subjects ?? []) set.add(subject);
+    subjectsByTutor.set(row.tutor_id, set);
+  }
+
+  const payoutByTutor = new Map<string, Payout>();
+  for (const p of (payouts.data ?? []) as Payout[]) {
+    payoutByTutor.set(p.tutor_id, p);
+  }
+
+  return tutors.map((tutor) => {
+    const verified = financeLines.filter((line) => line.tutorId === tutor.id);
+    const pending = pendingLines.filter((line) => line.tutorId === tutor.id);
+    const linesThisMonth = verified.filter((line) => line.monthKey === mk);
+    const pendingPln = pending.reduce((sum, line) => sum + line.amountPln, 0);
+    const paidPln = verified.reduce((sum, line) => sum + line.amountPln, 0);
+    const payout = payoutByTutor.get(tutor.id);
+
+    const minutesThisMonth = linesThisMonth.reduce((sum, line) => {
+      const match = line.label.match(/(\d+)\s*min/);
+      return sum + (match ? Number(match[1]) : 60);
+    }, 0);
+    const hoursDoneMonth = Math.round((minutesThisMonth / 60) * 10) / 10;
+
+    const subjectSet = new Set<string>([
+      ...(subjectsByTutor.get(tutor.id) ?? []),
+      ...(tutor.active_subjects ?? []),
+    ]);
+
+    return {
+      id: tutor.id,
+      name: tutor.full_name ?? "Nieznany",
+      email: emailMap.get(tutor.id) ?? "",
+      phone: tutor.phone ?? null,
+      bankAccount: tutor.bank_account ?? null,
+      olxUrl: tutor.olx_url ?? null,
+      contractStart: tutor.contract_start ?? null,
+      contractEnd: tutor.contract_end ?? null,
+      students: studentsByTutor.get(tutor.id) ?? 0,
+      lessonsDoneMonth: linesThisMonth.length,
+      hoursDoneMonth,
+      pendingPln,
+      paidPln,
+      subjects: [...subjectSet],
+      payoutStatusForMonth: payout?.status ?? null,
+      acceptingStudents: tutor.accepting_students !== false,
+      pesel: tutor.pesel ?? null,
+      birthDate: tutor.birth_date ?? null,
+      taxStreet: tutor.tax_street ?? null,
+      taxPostalCode: tutor.tax_postal_code ?? null,
+      taxCity: tutor.tax_city ?? null,
+      taxCountry: tutor.tax_country ?? null,
+      nip: tutor.nip ?? null,
+      taxOffice: tutor.tax_office ?? null,
+      employmentType: tutor.employment_type ?? null,
+      taxYearData: (tutor.tax_year_data as Record<string, unknown> | null) ?? null,
+      driveFolderId: tutor.drive_folder_id ?? null,
+      photoUrl: tutor.photo_url ?? null,
+    };
+  });
+}
+
+export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTutorSummary[]> {
+  const now = new Date();
+  const mk = monthKey ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return unstable_cache(
+    async () => fetchAdminTutorSummaries(mk),
+    ["admin-tutor-summaries", mk],
+    { tags: [TAG.lessons, TAG.dashboardStats, TAG.cennik, financeTag(mk)], revalidate: 30 },
+  )();
+}
+
+/** Publiczna lista aktywnych nauczycieli na landing (także gdy nie przyjmują nowych uczniów). */
 export type PublicTutorCard = {
   id: string;
   name: string;
@@ -205,8 +370,7 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
   return (rows ?? [])
     .filter((row) => {
       const former = Boolean(row.contract_end && String(row.contract_end) <= today);
-      const accepting = row.accepting_students !== false;
-      return !former && accepting;
+      return !former;
     })
     .map((row) => {
       const name = (row.full_name as string | null)?.trim() || "Korepetytor";
@@ -229,89 +393,6 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pl"));
-}
-
-export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTutorSummary[]> {
-  const supabase = await createClient();
-  const tutors = await getAllTutorProfiles();
-  const financeLines = await getAllVerifiedFinanceLines();
-  const pendingLines = await getPendingAndUnpaidLines();
-  const emailMap = await getTutorEmailMap();
-
-  const now = new Date();
-  const mk = monthKey ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-  const { data: studentCounts } = await supabase.from("students").select("tutor_id");
-  const studentsByTutor = new Map<string, number>();
-  for (const row of studentCounts ?? []) {
-    studentsByTutor.set(row.tutor_id, (studentsByTutor.get(row.tutor_id) ?? 0) + 1);
-  }
-
-  const { data: allSubjects } = await supabase.from("students").select("tutor_id, subjects");
-  const subjectsByTutor = new Map<string, Set<string>>();
-  for (const row of allSubjects ?? []) {
-    const set = subjectsByTutor.get(row.tutor_id) ?? new Set<string>();
-    for (const subject of row.subjects ?? []) set.add(subject);
-    subjectsByTutor.set(row.tutor_id, set);
-  }
-
-  const { data: payouts } = await supabase.from("payouts").select("*").eq("month", mk);
-  const payoutByTutor = new Map<string, Payout>();
-  for (const p of (payouts ?? []) as Payout[]) {
-    payoutByTutor.set(p.tutor_id, p);
-  }
-
-  return tutors.map((tutor) => {
-    const verified = financeLines.filter((line) => line.tutorId === tutor.id);
-    const pending = pendingLines.filter((line) => line.tutorId === tutor.id);
-    const linesThisMonth = verified.filter((line) => line.monthKey === mk);
-    const pendingPln = pending.reduce((sum, line) => sum + line.amountPln, 0);
-    const paidPln = verified.reduce((sum, line) => sum + line.amountPln, 0);
-    const payout = payoutByTutor.get(tutor.id);
-
-    const minutesThisMonth = linesThisMonth.reduce((sum, line) => {
-      const match = line.label.match(/(\d+)\s*min/);
-      return sum + (match ? Number(match[1]) : 60);
-    }, 0);
-    const hoursDoneMonth = Math.round((minutesThisMonth / 60) * 10) / 10;
-
-    const subjectSet = new Set<string>([
-      ...(subjectsByTutor.get(tutor.id) ?? []),
-      ...(tutor.active_subjects ?? []),
-    ]);
-
-    return {
-      id: tutor.id,
-      name: tutor.full_name ?? "Nieznany",
-      email: emailMap.get(tutor.id) ?? "",
-      phone: tutor.phone ?? null,
-      bankAccount: tutor.bank_account ?? null,
-      olxUrl: tutor.olx_url ?? null,
-      contractStart: tutor.contract_start ?? null,
-      contractEnd: tutor.contract_end ?? null,
-      students: studentsByTutor.get(tutor.id) ?? 0,
-      lessonsDoneMonth: linesThisMonth.length,
-      hoursDoneMonth,
-      pendingPln,
-      paidPln,
-      subjects: [...subjectSet],
-      ewidencjaUnlockedForMonth: tutor.ewidencja_unlocked_for_month,
-      payoutStatusForMonth: payout?.status ?? null,
-      acceptingStudents: tutor.accepting_students !== false,
-      pesel: tutor.pesel ?? null,
-      birthDate: tutor.birth_date ?? null,
-      taxStreet: tutor.tax_street ?? null,
-      taxPostalCode: tutor.tax_postal_code ?? null,
-      taxCity: tutor.tax_city ?? null,
-      taxCountry: tutor.tax_country ?? null,
-      nip: tutor.nip ?? null,
-      taxOffice: tutor.tax_office ?? null,
-      employmentType: tutor.employment_type ?? null,
-      taxYearData: (tutor.tax_year_data as Record<string, unknown> | null) ?? null,
-      driveFolderId: tutor.drive_folder_id ?? null,
-      photoUrl: tutor.photo_url ?? null,
-    };
-  });
 }
 
 export async function getStudentCountForTutor(tutorId: string): Promise<number> {
@@ -340,15 +421,21 @@ export async function getSubjectRequests(status?: "PENDING" | "APPROVED" | "REJE
 }
 
 export async function getTutorSubjectRequests(tutorId: string): Promise<SubjectRequest[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("subject_requests")
-    .select("*")
-    .eq("tutor_id", tutorId)
-    .order("created_at", { ascending: false });
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("subject_requests")
+        .select("*")
+        .eq("tutor_id", tutorId)
+        .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return (data ?? []) as SubjectRequest[];
+      if (error) throw error;
+      return (data ?? []) as SubjectRequest[];
+    },
+    ["tutor-subject-requests", tutorId],
+    { tags: [subjectsTag(tutorId)], revalidate: false },
+  )();
 }
 
 export async function getPayoutsForMonth(month: string): Promise<Payout[]> {
@@ -391,28 +478,33 @@ export async function isMonthClosed(monthKey: string): Promise<boolean> {
 }
 
 export async function getClosedMonths(): Promise<string[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("closed_months").select("month").order("month", {
-    ascending: false,
-  });
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase.from("closed_months").select("month").order("month", {
+        ascending: false,
+      });
 
-  if (error) {
-    const msg = error.message ?? "";
-    // Tabela może nie istnieć przed migracją 0005 — nie blokuj UI
-    if (
-      msg.includes("closed_months") ||
-      msg.includes("schema cache") ||
-      error.code === "42P01" ||
-      error.code === "PGRST205"
-    ) {
-      return [];
-    }
-    throw error;
-  }
-  return (data ?? []).map((row) => row.month as string);
+      if (error) {
+        const msg = error.message ?? "";
+        if (
+          msg.includes("closed_months") ||
+          msg.includes("schema cache") ||
+          error.code === "42P01" ||
+          error.code === "PGRST205"
+        ) {
+          return [];
+        }
+        throw error;
+      }
+      return (data ?? []).map((row) => row.month as string);
+    },
+    ["closed-months"],
+    { tags: [TAG.finance, TAG.accounting], revalidate: false },
+  )();
 }
 
-/** Singleton trybu prawnego — fail-open → NDG gdy tabela nie istnieje / błąd odczytu. */
+/** Singleton trybu prawnego - fail-open → NDG gdy tabela nie istnieje / błąd odczytu. */
 export async function getBusinessSettings(): Promise<BusinessSettings> {
   const fallback: BusinessSettings = { legalMode: "NDG", jdgRegistrationDate: null };
   try {
@@ -477,16 +569,16 @@ export async function getTutorVerifiedLessonsForMonth(
 }
 
 export async function getPriceTiers(): Promise<PriceTier[]> {
-  // Cennik jest konfiguracją publiczną dla zalogowanych — service role omija RLS,
-  // które w praktyce blokowało odczyt tutorom (pusta lista → złe wyliczenie wypłaty).
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("price_tiers")
-    .select("*")
-    .order("sort_order");
-
-  if (error) throw error;
-  return (data ?? []) as PriceTier[];
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase.from("price_tiers").select("*").order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as PriceTier[];
+    },
+    ["price-tiers"],
+    { tags: [TAG.cennik], revalidate: false },
+  )();
 }
 
 export async function getCompanySalesMonths(): Promise<CompanySalesMonth[]> {
@@ -508,16 +600,28 @@ export async function getCompanySalesMonths(): Promise<CompanySalesMonth[]> {
     }));
 }
 
-/** Uczniowie danego tutora — widok admina (profil nauczyciela). */
+/** Uczniowie danego tutora - widok admina (profil nauczyciela). */
 export async function getTutorStudentsForAdmin(tutorId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("students")
-    .select("id, name, class_level, subjects, rate_pln")
+    .select("id, name, class_level, subjects, rate_pln, blocked")
     .eq("tutor_id", tutorId)
     .order("name");
 
-  if (error) throw error;
+  if (error) {
+    const msg = error.message ?? "";
+    if (msg.includes("blocked") || error.code === "PGRST204" || error.code === "42703") {
+      const retry = await supabase
+        .from("students")
+        .select("id, name, class_level, subjects, rate_pln")
+        .eq("tutor_id", tutorId)
+        .order("name");
+      if (retry.error) throw retry.error;
+      return retry.data ?? [];
+    }
+    throw error;
+  }
   return data ?? [];
 }
 
@@ -539,68 +643,78 @@ function isMissingDocsSchema(error: { message?: string; code?: string; details?:
 
 /** Drzewo dokumentów dysku (foldery + pliki). Graceful gdy migracja 0005 nie jest uruchomiona. */
 export async function getDocumentTree(): Promise<DocumentTreeResult> {
-  const supabase = await createClient();
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const foldersRes = await supabase.from("document_folders").select("*").order("name");
+      if (foldersRes.error) {
+        if (isMissingDocsSchema(foldersRes.error)) {
+          return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
+        }
+        throw foldersRes.error;
+      }
 
-  const foldersRes = await supabase.from("document_folders").select("*").order("name");
-  if (foldersRes.error) {
-    if (isMissingDocsSchema(foldersRes.error)) {
-      return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
-    }
-    throw foldersRes.error;
-  }
+      const filesRes = await supabase.from("document_files").select("*").order("name");
+      if (filesRes.error) {
+        if (isMissingDocsSchema(filesRes.error)) {
+          return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
+        }
+        throw filesRes.error;
+      }
 
-  const filesRes = await supabase.from("document_files").select("*").order("name");
-  if (filesRes.error) {
-    if (isMissingDocsSchema(filesRes.error)) {
-      return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
-    }
-    throw filesRes.error;
-  }
-
-  return {
-    folders: (foldersRes.data ?? []) as DocumentFolder[],
-    files: (filesRes.data ?? []) as DocumentFile[],
-    available: true,
-  };
+      return {
+        folders: (foldersRes.data ?? []) as DocumentFolder[],
+        files: (filesRes.data ?? []) as DocumentFile[],
+        available: true,
+      };
+    },
+    ["document-tree"],
+    { tags: [TAG.documents], revalidate: false },
+  )();
 }
 
-/** Pliki przypisane do korepetytora (scope TUTOR). */
+/** Pliki widoczne dla nauczyciela: jego teczka + wzory firmowe. */
 export async function getTutorDocumentFiles(tutorId: string): Promise<DocumentTreeResult> {
-  const supabase = await createClient();
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
 
-  const foldersRes = await supabase
-    .from("document_folders")
-    .select("*")
-    .eq("scope", "TUTOR")
-    .eq("tutor_id", tutorId)
-    .order("name");
+      const foldersRes = await supabase
+        .from("document_folders")
+        .select("*")
+        .eq("scope", "TUTOR")
+        .eq("tutor_id", tutorId)
+        .order("name");
 
-  if (foldersRes.error) {
-    if (isMissingDocsSchema(foldersRes.error)) {
-      return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
-    }
-    throw foldersRes.error;
-  }
+      if (foldersRes.error) {
+        if (isMissingDocsSchema(foldersRes.error)) {
+          return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
+        }
+        throw foldersRes.error;
+      }
 
-  const filesRes = await supabase
-    .from("document_files")
-    .select("*")
-    .eq("scope", "TUTOR")
-    .eq("tutor_id", tutorId)
-    .order("created_at", { ascending: false });
+      const filesRes = await supabase
+        .from("document_files")
+        .select("*")
+        .or(`and(scope.eq.TUTOR,tutor_id.eq.${tutorId}),scope.eq.COMPANY`)
+        .order("created_at", { ascending: false });
 
-  if (filesRes.error) {
-    if (isMissingDocsSchema(filesRes.error)) {
-      return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
-    }
-    throw filesRes.error;
-  }
+      if (filesRes.error) {
+        if (isMissingDocsSchema(filesRes.error)) {
+          return { folders: [], files: [], available: false, errorMessage: DOCS_MIGRATION_HINT };
+        }
+        throw filesRes.error;
+      }
 
-  return {
-    folders: (foldersRes.data ?? []) as DocumentFolder[],
-    files: (filesRes.data ?? []) as DocumentFile[],
-    available: true,
-  };
+      return {
+        folders: (foldersRes.data ?? []) as DocumentFolder[],
+        files: (filesRes.data ?? []) as DocumentFile[],
+        available: true,
+      };
+    },
+    ["tutor-documents", tutorId],
+    { tags: [documentsTag(tutorId), TAG.documents], revalidate: false },
+  )();
 }
 
 /** @deprecated use getTutorVerifiedFinanceLines */
@@ -668,4 +782,120 @@ export async function getTutorPitYearSummary(
   }
 
   return { year, paidIncomePln, months, taxEntry };
+}
+
+function mapAlertRow(row: {
+  id: string;
+  kind: AppAlert["kind"];
+  audience: AppAlert["audience"];
+  tutor_id: string | null;
+  student_id: string | null;
+  title: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+  resolved_at: string | null;
+  students?: { name: string } | { name: string }[] | null;
+}): AppAlert {
+  const student = Array.isArray(row.students) ? row.students[0] : row.students;
+  return {
+    id: row.id,
+    kind: row.kind,
+    audience: row.audience,
+    tutorId: row.tutor_id,
+    tutorName: null,
+    studentId: row.student_id,
+    studentName: student?.name ?? null,
+    title: row.title,
+    body: row.body,
+    createdAt: row.created_at,
+    readAt: row.read_at,
+    resolvedAt: row.resolved_at,
+  };
+}
+
+export const getOpenAdminAlerts = cache(async (): Promise<AppAlert[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("alerts")
+    .select("*, students(name)")
+    .eq("audience", "ADMIN")
+    .is("resolved_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (msg.includes("alerts") || error.code === "42P01" || error.code === "PGRST205") return [];
+    throw error;
+  }
+  return (data ?? []).map(mapAlertRow);
+});
+
+export async function getOpenTutorAlerts(tutorId: string): Promise<AppAlert[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("alerts")
+    .select("*, students(name)")
+    .eq("audience", "TUTOR")
+    .eq("tutor_id", tutorId)
+    .is("resolved_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (msg.includes("alerts") || error.code === "42P01" || error.code === "PGRST205") return [];
+    throw error;
+  }
+  return (data ?? []).map(mapAlertRow);
+}
+
+function mapNotificationRow(row: {
+  id: string;
+  audience: AppNotification["audience"];
+  tutor_id: string | null;
+  kind: AppNotification["kind"];
+  title: string;
+  body: string;
+  href: string | null;
+  created_at: string;
+  read_at: string | null;
+}): AppNotification {
+  return {
+    id: row.id,
+    audience: row.audience,
+    tutorId: row.tutor_id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    href: row.href,
+    createdAt: row.created_at,
+    readAt: row.read_at,
+  };
+}
+
+function isMissingNotifications(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  const msg = error.message ?? "";
+  return error.code === "42P01" || error.code === "PGRST205" || msg.includes("notifications");
+}
+
+export async function getTutorNotifications(tutorId: string): Promise<AppNotification[]> {
+  return unstable_cache(
+    async () => {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("audience", "TUTOR")
+        .eq("tutor_id", tutorId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        if (isMissingNotifications(error)) return [];
+        throw error;
+      }
+      return (data ?? []).map(mapNotificationRow);
+    },
+    ["tutor-notifications", tutorId],
+    { tags: [notificationsTag(tutorId), TAG.notifications], revalidate: false },
+  )();
 }

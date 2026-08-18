@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/page-shell";
 import { tutorPayoutFromCennik, sumTutorPayoutFromCennik, financeLinesHours } from "@/lib/data/mappers";
-import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
+import { TUTOR_SHARE, bonusProgress, ewidencjaAvailableFromHint, isEwidencjaPdfAvailable } from "@/lib/dates";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 
@@ -38,14 +38,12 @@ function formatMonthLongPl(monthKey: string): string {
 export function FinanseClient({
   financeLines,
   studentCount,
-  ewidencjaUnlockedForMonth,
   priceTiers,
   payouts = [],
   closedMonths = [],
 }: {
   financeLines: FinanceLineUi[];
   studentCount: number;
-  ewidencjaUnlockedForMonth: string | null;
   priceTiers: PriceTier[];
   payouts?: Payout[];
   closedMonths?: string[];
@@ -101,14 +99,16 @@ export function FinanseClient({
 
   const monthLabel = formatMonthLongPl(selectedMonthKey);
   const isCurrentMonth = selectedMonthKey === nowKey;
-  const canGenerateEwidencja = linesForMonth.length > 0;
+  const hasVerifiedLessons = linesForMonth.length > 0;
+  const dateUnlocked = isEwidencjaPdfAvailable(selectedMonthKey);
+  const canGenerateEwidencja = hasVerifiedLessons && dateUnlocked;
 
   return (
     <PageShell title="Finanse">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-muted max-w-xl text-sm font-medium">
-          Widzisz wyłącznie swoje zarobki z lekcji <strong>zatwierdzonych</strong> przez placówkę —
-          to kwota, z której idzie Twoja wypłata.
+          Widzisz tu tylko zarobki z lekcji, które placówka już zatwierdziła. Od tej kwoty liczymy
+          Twoją wypłatę.
         </p>
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
           <label className="grid w-full shrink-0 gap-1 sm:w-auto">
@@ -142,10 +142,7 @@ export function FinanseClient({
       <section className="mb-4 flex flex-wrap items-center justify-between gap-3 soft-panel px-4 py-3.5">
         <div className="min-w-0">
           <p className="section-label">Ewidencja zajęć</p>
-          <p className="text-muted mt-0.5 text-[11px] leading-snug">
-            PDF za {monthLabel}
-            {ewidencjaUnlockedForMonth === selectedMonthKey ? " · odblokowana" : ""}
-          </p>
+          <p className="text-muted mt-0.5 text-[11px] leading-snug">PDF za {monthLabel}</p>
         </div>
         {canGenerateEwidencja ? (
           <a
@@ -157,7 +154,9 @@ export function FinanseClient({
             Generuj
           </a>
         ) : (
-          <p className="text-muted shrink-0 text-[11px]">Brak zatwierdzonych lekcji</p>
+          <p className="text-muted max-w-[16rem] shrink-0 text-right text-[11px] leading-snug">
+            {hasVerifiedLessons ? ewidencjaAvailableFromHint(monthLabel) : "Brak zatwierdzonych lekcji"}
+          </p>
         )}
       </section>
 
@@ -234,7 +233,7 @@ export function FinanseClient({
         <div className="soft-panel p-4">
           <p className="section-label !text-muted">Status wypłaty</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
-            {payoutForMonth ? `${Number(payoutForMonth.amount).toLocaleString("pl-PL")} zł` : "—"}
+            {payoutForMonth ? `${Number(payoutForMonth.amount).toLocaleString("pl-PL")} zł` : "-"}
           </p>
           <p
             className={`mt-1 text-xs font-semibold ${

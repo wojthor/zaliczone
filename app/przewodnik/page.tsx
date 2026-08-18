@@ -4,18 +4,18 @@ import { COMPANY } from "@/lib/company";
 import { DATES } from "@/lib/dates";
 import { getCurrentUserProfile } from "@/lib/data/queries";
 
-/** Jeden film instruktażowy — podmień URL gdy będzie gotowy (YouTube / Vimeo / plik). */
+/** Jeden film instruktażowy - podmień URL gdy będzie gotowy (YouTube / Vimeo / plik). */
 const GUIDE_VIDEO = {
   title: "Jak działa panel ZALICZONE",
   blurb:
-    "Od terminarza i zaliczania lekcji, przez ewidencję godzin, po finanse i wypłatę — cały obieg w jednym nagraniu.",
-  /** Ustaw np. https://www.youtube.com/embed/XXXX — puste = placeholder */
+    "Od terminarza i zaliczania lekcji, przez ewidencję godzin, po finanse i wypłatę - cały obieg w jednym nagraniu.",
+  /** Ustaw np. https://www.youtube.com/embed/XXXX - puste = placeholder */
   embedUrl: "" as string,
 };
 
 function VideoBlock() {
   return (
-    <article className="min-w-0 max-w-3xl">
+    <article className="min-w-0 w-full">
       <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-[#000C4A] shadow-[0_12px_32px_rgba(0,12,74,0.16)]">
         {GUIDE_VIDEO.embedUrl ? (
           <iframe
@@ -47,7 +47,7 @@ function VideoBlock() {
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-lime/70">
                 Film instruktażowy · 16:9
               </p>
-              <p className="text-xs font-medium text-luster/55">Wkrótce — jedno nagranie o całym panelu</p>
+              <p className="text-xs font-medium text-luster/55">Wkrótce - jedno nagranie o całym panelu</p>
             </div>
           </>
         )}
@@ -61,16 +61,16 @@ function VideoBlock() {
 const DEADLINES = [
   {
     id: "ewidencja",
-    when: `do ${DATES.ewidencja.deadlineDayOfNextMonth}. dnia miesiąca`,
+    when: `od ${DATES.ewidencja.unlockDayOfNextMonth}. do ${DATES.ewidencja.deadlineDayOfNextMonth}. dnia miesiąca`,
     what: "Ewidencja godzin za poprzedni miesiąc",
-    how: "Wygeneruj PDF w Finansach, podpisz i odeślij skan administratorowi — zawsze do tego dnia kolejnego miesiąca.",
+    how: `Od ${DATES.ewidencja.unlockDayOfNextMonth}. dnia kolejnego miesiąca wygeneruj PDF w Finansach. Podpisz i odeślij skan koordynatorowi - masz czas do ${DATES.ewidencja.deadlineDayOfNextMonth}. dnia.`,
     tag: "Termin",
   },
   {
     id: "wypłata",
     when: `do ${DATES.payout.deadlineDayOfNextMonth}. dnia miesiąca`,
     what: "Wypłata za poprzedni miesiąc",
-    how: "Administrator księguje wypłatę najpóźniej do tego dnia — status zobaczysz w Finansach.",
+    how: "Koordynator księguje wypłatę najpóźniej do tego dnia - status zobaczysz w Finansach.",
     tag: "Termin",
   },
   {
@@ -89,7 +89,7 @@ export default async function PrzewodnikPage() {
 
   return (
     <PageShell title="Przewodnik">
-      <p className="text-muted max-w-2xl text-sm font-medium">
+      <p className="text-muted text-sm font-medium">
         Film instruktażowy, ważne terminy i dane firmy.
       </p>
 
@@ -104,7 +104,7 @@ export default async function PrzewodnikPage() {
       <section className="mt-8">
         <h2 className="section-label">Ważne daty</h2>
         <p className="text-muted mt-1 text-sm">
-          Stałe terminy w każdym cyklu rozliczeniowym — nie zależą od konkretnego miesiąca.
+          Stałe terminy w każdym cyklu rozliczeniowym - nie zależą od konkretnego miesiąca.
         </p>
 
         <ol className="mt-4 divide-y divide-mist overflow-hidden soft-panel">
@@ -135,10 +135,6 @@ export default async function PrzewodnikPage() {
             <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Nazwa</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.name}</dd>
           </div>
-          <div>
-            <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">NIP</dt>
-            <dd className="text-depths mt-0.5 font-semibold">{COMPANY.nip}</dd>
-          </div>
           <div className="sm:col-span-2">
             <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Adres</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.address}</dd>
@@ -148,10 +144,10 @@ export default async function PrzewodnikPage() {
         <div className="mt-4 rounded-2xl bg-[#000C4A] px-3.5 py-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-lime">Po co to jest</p>
           <p className="mt-1.5 text-sm leading-relaxed text-luster/90">
-            Kupujesz materiały biurowe lub inne rzeczy potrzebne do pracy? Poproś sprzedawcę o{" "}
-            <strong className="text-lime">fakturę</strong> (nie paragon) wystawioną na dane firmy
-            powyżej — sam paragon nie wystarczy do rozliczenia kosztu. Skan lub zdjęcie faktury
-            przekaż administratorowi mailem, razem z krótką notatką, co zostało kupione.
+            Kupujesz coś do pracy, materiały albo sprzęt? Poproś sprzedawcę o{" "}
+            <strong className="text-lime">fakturę</strong> na dane firmy powyżej, nie paragon. Sam
+            paragon nie wystarczy do rozliczenia. Zrób zdjęcie lub skan faktury i wyślij
+            koordynatorowi mailem, dopisz krótko, co to było.
           </p>
         </div>
       </section>

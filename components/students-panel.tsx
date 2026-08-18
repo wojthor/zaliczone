@@ -1,5 +1,4 @@
 import { PanelHeader } from "@/components/panel-header";
-import { SeeMoreLink } from "@/components/see-more-link";
 import type { StudentUi } from "@/lib/types/database";
 
 export function StudentsPanel({ students }: { students: StudentUi[] }) {
@@ -10,7 +9,7 @@ export function StudentsPanel({ students }: { students: StudentUi[] }) {
       <PanelHeader
         title={`Baza uczniów · ${count}`}
         compact
-        action={<SeeMoreLink href="/uczniowie" compact />}
+        titleHref="/uczniowie"
       />
       <ul className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden">
         {count === 0 ? (
@@ -26,6 +25,9 @@ export function StudentsPanel({ students }: { students: StudentUi[] }) {
               </div>
               <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-0.5">
                 <p className="text-depths text-sm font-extrabold leading-tight tracking-tight">{s.name}</p>
+                {s.blocked ? (
+                  <p className="text-[0.6rem] font-extrabold uppercase tracking-wide text-[#E23B3B]">Zablokowany</p>
+                ) : null}
                 <p className="text-muted text-xs font-medium leading-snug">{s.subjectsLine}</p>
                 <p className="text-steel text-[0.6875rem] font-medium leading-snug">{s.nextLesson}</p>
               </div>

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { DriveFilesPanel } from "@/components/drive/drive-files-panel";
 import { setAcceptingStudents } from "@/lib/actions/profile";
-import { insertSubjectRequest } from "@/lib/data/mutations";
-import { useToast } from "@/components/ui/toast";
+import { insertSubjectRequest } from "@/lib/actions/students";
+import { Spinner, useToast } from "@/components/ui/toast";
 import { SUBJECTS } from "@/lib/subjects";
 import type { TutorDriveFilesResult } from "@/lib/google-drive/types";
 import type { Profile, SubjectRequest } from "@/lib/types/database";
@@ -25,6 +25,7 @@ export function ProfilClient({
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const [subjectBusy, setSubjectBusy] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [acceptingStudents, setAcceptingStudentsLocal] = useState(
     profile.accepting_students !== false,
@@ -55,10 +56,22 @@ export function ProfilClient({
 
   function submitSubject() {
     if (!selectedSubject) return;
+    const subject = selectedSubject;
     startTransition(async () => {
-      await insertSubjectRequest(selectedSubject);
-      setSelectedSubject("");
-      router.refresh();
+      setSubjectBusy(true);
+      try {
+        await insertSubjectRequest(subject);
+        toast.success("Wysłano wniosek", `${subject} czeka na akceptację koordynatora.`);
+        setSelectedSubject("");
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          "Nie udało się zgłosić przedmiotu",
+          e instanceof Error ? e.message : "Spróbuj jeszcze raz.",
+        );
+      } finally {
+        setSubjectBusy(false);
+      }
     });
   }
 
@@ -69,8 +82,10 @@ export function ProfilClient({
       try {
         await setAcceptingStudents(next);
         toast.success(
-          next ? "Dostępność włączona" : "Dostępność wyłączona",
-          next ? "Admin widzi, że przyjmujesz nowych uczniów." : "Admin widzi, że nie przyjmujesz nowych uczniów.",
+          next ? "Przyjmujesz nowych uczniów" : "Nie przyjmujesz już nowych uczniów",
+          next
+            ? "Koordynator wie, że możesz brać nowych."
+            : "Zostajesz na stronie. Koordynator zdejmie ogłoszenie z OLX.",
         );
         router.refresh();
       } catch (e) {
@@ -86,7 +101,7 @@ export function ProfilClient({
   return (
     <PageShell title="Profil">
       <p className="text-muted mb-6 text-sm font-medium">
-        Dane korepetytora, aktywne przedmioty oraz zgłoszenia do akceptacji administratora.
+        Dane korepetytora, aktywne przedmioty oraz zgłoszenia do akceptacji koordynatora.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -95,7 +110,7 @@ export function ProfilClient({
           <dl className="text-depths mt-4 space-y-3 text-sm">
             <div>
               <dt className="section-label !text-muted">Imię i nazwisko</dt>
-              <dd className="mt-0.5 font-semibold">{profile.full_name ?? "—"}</dd>
+              <dd className="mt-0.5 font-semibold">{profile.full_name ?? "-"}</dd>
             </div>
             <div>
               <dt className="section-label !text-muted">E-mail</dt>
@@ -109,7 +124,7 @@ export function ProfilClient({
                     {profile.phone}
                   </a>
                 ) : (
-                  "— (uzupełnia administrator)"
+                  "- (uzupełnia koordynator)"
                 )}
               </dd>
             </div>
@@ -126,7 +141,7 @@ export function ProfilClient({
                     Zobacz ogłoszenie →
                   </a>
                 ) : (
-                  "— (uzupełnia administrator)"
+                  "- (uzupełnia koordynator)"
                 )}
               </dd>
             </div>
@@ -135,14 +150,20 @@ export function ProfilClient({
                 <div className="min-w-0">
                   <p className="section-label !text-muted">Dostępność</p>
                   <p className="text-depths mt-0.5 text-sm font-medium">
-                    {acceptingStudents ? "Przyjmuję nowych uczniów" : "Nie przyjmuję nowych uczniów"}
+                    {acceptingStudents
+                      ? "Przyjmuję nowych uczniów"
+                      : "Nie przyjmuję już nowych uczniów"}
                   </p>
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={acceptingStudents}
-                  aria-label="Dostępność — przyjmowanie nowych uczniów"
+                  aria-label={
+                    acceptingStudents
+                      ? "Przyjmuję nowych uczniów"
+                      : "Nie przyjmuję już nowych uczniów"
+                  }
                   disabled={pending}
                   onClick={toggleAcceptingStudents}
                   className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
@@ -157,7 +178,9 @@ export function ProfilClient({
                 </button>
               </div>
               <p className="text-muted mt-1.5 text-[0.7rem] leading-snug">
-                Widoczne dla administratora na liście nauczycieli.
+                {acceptingStudents
+                  ? "Wyłącz, gdy nie chcesz już nowych uczniów."
+                  : "Zostajesz na stronie. Koordynator zdejmie ogłoszenie z OLX."}
               </p>
             </div>
           </dl>
@@ -203,8 +226,9 @@ export function ProfilClient({
               type="button"
               onClick={submitSubject}
               disabled={!selectedSubject || pending}
-              className="w-fit rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-50"
+              className="inline-flex w-fit items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-50"
             >
+              {subjectBusy ? <Spinner className="h-3.5 w-3.5" /> : null}
               Zgłoś do akceptacji
             </button>
           </div>
@@ -248,10 +272,7 @@ export function ProfilClient({
       </div>
 
       <div className="mt-6">
-        <DriveFilesPanel
-          drive={driveDocuments}
-          description="Pliki, które administrator wrzucił do Twojego folderu na Dysku Google. Możesz je tylko przeglądać i pobierać."
-        />
+        <DriveFilesPanel drive={driveDocuments} />
       </div>
     </PageShell>
   );

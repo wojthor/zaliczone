@@ -11,9 +11,11 @@ import {
   IconClose,
   IconDashboard,
   IconDollar,
+  IconFileDoc,
   IconGuide,
   IconLogout,
   IconMenu,
+  IconPayroll,
   IconUsers,
   IconWallet,
 } from "@/components/icons";
@@ -33,7 +35,9 @@ const ADMIN_NAV = [
   { href: "/admin/wyplaty", label: "Wypłaty", Icon: IconWallet },
   { href: "/admin/ksiegowosc", label: "Księgowość", Icon: IconGuide },
   { href: "/admin/nauczyciele", label: "Nauczyciele", Icon: IconUsers },
+  { href: "/admin/premie", label: "Premie", Icon: IconPayroll },
   { href: "/admin/cennik", label: "Cennik i przedmioty", Icon: IconDollar },
+  { href: "/admin/dokumenty", label: "Dokumenty", Icon: IconFileDoc },
 ] as const;
 
 function subscribeLg(cb: () => void) {
@@ -61,9 +65,11 @@ function SidebarTooltip({ label }: { label: string }) {
 export function AdminLayoutClient({
   children,
   initialCollapsed = false,
+  alertCount = 0,
 }: {
   children: ReactNode;
   initialCollapsed?: boolean;
+  alertCount?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -116,7 +122,18 @@ export function AdminLayoutClient({
             } ${active ? "nav-active" : "font-semibold text-luster hover:bg-white/10"}`}
           >
             <Icon className="h-4.5 w-4.5 shrink-0" />
-            {!collapsedLook ? <span>{label}</span> : null}
+            {!collapsedLook ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+            {href === "/admin" && alertCount > 0 ? (
+              <span
+                className={`flex items-center justify-center rounded-full bg-[#E23B3B] text-[10px] font-extrabold text-white ${
+                  collapsedLook
+                    ? "absolute right-0.5 top-0.5 h-4 min-w-4 px-0.5"
+                    : "h-5 min-w-5 px-1"
+                }`}
+              >
+                {alertCount > 9 ? "9+" : alertCount}
+              </span>
+            ) : null}
             {collapsedLook ? <SidebarTooltip label={label} /> : null}
           </Link>
         );
@@ -153,7 +170,7 @@ export function AdminLayoutClient({
               {effectiveCollapsed ? "Z" : "ZALICZONE"}
             </p>
             {!effectiveCollapsed ? (
-              <p className="text-steel text-[10px] font-semibold uppercase tracking-[0.2em]">Panel Admina</p>
+              <p className="text-steel text-[10px] font-semibold uppercase tracking-[0.2em]">Koordynator</p>
             ) : null}
           </div>
           <button
@@ -207,7 +224,7 @@ export function AdminLayoutClient({
             <IconMenu className="h-5 w-5" strokeWidth={2.25} />
           </button>
           <p className={`${logoFont.className} text-depths min-w-0 truncate text-base font-extrabold italic uppercase tracking-tight`}>
-            Zaliczone · Admin
+            Zaliczone · Koordynator
           </p>
         </div>
         <div className={`min-h-0 flex-1 ${isRozliczenia ? "overflow-y-auto lg:overflow-hidden" : "overflow-y-auto"}`}>{children}</div>

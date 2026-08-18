@@ -26,7 +26,6 @@ export default async function FinansePage() {
     <FinanseClient
       financeLines={financeLines}
       studentCount={studentCount}
-      ewidencjaUnlockedForMonth={profile.ewidencja_unlocked_for_month}
       priceTiers={priceTiers}
       payouts={payouts}
       closedMonths={closedMonths}

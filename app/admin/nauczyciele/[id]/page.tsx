@@ -51,7 +51,7 @@ export default async function TutorDetailsPage({
     try {
       await ensureTutorDriveFolder(tutor.id, tutor.name);
     } catch {
-      // Drive opcjonalny — admin i tak pracuje bezpośrednio na Dysku
+      // Drive opcjonalny - admin i tak pracuje bezpośrednio na Dysku
     }
   }
 

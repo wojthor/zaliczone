@@ -6,7 +6,7 @@ const PLN = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN" 
 
 const TONE_FILL: Record<LimitBarTone, string> = {
   ok: "#D5ED21", // lime
-  warn: "#DFFD6F", // soft-lime / butter — ostrzeżenie w palecie
+  warn: "#DFFD6F", // soft-lime / butter - ostrzeżenie w palecie
   danger: "#000C4A", // depths / claret alias
 };
 
@@ -28,7 +28,7 @@ type LimitBarProps = {
   alertDetail?: string | null;
 };
 
-/** Wspólny pasek limitu — styl zbliżony do FinanceTile (rounded-xl, shadow-sm, paleta Ops-Ledger). */
+/** Wspólny pasek limitu - styl zbliżony do FinanceTile (rounded-xl, shadow-sm, paleta Ops-Ledger). */
 export function LimitProgressBar({
   aktualnaWartosc,
   limit,

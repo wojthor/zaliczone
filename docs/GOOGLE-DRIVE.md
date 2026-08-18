@@ -1,7 +1,7 @@
-# Google Drive — nakładka ZALICZONE
+# Google Drive - nakładka ZALICZONE
 
 Aplikacja łączy się z **Twoim prywatnym Dyskiem Google** przez **konto usługi** (service account).
-Admin wrzuca pliki do `zaliczone/nauczyciele/<Imię Nazwisko>` — nauczyciel widzi je w **Profil → Dokumenty** (tylko podgląd i pobieranie).
+Admin wrzuca pliki do `zaliczone/nauczyciele/<Imię Nazwisko>` - nauczyciel widzi je w **Profil → Dokumenty** (tylko podgląd i pobieranie).
 
 > **Język konsoli:** w prawym górnym rogu Google Cloud kliknij ikonę ustawień / profilu i ustaw język na **Polski**, jeśli widzisz angielskie menu.
 
@@ -19,7 +19,7 @@ zaliczone/
     Lamine Yamal/
 ```
 
-1. Otwórz folder **nauczyciele** w przeglądarce — ID z URL → `GOOGLE_DRIVE_TEACHERS_FOLDER_ID`.
+1. Otwórz folder **nauczyciele** w przeglądarce - ID z URL → `GOOGLE_DRIVE_TEACHERS_FOLDER_ID`.
 2. (Zalecane) Utwórz obok folder **byli pracownicy**, **udostępnij** go temu samemu kontu usługi (**Edytujący**) i opcjonalnie wpisz ID do `GOOGLE_DRIVE_FORMER_TEACHERS_FOLDER_ID`.
 3. Jeśli nie utworzysz osobnego folderu, aplikacja zrobi fallback: `nauczyciele/byli pracownicy/`.
 
@@ -55,15 +55,15 @@ Wejdź na: [https://console.cloud.google.com/?hl=pl](https://console.cloud.googl
 3. **Nazwa konta usługi:** np. `zaliczone-drive`.
 4. (Opcjonalnie) krótki opis, np. `Dostęp ZALICZONE do Dysku`.
 5. Kliknij **Utwórz i kontynuuj**.
-6. Krok „Uprawnienia” — **pomiń** (nie musisz nadawać ról w projekcie). Kliknij **Dalej** / **Gotowe**.
+6. Krok „Uprawnienia” - **pomiń** (nie musisz nadawać ról w projekcie). Kliknij **Dalej** / **Gotowe**.
 
 Na liście kont pojawi się e-mail w stylu:
 
 `zaliczone-drive@TWOJ-PROJEKT.iam.gserviceaccount.com`
 
-**Skopiuj ten adres e-mail** — będzie potrzebny przy udostępnianiu folderu na Dysku.
+**Skopiuj ten adres e-mail** - będzie potrzebny przy udostępnianiu folderu na Dysku.
 
-### 2.4. Utwórz klucz JSON (konta usługi — NIE „API Keys”)
+### 2.4. Utwórz klucz JSON (konta usługi - NIE „API Keys”)
 
 > **Uwaga:** sekcja **Interfejsy API i usługi → Dane logowania → Klucze API / API keys** to **coś innego**.  
 > Nam potrzebny jest klucz **konta usługi** (plik JSON z `private_key`). Bez tego Drive nie zadziała.
@@ -73,13 +73,13 @@ Na liście kont pojawi się e-mail w stylu:
 1. Wejdź bezpośrednio:  
    [https://console.cloud.google.com/iam-admin/serviceaccounts?hl=pl](https://console.cloud.google.com/iam-admin/serviceaccounts?hl=pl)
 2. Sprawdź u góry, że masz wybrany projekt `zaliczone-drive` (lub jak nazwałeś).
-3. Na liście kliknij **e-mail** konta usługi (nie trzy kropki z boku) — np. `zaliczone-drive@….iam.gserviceaccount.com`.
+3. Na liście kliknij **e-mail** konta usługi (nie trzy kropki z boku) - np. `zaliczone-drive@….iam.gserviceaccount.com`.
 4. Otworzy się strona szczegółów konta. U góry są zakładki typu:  
    **Szczegóły | Uprawnienia | Klucze | Dane logowania…**
 5. Kliknij zakładkę **Klucze** (ang. *Keys*).
 6. **Dodaj klucz** → **Utwórz nowy klucz**.
 7. Typ: **JSON** → **Utwórz**.
-8. Pobierze się plik `.json` — **to jedyna kopia**, nie wrzucaj go do gita.
+8. Pobierze się plik `.json` - **to jedyna kopia**, nie wrzucaj go do gita.
 
 **Ścieżka B (z menu):**
 
@@ -100,7 +100,7 @@ Otwórz pobrany plik w edytorze tekstu. Potrzebujesz dwóch pól:
 | `client_email`  | `GOOGLE_DRIVE_CLIENT_EMAIL` |
 | `private_key`   | `GOOGLE_DRIVE_PRIVATE_KEY`  |
 
-`private_key` wklej **w całości** (z `-----BEGIN PRIVATE KEY-----` do `-----END PRIVATE KEY-----`), w cudzysłowie. Znaki `\n` z JSON zostaw jak są — aplikacja je zamieni na nowe linie.
+`private_key` wklej **w całości** (z `-----BEGIN PRIVATE KEY-----` do `-----END PRIVATE KEY-----`), w cudzysłowie. Znaki `\n` z JSON zostaw jak są - aplikacja je zamieni na nowe linie.
 
 ---
 
@@ -146,7 +146,7 @@ Kolumna `profiles.drive_folder_id` trzyma ID folderu nauczyciela na Dysku.
 ## 6. Pierwsze uruchomienie w ZALICZONE
 
 1. Upewnij się, że folder `nauczyciele` jest udostępniony kontu usługi (**Edytujący**).
-2. Otwórz profil nauczyciela w adminie (albo utwórz nowego) — system **podłączy / utworzy** folder na Dysku.
+2. Otwórz profil nauczyciela w adminie (albo utwórz nowego) - system **podłączy / utworzy** folder na Dysku.
 3. Wrzuć testowy PDF do folderu nauczyciela na Dysku Google.
 4. Zaloguj się jako nauczyciel → **Profil** → Dokumenty → **Podgląd** / **Pobierz**.
 
@@ -169,7 +169,7 @@ Nauczyciel **nie może** edytować ani usuwać plików przez ZALICZONE.
 Opcjonalnie w `.env.local`:
 
 ```env
-GOOGLE_DRIVE_FORMER_TEACHERS_FOLDER_ID=   # ID folderu „byli pracownicy”; jeśli puste — tworzony automatycznie obok „nauczyciele”
+GOOGLE_DRIVE_FORMER_TEACHERS_FOLDER_ID=   # ID folderu „byli pracownicy”; jeśli puste - tworzony automatycznie obok „nauczyciele”
 ```
 
 Jednorazowa synchronizacja (np. po wdrożeniu):

@@ -19,7 +19,8 @@ import { subjectsFromLine } from "@/lib/data/mappers";
 import { lessonDatesFromDraft } from "@/lib/data/mutations";
 import { deleteLesson, deleteLessonAndRemainingInSeries, deleteLessonsByIds, insertLessons, updateLesson } from "@/lib/actions/lessons";
 import { lessonTimesOverlap } from "@/lib/lessons/time-overlap";
-import type { StudentUi } from "@/lib/types/database";
+import { AlertsBanner } from "@/components/alerts/alerts-banner";
+import type { AppAlert, StudentUi } from "@/lib/types/database";
 
 type RecurrenceMode = "once" | "weekly" | "custom";
 
@@ -212,7 +213,11 @@ function LessonModal({
 }) {
   const eligibleStudents = useMemo(() => {
     if (!draft.subject) return [];
-    return students.filter((student) => subjectsFromLine(student.subjectsLine).includes(draft.subject));
+    return students.filter(
+      (student) =>
+        !student.blocked &&
+        subjectsFromLine(student.subjectsLine).includes(draft.subject),
+    );
   }, [draft.subject, students]);
 
   return (
@@ -236,7 +241,7 @@ function LessonModal({
             <span className="text-depths/80 text-xs font-semibold">Przedmiot</span>
             {activeSubjects.length === 0 ? (
               <p className="text-muted rounded-app bg-luster/60 px-3 py-2 text-sm">
-                Brak aktywnych przedmiotów — poproś o dodanie w Profilu
+                Brak aktywnych przedmiotów - poproś o dodanie w Profilu
               </p>
             ) : (
               <select
@@ -460,10 +465,12 @@ function TerminarzInner({
   initialLessons,
   students,
   activeSubjects,
+  alerts,
 }: {
   initialLessons: Lesson[];
   students: StudentUi[];
   activeSubjects: string[];
+  alerts: AppAlert[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -766,8 +773,9 @@ function TerminarzInner({
       }
     >
       <div className="flex flex-col gap-6">
+      {alerts.length > 0 ? <AlertsBanner alerts={alerts} role="TUTOR" /> : null}
       <p className="text-muted max-w-2xl text-sm font-medium">
-        Plan lekcji, kalendarz miesiąca i pełna lista wpisów zsynchronizowana z bazą Supabase.
+        Plan lekcji, kalendarz miesiąca i pełna lista zajęć - wszystko zapisuje się na bieżąco.
       </p>
 
       <section className="card-quiet p-3 sm:p-4">
@@ -838,7 +846,7 @@ function TerminarzInner({
 
       <section className="rounded-app bg-paper p-4">
         <div>
-          <h2 className="text-depths text-base font-extrabold tracking-tight">Lista lekcji — miesiąc</h2>
+          <h2 className="text-depths text-base font-extrabold tracking-tight">Lista lekcji - miesiąc</h2>
           <p className="text-muted mt-0.5 text-xs capitalize">{formatMonthLongFromKey(listMonthKey)}</p>
         </div>
 
@@ -910,18 +918,10 @@ function TerminarzInner({
               const isPast = Boolean(lesson.date && lesson.date < today);
               const canEdit = !isPast && status === "PLANNED";
               const canDelete = !isPast && status === "PLANNED";
-              const rail =
-                status === "UNPAID"
-                  ? "status-rail status-rail-unpaid"
-                  : status === "PENDING_VERIFICATION"
-                    ? "status-rail status-rail-pending"
-                    : status === "VERIFIED"
-                      ? "status-rail status-rail-verified"
-                      : "status-rail status-rail-neutral";
               return (
                 <li
                   key={lesson.id}
-                  className={`flex flex-col gap-3 rounded-app bg-snow px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${rail}`}
+                  className="flex flex-col gap-3 rounded-app bg-snow px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="avatar-initials h-10 w-10 shrink-0 text-sm">
@@ -943,7 +943,7 @@ function TerminarzInner({
                       </p>
                       {status === "UNPAID" ? (
                         <p className="mt-1 text-[0.65rem] font-bold text-depths">
-                          Brak wpłaty od rodzica — skontaktuj się i ponów w planie tygodnia.
+                          Brak wpłaty od rodzica - skontaktuj się i ponów w planie tygodnia.
                         </p>
                       ) : null}
                       {needsAction && status === "PLANNED" ? (
@@ -952,7 +952,7 @@ function TerminarzInner({
                         </p>
                       ) : null}
                       {isPast ? (
-                        <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone — bez edycji</p>
+                        <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone - bez edycji</p>
                       ) : status !== "PLANNED" ? (
                         <p className="text-muted mt-1 text-[0.65rem]">
                           Edycja i usuwanie tylko dla lekcji zaplanowanych
@@ -1065,10 +1065,12 @@ export function TerminarzPageView({
   initialLessons,
   students,
   activeSubjects,
+  alerts = [],
 }: {
   initialLessons: Lesson[];
   students: StudentUi[];
   activeSubjects: string[];
+  alerts?: AppAlert[];
 }) {
   return (
     <LessonCompletionProvider>
@@ -1076,6 +1078,7 @@ export function TerminarzPageView({
         initialLessons={initialLessons}
         students={students}
         activeSubjects={activeSubjects}
+        alerts={alerts}
       />
     </LessonCompletionProvider>
   );

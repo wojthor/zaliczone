@@ -1,5 +1,5 @@
 /**
- * Demo lekcje dla Benio — losowy podział VERIFIED / UNPAID (tydzień 6–12 lipca 2026)
+ * Demo lekcje dla Benio - losowy podział VERIFIED / UNPAID (tydzień 6–12 lipca 2026)
  * Run: pnpm seed:demo
  */
 
@@ -19,7 +19,7 @@ const STUDENTS = [
   { name: "Zosia Kamińska", subjects: ["Matematyka"], class_level: "Szkoła podstawowa", rate_pln: 60 },
 ];
 
-/** Poprzedni tydzień względem 14 lipca 2026 — widoczny domyślnie w Rozliczeniach */
+/** Poprzedni tydzień względem 14 lipca 2026 - widoczny domyślnie w Rozliczeniach */
 const SETTLEMENT_DATES = [
   "2026-07-06",
   "2026-07-07",
@@ -84,7 +84,7 @@ function pickSubject(student) {
 }
 
 async function main() {
-  console.log("🎲 Seed demo — Benio, losowe VERIFIED / UNPAID\n");
+  console.log("🎲 Seed demo - Benio, losowe VERIFIED / UNPAID\n");
 
   const users = await listUsers();
   const tutorId = users.find((u) => u.email === TUTOR_EMAIL)?.id;
@@ -151,7 +151,7 @@ async function main() {
         body: JSON.stringify({ payment_received_at: row.date }),
       });
       if (!res.ok) {
-        console.log("ℹ Kolumna payment_received_at niedostępna — uruchom migrację 0004 w Supabase.");
+        console.log("ℹ Kolumna payment_received_at niedostępna - uruchom migrację 0004 w Supabase.");
         break;
       }
     }

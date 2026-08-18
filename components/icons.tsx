@@ -50,7 +50,7 @@ export function IconWallet(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Lista / checklista — weryfikacja lekcji. */
+/** Lista / checklista - weryfikacja lekcji. */
 export function IconChecklist(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -69,7 +69,7 @@ export function IconChecklist(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Dolar — cennik. */
+/** Dolar - cennik. */
 export function IconDollar(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -88,7 +88,7 @@ export function IconDollar(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Wypłaty / przelew — banknot z okienkiem (inny styl niż portfel). */
+/** Wypłaty / przelew - banknot z okienkiem (inny styl niż portfel). */
 export function IconPayroll(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -118,7 +118,7 @@ export function IconMenu(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Chevron — toggle zwijania sidebara (obróć o 180° przez className dla stanu odwrotnego). */
+/** Chevron - toggle zwijania sidebara (obróć o 180° przez className dla stanu odwrotnego). */
 export function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -136,7 +136,7 @@ export function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Kłódka — plakietka "miesiąc zamknięty" w księgowości. */
+/** Kłódka - plakietka "miesiąc zamknięty" w księgowości. */
 export function IconLock(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -155,7 +155,7 @@ export function IconClose(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Książka / przewodnik — zakładka Przewodnik w panelu tutora. */
+/** Książka / przewodnik - zakładka Przewodnik w panelu tutora. */
 export function IconGuide(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -176,7 +176,7 @@ export function IconLogout(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Folder — obrys, styl zbliżony do ikon systemowych (Finder / Eksplorator). */
+/** Folder - obrys, styl zbliżony do ikon systemowych (Finder / Eksplorator). */
 export function IconFolder(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
@@ -190,7 +190,7 @@ export function IconFolder(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Budynek — dysk firmowy (rozróżnienie od dysku pracowników w Dokumentach). */
+/** Budynek - dysk firmowy (rozróżnienie od dysku pracowników w Dokumentach). */
 export function IconBuilding(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -202,7 +202,7 @@ export function IconBuilding(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Strzałka do góry w chmurze/tacy — duża strefa drag&drop w Dokumentach. */
+/** Strzałka do góry w chmurze/tacy - duża strefa drag&drop w Dokumentach. */
 export function IconUpload(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>

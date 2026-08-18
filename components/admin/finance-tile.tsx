@@ -4,7 +4,7 @@ export type FinanceTone = "navy" | "orange" | "green" | "red";
 
 /**
  * Tone names kept for call-site compatibility; mapped to Zaliczone palette only
- * (navy / lime / soft-lime / steel — no red/orange/green hues).
+ * (navy / lime / soft-lime / steel - no red/orange/green hues).
  */
 const FINANCE_TONE_STYLES: Record<
   FinanceTone,
@@ -32,7 +32,7 @@ const FINANCE_TONE_STYLES: Record<
   },
 };
 
-/** Kolorowy kafelek KPI — ten sam styl co na Głównej (Przychód / Koszty / Marża). */
+/** Kolorowy kafelek KPI - ten sam styl co na Głównej (Przychód / Koszty / Marża). */
 export function FinanceTile({
   label,
   tone,

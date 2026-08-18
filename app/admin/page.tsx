@@ -4,9 +4,8 @@ import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import {
   getAllOperatingExpenses,
   getAllTutorProfiles,
-  getAllVerifiedFinanceLines,
-  getPendingVerificationLines,
-  getUnpaidFinanceLines,
+  getCachedCoordinatorDashboardLines,
+  getOpenAdminAlerts,
 } from "@/lib/data/queries";
 import type { FinanceLineUi } from "@/lib/types/database";
 
@@ -59,19 +58,20 @@ export default async function AdminHomePage() {
   const today = new Date();
   const monthKey = currentMonthKey(today);
 
-  const [pendingLessons, unpaidLessons, verifiedLines, tutors, operatingExpenses] =
-    await Promise.all([
-      getPendingVerificationLines(),
-      getUnpaidFinanceLines(),
-      getAllVerifiedFinanceLines(),
-      getAllTutorProfiles(),
-      getAllOperatingExpenses(),
-    ]);
+  const [dashboardLines, tutors, operatingExpenses, alerts, studentCountRes] = await Promise.all([
+    getCachedCoordinatorDashboardLines(),
+    getAllTutorProfiles(),
+    getAllOperatingExpenses(),
+    getOpenAdminAlerts(),
+    createClient().then((supabase) =>
+      supabase.from("students").select("*", { count: "exact", head: true }),
+    ),
+  ]);
+  const pendingLessons = dashboardLines.pending;
+  const unpaidLessons = dashboardLines.unpaid;
+  const verifiedLines = dashboardLines.verified;
 
-  const supabase = await createClient();
-  const { count: studentCount } = await supabase
-    .from("students")
-    .select("*", { count: "exact", head: true });
+  const studentCount = studentCountRes.count;
 
   const verifiedThisMonth = verifiedLines.filter((l) => l.monthKey === monthKey);
   const pendingThisMonth = pendingLessons.filter((l) => l.monthKey === monthKey);
@@ -115,6 +115,7 @@ export default async function AdminHomePage() {
       verifiedMonthCount={verifiedThisMonth.length}
       unpaidMonthCount={unpaidThisMonth.length}
       expiringContracts={expiringContracts}
+      alerts={alerts}
     />
   );
 }

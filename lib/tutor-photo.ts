@@ -11,7 +11,7 @@ export const TUTOR_PHOTO = {
   bucket: "tutor-photos",
   /** Krótka podpowiedź pod polem w formularzu admina */
   hint:
-    "Portret pionowy 3:4 — zalecane 900×1200 px (min. 600×800). JPG / PNG / WebP, max 5 MB. Tak wygląda kafelek na stronie głównej.",
+    "Portret pionowy 3:4 - zalecane 900×1200 px (min. 600×800). JPG / PNG / WebP, max 5 MB. Tak wygląda kafelek na stronie głównej.",
 } as const;
 
 export function tutorPhotoSizeLabel(): string {

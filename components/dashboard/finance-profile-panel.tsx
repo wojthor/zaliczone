@@ -61,7 +61,10 @@ export function FinanceProfilePanel({ totalPayout, lessonStats }: FinanceProfile
 
   return (
     <div className="grid h-full min-h-0 min-w-0 grid-rows-2 gap-2 overflow-hidden">
-      <div className="card-feature flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden px-3 py-3 text-center">
+      <div className="card-feature relative flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden px-3 py-3 text-center">
+        <div className="absolute top-2.5 right-3">
+          <SeeMoreLink href="/finanse" compact inverted />
+        </div>
         <p className="section-label flex shrink-0 items-center justify-center gap-1.5 !text-lime">
           <IconWallet className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
           Do wypłaty
@@ -72,9 +75,6 @@ export function FinanceProfilePanel({ totalPayout, lessonStats }: FinanceProfile
           </span>
           <span className="ml-1 align-baseline text-sm font-bold text-soft-lime">zł</span>
         </p>
-        <div className="shrink-0">
-          <SeeMoreLink href="/finanse" compact inverted />
-        </div>
       </div>
 
       <div className="soft-panel flex min-h-0 flex-col overflow-hidden px-3 py-2.5 text-depths">

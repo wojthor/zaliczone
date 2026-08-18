@@ -5,7 +5,7 @@ import { Spinner, useToast } from "@/components/ui/toast";
 import type { DriveFileItem, TutorDriveFilesResult } from "@/lib/google-drive/types";
 
 function formatBytes(n: number | null): string {
-  if (n == null || n <= 0) return "—";
+  if (n == null || n <= 0) return "-";
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
@@ -20,15 +20,13 @@ function fileHref(fileId: string, opts: { tutorId?: string; disposition: "inline
 export function DriveFilesPanel({
   drive,
   tutorId,
-  title = "Dokumenty",
-  description = "Pliki z Twojego folderu na Dysku Google. Tylko podgląd i pobieranie.",
+  title = "Twoje dokumenty",
   emptyLabel = "Brak plików w folderze.",
 }: {
   drive: TutorDriveFilesResult;
   /** Wymagane dla admina (API sprawdza folder nauczyciela). */
   tutorId?: string;
   title?: string;
-  description?: string;
   emptyLabel?: string;
 }) {
   const toast = useToast();
@@ -52,7 +50,6 @@ export function DriveFilesPanel({
   return (
     <section className="card-quiet p-4">
       <h2 className="section-label">{title}</h2>
-      <p className="text-muted mt-1 text-sm">{description}</p>
 
       {!drive.configured ? (
         <p className="mt-3 rounded-app bg-mist px-3 py-2 text-xs text-depths">

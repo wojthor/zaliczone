@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { FinanceTile } from "@/components/admin/finance-tile";
+import { AlertsBanner } from "@/components/alerts/alerts-banner";
+import type { AppAlert } from "@/lib/types/database";
 
 type ExpiringContract = {
   id: string;
@@ -35,7 +37,6 @@ const DEADLINES_DONE_KEY = "zaliczone-admin-deadlines-done";
 const DEADLINES_STATUS_KEY = "zaliczone-admin-deadlines-status";
 
 const MONTHLY_CYCLE: Array<{ id: string; day: number; label: string; href: string }> = [
-  { id: "ewidencja-mail", day: 1, label: "Mail o ewidencjach", href: "/admin/wyplaty" },
   { id: "ewidencja-deadline", day: 3, label: "Ewidencje podpisane (do)", href: "/admin/wyplaty" },
   { id: "rachunek-send", day: 3, label: "Wysyłka rachunków do podpisania", href: "/admin/wyplaty" },
   { id: "rachunek-deadline", day: 5, label: "Rachunki podpisane (do)", href: "/admin/wyplaty" },
@@ -116,7 +117,7 @@ function buildMonthCycleDeadlines(year: number, monthIndex0: number, today = new
   });
 }
 
-/** Bieżący + następny miesiąc — żeby „kolejne terminy” nie znikały pod koniec miesiąca. */
+/** Bieżący + następny miesiąc - żeby „kolejne terminy” nie znikały pod koniec miesiąca. */
 function buildHomeDeadlines(): MonthDeadline[] {
   const now = new Date();
   const y = now.getFullYear();
@@ -130,7 +131,7 @@ function buildHomeDeadlines(): MonthDeadline[] {
   return [...map.values()].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
 }
 
-/** Uproszczony kalendarz — tylko bieżący miesiąc, bez listy i nawigacji. */
+/** Uproszczony kalendarz - tylko bieżący miesiąc, bez listy i nawigacji. */
 function CurrentMonthCalendar({ monthLabel }: { monthLabel: string }) {
   const todayIso = toIsoLocal(new Date());
   const year = Number(todayIso.slice(0, 4));
@@ -517,6 +518,7 @@ export function AdminDashboardClient({
   verifiedMonthCount,
   unpaidMonthCount,
   expiringContracts,
+  alerts,
 }: {
   todayLabel: string;
   monthLabel: string;
@@ -531,6 +533,7 @@ export function AdminDashboardClient({
   verifiedMonthCount: number;
   unpaidMonthCount: number;
   expiringContracts: ExpiringContract[];
+  alerts: AppAlert[];
 }) {
   return (
     <div className="space-y-7">
@@ -543,6 +546,15 @@ export function AdminDashboardClient({
           Miesiąc <span className="text-depths ml-1 font-bold capitalize">{monthLabel}</span>
         </div>
       </header>
+
+      {alerts.length > 0 ? (
+        <section>
+          <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">
+            Alerty · {alerts.length}
+          </h2>
+          <AlertsBanner alerts={alerts} role="ADMIN" />
+        </section>
+      ) : null}
 
       <section>
         <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Finanse miesiąca</h2>

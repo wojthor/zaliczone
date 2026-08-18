@@ -49,7 +49,6 @@ export default async function AdminKalendarzPage() {
   const m = today.getMonth() + 1;
   const prevLabel = formatMonthLongPl(prevKey);
 
-  const ewidencjaReminderIso = isoFromYmd(y, m, DATES.ewidencja.reminderDayOfNextMonth);
   const ewidencjaDeadlineIsoDate = isoFromYmd(y, m, DATES.ewidencja.deadlineDayOfNextMonth);
   const rachunekSendIso = isoFromYmd(y, m, DATES.rachunek.sendDayOfNextMonth);
   const rachunekDeadlineIso = isoFromYmd(y, m, DATES.rachunek.signedDeadlineDayOfNextMonth);
@@ -63,14 +62,6 @@ export default async function AdminKalendarzPage() {
   const yearClosedLabel = String(yearEndYear - 1);
 
   const deadlines = [
-    {
-      id: "ewidencja-mail",
-      label: `Mail o ewidencjach · ${prevLabel}`,
-      dateLabel: formatDayPl(ewidencjaReminderIso),
-      dateIso: ewidencjaReminderIso,
-      daysLeft: daysUntilIso(ewidencjaReminderIso, today),
-      href: "/admin/wyplaty",
-    },
     {
       id: "ewidencja-deadline",
       label: `Ewidencje podpisane (do) · ${prevLabel}`,
@@ -157,7 +148,7 @@ export default async function AdminKalendarzPage() {
       dateLabel: formatDayPl(lastDayOfMonthIso(yearEndYear, DATES.yearEnd.pitToTeachersMonth)),
       dateIso: lastDayOfMonthIso(yearEndYear, DATES.yearEnd.pitToTeachersMonth),
       daysLeft: daysUntilIso(lastDayOfMonthIso(yearEndYear, DATES.yearEnd.pitToTeachersMonth), today),
-      href: "/admin/powiadomienia",
+      href: "/admin/nauczyciele",
     },
     {
       id: "year-pit36",

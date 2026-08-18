@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserProfile, getTutorVerifiedLessonsForMonth } from "@/lib/data/queries";
+import { ewidencjaAvailableFromHint, formatMonthLongPl, isEwidencjaPdfAvailable } from "@/lib/dates";
 import { EwidencjaPrintView } from "./ewidencja-print";
 
 export default async function EwidencjaPage({
@@ -21,6 +22,19 @@ export default async function EwidencjaPage({
   }
 
   const lines = await getTutorVerifiedLessonsForMonth(profile.id, month);
+  if (!isEwidencjaPdfAvailable(month) || lines.length === 0) {
+    const monthLabel = formatMonthLongPl(month);
+    return (
+      <div className="p-8 text-center">
+        <p className="text-muted">
+          {lines.length === 0
+            ? "Brak zatwierdzonych lekcji"
+            : ewidencjaAvailableFromHint(monthLabel)}
+        </p>
+      </div>
+    );
+  }
+
   const tutorName = profile.full_name ?? "Korepetytor";
 
   return <EwidencjaPrintView month={month} tutorName={tutorName} lines={lines} />;

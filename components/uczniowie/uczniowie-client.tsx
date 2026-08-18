@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { Spinner, useToast } from "@/components/ui/toast";
-import { insertStudent, updateStudent, deleteStudent } from "@/lib/data/mutations";
-import type { StudentUi } from "@/lib/types/database";
+import { insertStudent, updateStudent, deleteStudent } from "@/lib/actions/students";
+import { AlertsBanner } from "@/components/alerts/alerts-banner";
+import type { AppAlert, StudentUi } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 
 type SortMode = "newest" | "oldest" | "az" | "za";
@@ -52,10 +53,12 @@ export function UczniowieClient({
   initialStudents,
   activeSubjects,
   priceTiers,
+  alerts = [],
 }: {
   initialStudents: StudentUi[];
   activeSubjects: string[];
   priceTiers: PriceTier[];
+  alerts?: AppAlert[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -114,10 +117,10 @@ export function UczniowieClient({
       selectedSubjects: student.subjectsLine.split(",").map((s) => s.trim()).filter(Boolean),
       classLabel: student.classLabel,
       schoolClass: student.schoolClass,
-      phone: student.phone === "—" ? "" : student.phone,
-      email: student.email === "—" ? "" : student.email,
+      phone: student.phone === "-" ? "" : student.phone,
+      email: student.email === "-" ? "" : student.email,
       nextLesson: student.nextLesson,
-      notes: student.notes === "—" ? "" : student.notes,
+      notes: student.notes === "-" ? "" : student.notes,
     });
     setModalOpen(true);
   }
@@ -156,12 +159,12 @@ export function UczniowieClient({
             name: row.name,
             initials: row.name.trim().split(/\s+/).map((p: string) => p[0]).join("").slice(0, 2).toUpperCase(),
             subjectsLine: row.subjects.join(", "),
-            phone: draft.phone.trim() || "—",
-            email: draft.email.trim() || "—",
+            phone: draft.phone.trim() || "-",
+            email: draft.email.trim() || "-",
             guardian: "Rodzic / opiekun",
             classLabel: row.class_level,
-            schoolClass: draft.schoolClass.trim() || "—",
-            notes: draft.notes.trim() || "—",
+            schoolClass: draft.schoolClass.trim() || "-",
+            notes: draft.notes.trim() || "-",
             ratePerHourPln: Number(row.rate_pln),
             nextLesson: draft.nextLesson.trim() || "Brak zaplanowanej lekcji",
             createdAtTs: Date.now(),
@@ -182,7 +185,7 @@ export function UczniowieClient({
   }
 
   async function removeStudent(id: string, name: string) {
-    if (!confirm(`Usunąć ucznia ${name}? Powiązane lekcje również zostaną usunięte.`)) return;
+    if (!confirm(`Na pewno usunąć ${name}? Razem z nim znikną też jego lekcje.`)) return;
     try {
       await deleteStudent(id);
       setItems((prev) => prev.filter((s) => s.id !== id));
@@ -195,6 +198,11 @@ export function UczniowieClient({
 
   return (
     <PageShell title="Uczniowie">
+      {alerts.length > 0 ? (
+        <div className="mb-4">
+          <AlertsBanner alerts={alerts} role="TUTOR" />
+        </div>
+      ) : null}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <p className="text-muted max-w-2xl text-sm font-medium">
           Karty uczniów z poziomem, klasą, przedmiotami, stawką i możliwością dodawania nowych rekordów.
@@ -247,86 +255,106 @@ export function UczniowieClient({
           <p className="section-label">Lista uczniów</p>
           <span className="text-muted text-xs font-semibold tabular-nums">{filtered.length}</span>
         </div>
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {filtered.map((student) => (
             <li
               key={student.id}
-              className="soft-panel p-4"
+              className={`soft-panel flex aspect-square min-h-0 flex-col justify-between gap-2 overflow-hidden p-3 ${
+                student.blocked ? "ring-1 ring-[#E23B3B]/30" : ""
+              }`}
             >
-              <div className="flex items-start gap-3">
-                <span className="avatar-initials h-12 w-12 shrink-0 text-sm">
+              <div className="flex min-h-0 items-start gap-2.5">
+                <span className="avatar-initials h-11 w-11 shrink-0 text-sm">
                   {student.initials}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-depths text-lg font-extrabold leading-tight tracking-tight">
+                  <h2 className="text-depths line-clamp-2 text-[0.95rem] font-extrabold leading-snug tracking-tight">
                     {student.name}
                   </h2>
-                  <p className="mt-1.5 flex flex-wrap gap-1.5">
-                    {student.subjectsLine ? (
-                      student.subjectsLine.split(",").map((subject) => (
-                        <span
-                          key={subject}
-                          className="rounded-full bg-lime px-2.5 py-0.5 text-[0.65rem] font-semibold text-depths"
-                        >
-                          {subject.trim()}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted text-sm">Brak przedmiotów</span>
-                    )}
-                  </p>
-                  <p className="text-muted mt-2 text-xs font-semibold">
+                  {student.blocked ? (
+                    <p className="mt-0.5 text-[0.6rem] font-extrabold uppercase tracking-wide text-[#E23B3B]">
+                      Zablokowany
+                    </p>
+                  ) : null}
+                  <p className="text-muted mt-1 text-xs font-semibold leading-snug">
                     {student.classLabel} · {student.schoolClass}
                   </p>
                 </div>
               </div>
 
-              <dl className="mt-4 space-y-2 border-t border-panel-frame/50 pt-3 text-sm">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted font-medium">Telefon</dt>
-                  <dd className="text-right font-semibold tabular-nums text-depths">{student.phone}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted font-medium">E-mail</dt>
-                  <dd className="min-w-0 truncate text-right font-medium text-depths">{student.email}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted font-medium">{student.guardian}</dt>
-                </div>
-              </dl>
+              <p className="flex flex-wrap gap-1">
+                {student.subjectsLine ? (
+                  student.subjectsLine.split(",").map((subject) => (
+                    <span
+                      key={subject}
+                      className="rounded-full bg-lime px-2 py-0.5 text-[0.6rem] font-semibold text-depths"
+                    >
+                      {subject.trim()}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-muted text-xs">Brak przedmiotów</span>
+                )}
+              </p>
 
-              <dl className="mt-3 space-y-2 border-t border-panel-frame/50 pt-3 text-sm">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted font-medium">Stawka</dt>
-                  <dd className="font-extrabold tabular-nums text-depths">
+              <dl className="grid flex-1 content-evenly gap-1 text-xs">
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted shrink-0">Stawka</dt>
+                  <dd className="text-right font-extrabold tabular-nums text-depths">
                     {student.ratePerHourPln} zł / h
                   </dd>
                 </div>
-                <div>
-                  <dt className="section-label !text-muted mb-0.5">Następna lekcja</dt>
-                  <dd className="text-depths font-semibold">{student.nextLesson}</dd>
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted shrink-0">Lekcja</dt>
+                  <dd className="min-w-0 text-right font-semibold leading-snug text-depths">
+                    {student.nextLesson}
+                  </dd>
                 </div>
-                <div>
-                  <dt className="section-label !text-muted mb-0.5">Notatki</dt>
-                  <dd className="text-muted text-xs leading-snug">{student.notes}</dd>
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted shrink-0">Tel.</dt>
+                  <dd className="text-right font-semibold tabular-nums text-depths">{student.phone}</dd>
                 </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted shrink-0">E-mail</dt>
+                  <dd className="min-w-0 truncate text-right font-medium text-depths">{student.email}</dd>
+                </div>
+                {student.notes && student.notes !== "-" ? (
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted shrink-0">Notatki</dt>
+                    <dd className="min-w-0 line-clamp-3 text-right font-medium leading-snug text-depths">
+                      {student.notes}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
 
-              <div className="mt-4 flex gap-2 border-t border-panel-frame/50 pt-3">
-                <button
-                  type="button"
-                  onClick={() => openEdit(student)}
-                  className="rounded-full bg-[#000C4A] px-3.5 py-1.5 text-xs font-semibold text-lime"
-                >
-                  Edytuj
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeStudent(student.id, student.name)}
-                  className="rounded-full border border-panel-frame/50 bg-snow px-3.5 py-1.5 text-xs font-semibold text-steel"
-                >
-                  Usuń
-                </button>
+              <div className="shrink-0">
+                {student.blocked ? (
+                  <button
+                    type="button"
+                    onClick={() => removeStudent(student.id, student.name)}
+                    className="rounded-full border border-[#E23B3B]/40 bg-snow px-3 py-1.5 text-xs font-semibold text-[#E23B3B]"
+                  >
+                    Usuń
+                  </button>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(student)}
+                      className="rounded-full bg-[#000C4A] px-3 py-1.5 text-xs font-semibold text-lime"
+                    >
+                      Edytuj
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeStudent(student.id, student.name)}
+                      className="rounded-full border border-panel-frame/50 bg-snow px-3 py-1.5 text-xs font-semibold text-steel"
+                    >
+                      Usuń
+                    </button>
+                  </div>
+                )}
               </div>
             </li>
           ))}
@@ -363,7 +391,7 @@ export function UczniowieClient({
                 <span className="text-depths/80 text-xs font-semibold">Przedmioty</span>
                 {activeSubjects.length === 0 ? (
                   <p className="text-muted rounded-app bg-luster/60 px-3 py-2 text-sm">
-                    Brak aktywnych przedmiotów — poproś o dodanie w Profilu
+                    Brak aktywnych przedmiotów - poproś o dodanie w Profilu
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">

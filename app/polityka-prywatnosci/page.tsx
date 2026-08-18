@@ -28,12 +28,15 @@ export default function PolitykaPrywatnosciPage() {
           </p>
           <p>
             Podstawą są art. 6 ust. 1 lit. b i f RODO (umowa / prawnie uzasadniony interes). Dane nie są
-            sprzedawane. Przysługuje Ci prawo dostępu, sprostowania, usunięcia, ograniczenia przetwarzania
-            oraz wniesienia skargi do PUODO.
+            sprzedawane.
           </p>
           <p>
-            Ta strona to wersja robocza polityki — przed publikacją produkcyjną uzupełnij ją o pełną
-            treść prawną.
+            Przysługuje Ci prawo dostępu, sprostowania, usunięcia i ograniczenia przetwarzania. Możesz
+            też wnieść skargę do PUODO.
+          </p>
+          <p>
+            To jest wersja robocza polityki. Przed uruchomieniem serwisu uzupełnij ją o pełną treść
+            prawną.
           </p>
         </div>
       </main>

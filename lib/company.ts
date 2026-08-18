@@ -1,11 +1,11 @@
 /**
- * Dane firmowe ZALICZONE — jedno miejsce do edycji, czytane m.in. przez zakładkę
+ * Dane firmowe ZALICZONE - jedno miejsce do edycji, czytane m.in. przez zakładkę
  * „Przewodnik” (panel tutora) i wydruki księgowości. Podmień na docelowe dane firmy.
  */
 export const COMPANY = {
   name: "ZALICZONE",
+  owner: "Martyna Wilczyńska",
   nip: "………………",
-  address: "……………………………………",
+  address: "ul. Słonimskiego 1/48 Gdańsk",
   email: "kontakt@zaliczone.pl",
-  phone: "+48 000 000 000",
 } as const;

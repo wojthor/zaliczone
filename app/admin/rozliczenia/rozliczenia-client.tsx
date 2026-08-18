@@ -13,7 +13,7 @@ import { Spinner, useToast } from "@/components/ui/toast";
 
 /** Czas pulzu potwierdzenia (lime), zanim wiersz zacznie się przesuwać. */
 const PULSE_MS = 320;
-/** Czas trwania hop-to-paid — wiersz zostaje widoczny w starej liście, żeby animacja miała czas dograć. */
+/** Czas trwania hop-to-paid - wiersz zostaje widoczny w starej liście, żeby animacja miała czas dograć. */
 const HOP_MS = 520;
 
 function todayIso(): string {
@@ -134,7 +134,7 @@ export function RozliczeniaClient({
   /**
    * Odtwarza dwuetapowy, satysfakcjonujący feedback po udanej akcji:
    * krótki pulz limonki („potwierdzone!”), potem hop-to-paid („…i już się przenosi”),
-   * a dopiero na końcu commit lokalnego stanu + router.refresh() — żeby refresh
+   * a dopiero na końcu commit lokalnego stanu + router.refresh() - żeby refresh
    * nie „przeciął” animacji w połowie.
    */
   function animateAndCommit(id: string, commit: () => void) {
@@ -211,8 +211,8 @@ export function RozliczeniaClient({
       <div className="min-w-0 shrink-0 space-y-2">
         <h1 className="dash-sans text-depths text-lg font-bold tracking-tight sm:text-xl">Lekcje</h1>
         <p className="dash-sans text-muted text-[0.7rem] leading-snug sm:text-xs">
-          Przy zatwierdzeniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego — po zatwierdzeniu nie da się jej
-          zmienić.
+          Przy zatwierdzaniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego. Po zatwierdzeniu
+          nie da się jej już zmienić.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <WeekVerificationBar
@@ -236,10 +236,10 @@ export function RozliczeniaClient({
         </div>
       </div>
 
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-3 lg:overflow-hidden">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
         <PaymentsPanel
           title="Do zatwierdzenia"
-          subtitle="PENDING_VERIFICATION — sprawdź przelew i ustaw datę wpływu."
+          subtitle="Sprawdź przelew i ustaw datę wpływu."
           empty="Brak lekcji do weryfikacji w wybranym tygodniu."
           groups={pendingByDay}
           variant="pending"
@@ -253,40 +253,42 @@ export function RozliczeniaClient({
           onReject={markUnpaid}
         />
 
-        <PaymentsPanel
-          title="Zatwierdzone"
-          subtitle="VERIFIED — data wpływu zablokowana · idą do wypłat / księgowości."
-          empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
-          groups={verifiedByDay}
-          variant="verified"
-          count={verifiedInWeek.length}
-          movingId={movingId}
-          pulseId={pulseId}
-          leavingId={leavingId}
-          paymentDates={paymentDates}
-          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-        />
+        <div className="grid min-h-0 min-w-0 grid-cols-1 gap-3 lg:grid-rows-2 lg:overflow-hidden">
+          <PaymentsPanel
+            title="Zatwierdzone"
+            subtitle="Data wpływu zablokowana. Idą do wypłat i księgowości."
+            empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
+            groups={verifiedByDay}
+            variant="verified"
+            count={verifiedInWeek.length}
+            movingId={movingId}
+            pulseId={pulseId}
+            leavingId={leavingId}
+            paymentDates={paymentDates}
+            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+          />
 
-        <PaymentsPanel
-          title="Nieopłacone"
-          subtitle="UNPAID — po wpływie ustaw datę i zatwierdź ponownie."
-          empty="Brak nieopłaconych lekcji w wybranym tygodniu."
-          groups={unpaidByDay}
-          variant="unpaid"
-          count={unpaidInWeek.length}
-          movingId={movingId}
-          pulseId={pulseId}
-          leavingId={leavingId}
-          paymentDates={paymentDates}
-          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-          onVerify={(id) => openVerifyModal(id, "unpaid")}
-        />
+          <PaymentsPanel
+            title="Nieopłacone"
+            subtitle="Po wpływie ustaw datę i zatwierdź ponownie."
+            empty="Brak nieopłaconych lekcji w wybranym tygodniu."
+            groups={unpaidByDay}
+            variant="unpaid"
+            count={unpaidInWeek.length}
+            movingId={movingId}
+            pulseId={pulseId}
+            leavingId={leavingId}
+            paymentDates={paymentDates}
+            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+            onVerify={(id) => openVerifyModal(id, "unpaid")}
+          />
+        </div>
       </div>
 
       <ConfirmDialog
         open={verifyTarget !== null}
         tone="positive"
-        title={verifyTarget ? `Zatwierdź wpłatę — ${verifyTarget.studentName}` : ""}
+        title={verifyTarget ? `Zatwierdź wpłatę - ${verifyTarget.studentName}` : ""}
         description={
           verifyTarget
             ? `Kwota ${verifyTarget.amountPln} zł. Po zatwierdzeniu daty wpływu nie da się jej zmienić.`
@@ -322,7 +324,7 @@ export function RozliczeniaClient({
                 className="dash-sans text-depths w-full rounded-app border border-panel-frame/40 bg-white px-2.5 py-2 text-sm"
                 aria-label="Metoda płatności"
               >
-                <option value="">— wybierz metodę —</option>
+                <option value="">- wybierz metodę -</option>
                 {PAYMENT_METHODS.map((method) => (
                   <option key={method} value={method}>
                     {method}
@@ -505,12 +507,10 @@ function LessonRow({
   onReject?: () => void;
 }) {
   const amountClass = variant === "verified" ? "text-moss" : variant === "unpaid" ? "text-claret" : "text-depths";
-  const rail =
-    variant === "verified" ? "status-rail-verified" : variant === "unpaid" ? "status-rail-unpaid" : "status-rail-pending";
 
   return (
     <li
-      className={`status-rail ${rail} rounded-ledger border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
+      className={`rounded-ledger border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
         variant === "unpaid" ? "bg-claret/5" : ""
       } ${busy ? "opacity-80" : ""} ${pulsing ? "row-confirm-pulse" : ""} ${leaving ? "hop-to-paid" : ""}`}
     >
@@ -531,7 +531,7 @@ function LessonRow({
           </span>
           {variant === "verified" ? (
             <span className="dash-mono text-depths inline-block text-xs font-semibold">
-              {row.paymentReceivedAt ?? "—"}
+              {row.paymentReceivedAt ?? "-"}
             </span>
           ) : (
             <input
@@ -540,7 +540,7 @@ function LessonRow({
               onChange={(e) => onPaymentDateChange(e.target.value)}
               disabled={disabled}
               className="dash-mono text-depths w-full min-w-0 max-w-44 rounded-app border border-panel-frame/40 bg-white px-1.5 py-1 text-xs disabled:opacity-60"
-              aria-label={`Data wpływu — ${row.studentName}`}
+              aria-label={`Data wpływu - ${row.studentName}`}
             />
           )}
         </label>
