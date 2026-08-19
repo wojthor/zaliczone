@@ -105,7 +105,7 @@ export function TutorPhotoField({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={shown} alt="" className="h-full w-full object-cover" />
       ) : initials ? (
-        <span className="flex h-full w-full items-center justify-center bg-[#000C4A] text-[0.65rem] font-extrabold text-lime">
+        <span className="landing-navy flex h-full w-full items-center justify-center text-[0.65rem] font-extrabold text-lime">
           {initials}
         </span>
       ) : (

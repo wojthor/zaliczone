@@ -210,7 +210,7 @@ export function UczniowieClient({
         <button
           type="button"
           onClick={openAdd}
-          className="rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+          className="landing-navy rounded-full px-4 py-2 text-sm font-semibold text-lime"
         >
           + Dodaj ucznia
         </button>
@@ -342,7 +342,7 @@ export function UczniowieClient({
                     <button
                       type="button"
                       onClick={() => openEdit(student)}
-                      className="rounded-full bg-[#000C4A] px-3 py-1.5 text-xs font-semibold text-lime"
+                      className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime"
                     >
                       Edytuj
                     </button>
@@ -403,7 +403,7 @@ export function UczniowieClient({
                           type="button"
                           onClick={() => toggleSubject(subject)}
                           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                            active ? "bg-[#000C4A] text-lime" : "bg-luster text-depths"
+                            active ? "landing-navy text-lime" : "bg-luster text-depths"
                           }`}
                         >
                           {subject}
@@ -497,7 +497,7 @@ export function UczniowieClient({
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+                className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
                 onClick={saveStudent}
                 disabled={saving || activeSubjects.length === 0}
               >

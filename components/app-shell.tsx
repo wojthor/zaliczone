@@ -49,7 +49,7 @@ function iconBtn(active: boolean) {
   return [
     "flex h-11 w-11 items-center justify-center rounded-full transition touch-manipulation",
     active
-      ? "bg-[#000C4A] text-lime shadow-[0_6px_16px_rgba(0,12,74,0.28)]"
+      ? "landing-navy text-lime shadow-[0_6px_16px_rgba(0,12,74,0.28)]"
       : "text-depths/55 hover:bg-mist hover:text-depths",
   ].join(" ");
 }
@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           href="/panel"
           onClick={closeMobile}
           title="Zaliczone"
-          className={`${logoFont.className} flex h-14 w-14 items-center justify-center rounded-full bg-[#000C4A] text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime shadow-[0_8px_22px_rgba(0,12,74,0.2)]`}
+          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime shadow-[0_8px_22px_rgba(0,12,74,0.2)]`}
         >
           Z
         </Link>
@@ -141,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={closeMobile}
             className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition ${
               pathname === "/profil"
-                ? "border-lime bg-[#000C4A] text-lime"
+                ? "border-lime landing-navy text-lime"
                 : "border-transparent bg-mist text-depths"
             }`}
           >

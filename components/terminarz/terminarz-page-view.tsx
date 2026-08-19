@@ -179,7 +179,7 @@ function MiniCalendar({
                 disabled
                   ? "cursor-not-allowed text-steel/50"
                   : active
-                    ? "bg-[#000C4A] text-lime"
+                    ? "landing-navy text-lime"
                     : "bg-luster text-depths hover:bg-jodhpur"
               }`}
             >
@@ -380,7 +380,7 @@ function LessonModal({
                             }))
                           }
                           className={`rounded-full px-1 py-1 text-[0.65rem] font-semibold leading-none ${
-                            active ? "bg-[#000C4A] text-lime" : "bg-snow text-depths"
+                            active ? "landing-navy text-lime" : "bg-snow text-depths"
                           }`}
                         >
                           {label}
@@ -447,7 +447,7 @@ function LessonModal({
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+              className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
               onClick={onSave}
               disabled={saving || activeSubjects.length === 0}
             >
@@ -767,7 +767,7 @@ function TerminarzInner({
           value={listSearch}
           onChange={(e) => setListSearch(e.target.value)}
           placeholder="Szukaj…"
-          className="text-depths w-[11rem] rounded-full border border-panel-frame/50 bg-luster/80 py-1.5 pl-3 pr-3 text-xs outline-none placeholder:text-muted focus:border-[#000C4A]/50 sm:w-[13rem]"
+          className="text-depths w-[11rem] rounded-full border border-panel-frame/50 bg-luster/80 py-1.5 pl-3 pr-3 text-xs outline-none placeholder:text-muted focus:border-depths/50 sm:w-[13rem]"
           aria-label="Szukaj lekcji"
         />
       }
@@ -830,7 +830,7 @@ function TerminarzInner({
           <h2 className="text-depths text-base font-extrabold tracking-tight">Plan tygodnia</h2>
           <button
             type="button"
-            className="shrink-0 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+            className="landing-navy shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-lime"
             onClick={openAdd}
           >
             + Dodaj lekcję
@@ -844,10 +844,11 @@ function TerminarzInner({
         />
       </section>
 
-      <section className="rounded-app bg-paper p-4">
+      <section>
         <div>
-          <h2 className="text-depths text-base font-extrabold tracking-tight">Lista lekcji - miesiąc</h2>
-          <p className="text-muted mt-0.5 text-xs capitalize">{formatMonthLongFromKey(listMonthKey)}</p>
+          <h2 className="text-depths text-base font-extrabold tracking-tight capitalize">
+            Wszystkie lekcje w miesiącu: {formatMonthLongFromKey(listMonthKey)}
+          </h2>
         </div>
 
         <MonthNavigator monthKey={listMonthKey} onMonthKeyChange={setListMonthKey} className="mt-3" />
@@ -921,7 +922,7 @@ function TerminarzInner({
               return (
                 <li
                   key={lesson.id}
-                  className="flex flex-col gap-3 rounded-app bg-snow px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="soft-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="avatar-initials h-10 w-10 shrink-0 text-sm">
@@ -965,7 +966,7 @@ function TerminarzInner({
                       {canEdit ? (
                         <button
                           type="button"
-                          className="rounded-full bg-jodhpur px-3 py-1.5 text-xs font-semibold text-depths"
+                          className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime"
                           onClick={() => openEdit(lesson)}
                         >
                           Edytuj
@@ -1032,7 +1033,7 @@ function TerminarzInner({
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => confirmDelete("one")}
-                className="rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+                className="landing-navy rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
               >
                 {deleteBusy ? "Usuwanie…" : "Usuń tylko tę lekcję"}
               </button>

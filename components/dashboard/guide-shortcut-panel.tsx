@@ -30,7 +30,7 @@ export function GuideShortcutPanel() {
         </div>
         <Link
           href="/przewodnik"
-          className="mt-auto flex items-center justify-center gap-1.5 rounded-full bg-[#000C4A] px-3 py-2 text-[0.7rem] font-extrabold uppercase tracking-wide text-lime transition hover:brightness-110"
+          className="landing-navy mt-auto flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[0.7rem] font-extrabold uppercase tracking-wide text-lime transition hover:brightness-110"
         >
           <IconGuide className="h-3.5 w-3.5" />
           Otwórz przewodnik

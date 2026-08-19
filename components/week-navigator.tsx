@@ -89,16 +89,16 @@ export function WeekNavigator({
   }
 
   const arrowBtnClass =
-    "inline-flex shrink-0 items-center justify-center rounded-full bg-depths font-bold text-lime hover:opacity-90 touch-manipulation " +
+    "landing-navy inline-flex shrink-0 items-center justify-center rounded-full font-bold text-lime hover:opacity-90 touch-manipulation " +
     (compact ? "size-7 text-sm" : "size-8 text-base");
 
   const labelClass = compact
-    ? "text-depths text-[0.7rem] font-extrabold tabular-nums tracking-tight whitespace-nowrap"
-    : "text-depths text-xs font-extrabold tabular-nums tracking-tight whitespace-nowrap";
+    ? "text-lime text-[0.7rem] font-extrabold tabular-nums tracking-tight whitespace-nowrap"
+    : "text-lime text-xs font-extrabold tabular-nums tracking-tight whitespace-nowrap";
 
   const dateFrameClass = compact
-    ? "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-app bg-mist py-1 px-2"
-    : "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-app bg-mist py-1.5 px-2.5";
+    ? "landing-navy flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-app py-1 px-2"
+    : "landing-navy flex min-w-0 flex-1 items-center justify-center gap-2 rounded-app py-1.5 px-2.5";
 
   const todayMondayIso = toMondayIso(new Date());
   const isCurrentWeek = displayIso === todayMondayIso;
@@ -126,7 +126,7 @@ export function WeekNavigator({
           <button
             type="button"
             onClick={openDatePicker}
-            className="text-depths/70 hover:text-depths shrink-0 rounded-full p-0.5 transition hover:bg-luster touch-manipulation"
+            className="shrink-0 rounded-full p-0.5 text-lime/80 transition hover:bg-white/10 hover:text-lime touch-manipulation"
             aria-label="Wybierz tydzień przez konkretny dzień"
             title="Wybierz dzień - ustawimy cały tydzień"
           >
@@ -150,8 +150,8 @@ export function WeekNavigator({
               onClick={goToday}
               className={
                 compact
-                  ? "text-depths shrink-0 rounded-ledger px-1.5 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-wide hover:bg-luster"
-                  : "text-depths shrink-0 rounded-ledger px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wide hover:bg-luster"
+                  ? "shrink-0 rounded-ledger px-1.5 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-wide text-lime/80 hover:bg-white/10 hover:text-lime"
+                  : "shrink-0 rounded-ledger px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wide text-lime/80 hover:bg-white/10 hover:text-lime"
               }
               title="Wróć do bieżącego tygodnia"
             >

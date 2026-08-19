@@ -142,7 +142,7 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
                     isToday
                       ? "bg-lime font-extrabold text-depths"
                       : state === "done"
-                        ? "bg-depths font-extrabold text-soft-lime"
+                        ? "landing-navy font-extrabold text-soft-lime"
                         : "bg-mist text-depths"
                   }`}
                   aria-label={

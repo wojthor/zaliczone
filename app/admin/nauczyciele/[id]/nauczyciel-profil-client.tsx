@@ -377,7 +377,7 @@ export function NauczycielProfilClient({
             type="button"
             onClick={save}
             disabled={busy}
-            className="dash-sans mt-4 btn-block bg-[#000C4A] px-4 py-2 text-xs font-bold text-lime disabled:opacity-60"
+            className="dash-sans mt-4 btn-block landing-navy px-4 py-2 text-xs font-bold text-lime disabled:opacity-60"
           >
             {busy ? "Zapisywanie…" : "Zapisz"}
           </button>
@@ -442,7 +442,7 @@ export function NauczycielProfilClient({
                       type="button"
                       disabled={busy}
                       onClick={() => unlockStudent(s.id)}
-                      className="rounded-full bg-[#000C4A] px-3 py-1 text-[0.65rem] font-semibold text-lime disabled:opacity-60"
+                      className="landing-navy rounded-full px-3 py-1 text-[0.65rem] font-semibold text-lime disabled:opacity-60"
                     >
                       Odblokuj
                     </button>
