@@ -210,7 +210,7 @@ export function UczniowieClient({
         <button
           type="button"
           onClick={openAdd}
-          className="rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime"
+          className="landing-navy rounded-full px-4 py-2 text-sm font-semibold text-lime"
         >
           + Dodaj ucznia
         </button>
@@ -259,8 +259,10 @@ export function UczniowieClient({
           {filtered.map((student) => (
             <li
               key={student.id}
-              className={`soft-panel flex aspect-square min-h-0 flex-col justify-between gap-2 overflow-hidden p-3 ${
-                student.blocked ? "ring-1 ring-[#E23B3B]/30" : ""
+              className={`tutor-panel-surface flex aspect-square min-h-0 flex-col justify-between gap-2 overflow-hidden p-3 ${
+                student.blocked
+                  ? "ring-2 ring-[#E23B3B]/50"
+                  : "ring-1 ring-depths/8"
               }`}
             >
               <div className="flex min-h-0 items-start gap-2.5">
@@ -333,7 +335,7 @@ export function UczniowieClient({
                   <button
                     type="button"
                     onClick={() => removeStudent(student.id, student.name)}
-                    className="rounded-full border border-[#E23B3B]/40 bg-snow px-3 py-1.5 text-xs font-semibold text-[#E23B3B]"
+                    className="rounded-full border border-[#E23B3B]/35 bg-[#E23B3B]/8 px-3 py-1.5 text-xs font-semibold text-[#B42318] transition hover:bg-[#E23B3B]/12"
                   >
                     Usuń
                   </button>
@@ -342,14 +344,15 @@ export function UczniowieClient({
                     <button
                       type="button"
                       onClick={() => openEdit(student)}
-                      className="rounded-full bg-[#000C4A] px-3 py-1.5 text-xs font-semibold text-lime"
+                      className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime shadow-none"
+                      style={{ boxShadow: "none" }}
                     >
                       Edytuj
                     </button>
                     <button
                       type="button"
                       onClick={() => removeStudent(student.id, student.name)}
-                      className="rounded-full border border-panel-frame/50 bg-snow px-3 py-1.5 text-xs font-semibold text-steel"
+                      className="rounded-full border border-depths/14 bg-depths/8 px-3 py-1.5 text-xs font-semibold text-depths/72 transition hover:bg-depths/12 hover:text-depths"
                     >
                       Usuń
                     </button>
@@ -403,7 +406,7 @@ export function UczniowieClient({
                           type="button"
                           onClick={() => toggleSubject(subject)}
                           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                            active ? "bg-[#000C4A] text-lime" : "bg-luster text-depths"
+                            active ? "landing-navy text-lime" : "bg-luster text-depths"
                           }`}
                         >
                           {subject}
@@ -497,7 +500,7 @@ export function UczniowieClient({
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+                className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
                 onClick={saveStudent}
                 disabled={saving || activeSubjects.length === 0}
               >

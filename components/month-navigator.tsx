@@ -49,23 +49,23 @@ export function MonthNavigator({ monthKey, onMonthKeyChange, className, summary 
 
   const todayKey = currentMonthKey();
   const isCurrentMonth = displayKey === todayKey;
+  const arrowBtnClass =
+    "landing-navy shrink-0 rounded-full px-3 py-1 text-xs font-bold text-lime hover:opacity-90 touch-manipulation";
 
   return (
-    <div
-      className={`relative z-10 flex flex-wrap items-center justify-between gap-2 rounded-app border border-panel-frame/25 bg-snow px-3 py-2 ${className ?? ""}`}
-    >
+    <div className={`relative z-10 flex w-full min-w-0 max-w-full flex-col gap-1 ${className ?? ""}`}>
+      <div className="flex w-full min-w-0 max-w-full items-center gap-1.5">
       <button
         type="button"
         onClick={() => shift(-1)}
-        className="rounded-full border border-panel-frame/40 px-3 py-1 text-xs font-bold text-depths hover:bg-luster touch-manipulation"
+        className={arrowBtnClass}
       >
-        ← Poprzedni miesiąc
+        ←
       </button>
-      <div className="min-w-[8rem] flex-1 text-center">
-        <p className="text-depths text-xs font-semibold capitalize tabular-nums">
+      <div className="landing-navy flex min-w-0 flex-1 items-center justify-center gap-2 rounded-app px-2.5 py-1.5">
+        <p className="min-w-0 flex-1 text-center text-xs font-extrabold capitalize tabular-nums text-lime">
           {formatMonthLongFromKey(displayKey)}
         </p>
-        {summary}
         {!isCurrentMonth ? (
           <button
             type="button"
@@ -73,19 +73,21 @@ export function MonthNavigator({ monthKey, onMonthKeyChange, className, summary 
               setDisplayKey(todayKey);
               onMonthKeyChange(todayKey);
             }}
-            className="mt-1.5 rounded-full bg-[#000C4A] px-3 py-1 text-[0.65rem] font-bold text-lime"
+            className="shrink-0 rounded-ledger px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wide text-lime/80 hover:bg-white/10 hover:text-lime"
           >
-            Dzisiaj
+            Dziś
           </button>
         ) : null}
       </div>
       <button
         type="button"
         onClick={() => shift(1)}
-        className="rounded-full border border-panel-frame/40 px-3 py-1 text-xs font-bold text-depths hover:bg-luster touch-manipulation"
+        className={arrowBtnClass}
       >
-        Następny miesiąc →
+        →
       </button>
+      </div>
+      {summary}
     </div>
   );
 }

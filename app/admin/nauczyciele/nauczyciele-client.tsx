@@ -258,7 +258,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
           <button
             type="button"
             onClick={openAdd}
-            className="dash-sans btn-block bg-[#000C4A] px-4 py-2 text-sm font-bold text-lime"
+            className="dash-sans btn-block landing-navy px-4 py-2 text-sm font-bold text-lime"
           >
             + Dodaj nauczyciela
           </button>
@@ -276,7 +276,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
           aria-selected={tab === "active"}
           onClick={() => setTab("active")}
           className={`rounded-ledger px-3.5 py-1.5 transition ${
-            tab === "active" ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+            tab === "active" ? "landing-navy text-lime" : "text-muted hover:text-depths"
           }`}
         >
           Aktywni
@@ -288,7 +288,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
           aria-selected={tab === "former"}
           onClick={() => setTab("former")}
           className={`rounded-ledger px-3.5 py-1.5 transition ${
-            tab === "former" ? "bg-[#000C4A] text-lime" : "text-muted hover:text-depths"
+            tab === "former" ? "landing-navy text-lime" : "text-muted hover:text-depths"
           }`}
         >
           Byli pracownicy
@@ -353,7 +353,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="dash-sans mt-4 w-full btn-block bg-[#000C4A] py-2 text-xs font-bold text-lime"
+                  className="dash-sans mt-4 w-full btn-block landing-navy py-2 text-xs font-bold text-lime"
                 >
                   Zamknij
                 </button>
@@ -545,7 +545,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                   <button
                     type="submit"
                     disabled={pending}
-                    className="dash-sans btn-block bg-[#000C4A] px-4 py-2.5 text-xs font-bold text-lime disabled:opacity-60 touch-manipulation"
+                    className="dash-sans btn-block landing-navy px-4 py-2.5 text-xs font-bold text-lime disabled:opacity-60 touch-manipulation"
                   >
                     {pending ? "Tworzenie…" : "Utwórz konto"}
                   </button>

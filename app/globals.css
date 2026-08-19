@@ -45,11 +45,16 @@
 }
 
 @utility card-feature {
-  background-color: var(--color-depths);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(165deg, #000c4a 0%, #001a6e 45%, #00082f 100%);
   color: var(--color-lime);
   border-radius: 1.75rem;
   border: 1px solid rgba(213, 237, 33, 0.12);
-  box-shadow: 0 12px 32px rgba(0, 12, 74, 0.18);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 12px 32px rgba(0, 12, 74, 0.18),
+    0 0 32px rgba(255, 255, 255, 0.12);
 }
 
 @utility card-feature-alt {
@@ -70,6 +75,29 @@
   background-color: var(--color-snow);
   border-radius: 1.75rem;
   box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
+}
+
+@utility tutor-shell-surface {
+  background-color: #f5f8ff;
+}
+
+@utility tutor-panel-surface {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 12, 74, 0.12);
+  border-radius: 1.75rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 18px 36px rgba(0, 12, 74, 0.1),
+    0 0 0 1px rgba(235, 241, 255, 0.9);
+}
+
+@utility tutor-panel-soft {
+  background-color: #f8faff;
+  border: 1px solid rgba(0, 12, 74, 0.09);
+  border-radius: 1.35rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.72) inset,
+    0 10px 24px rgba(0, 12, 74, 0.06);
 }
 
 @utility btn-block {
@@ -93,15 +121,33 @@
   font-weight: 800;
 }
 
+@utility landing-navy {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(165deg, #000c4a 0%, #001a6e 45%, #00082f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.16) inset,
+    0 10px 26px rgba(0, 12, 74, 0.2),
+    0 0 26px rgba(255, 255, 255, 0.1);
+}
+
 @utility badge-action {
   border-radius: 9999px;
-  background-color: var(--color-status-pending);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.14), transparent 42%),
+    linear-gradient(165deg, #000c4a 0%, #001a6e 45%, #00082f 100%);
   color: var(--color-lime);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 8px 22px rgba(0, 12, 74, 0.18),
+    0 0 22px rgba(255, 255, 255, 0.08);
 }
 
 @utility badge-done {
@@ -142,9 +188,16 @@
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  background-color: var(--color-depths);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(165deg, #000c4a 0%, #001a6e 45%, #00082f 100%);
   color: var(--color-lime);
   font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.16) inset,
+    0 10px 24px rgba(0, 12, 74, 0.18),
+    0 0 24px rgba(255, 255, 255, 0.1);
 }
 
 .dash-sans {

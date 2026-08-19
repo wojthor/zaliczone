@@ -56,7 +56,7 @@ function useLgUp() {
 
 function SidebarTooltip({ label }: { label: string }) {
   return (
-    <span className="sidebar-tooltip rounded-app bg-[#000C4A] px-2.5 py-1.5 text-xs font-semibold text-luster shadow-lg">
+    <span className="sidebar-tooltip landing-navy rounded-app px-2.5 py-1.5 text-xs font-semibold text-luster shadow-lg">
       {label}
     </span>
   );
@@ -156,7 +156,7 @@ export function AdminLayoutClient({
       />
 
       <aside
-        className="mobile-drawer-panel flex h-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-app bg-[#000C4A] p-3 text-luster max-lg:top-1 max-lg:bottom-1 max-lg:left-1 max-lg:w-[min(17rem,calc(100vw-1rem))] max-lg:shadow-xl lg:static lg:shadow-none"
+        className="mobile-drawer-panel landing-navy flex h-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-app p-3 text-luster max-lg:top-1 max-lg:bottom-1 max-lg:left-1 max-lg:w-[min(17rem,calc(100vw-1rem))] max-lg:shadow-xl lg:static lg:shadow-none"
         data-mobile-open={mobileOpen ? "true" : "false"}
         style={{ width: isLg ? (effectiveCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_OPEN_W) : undefined }}
       >
@@ -219,7 +219,7 @@ export function AdminLayoutClient({
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Otwórz menu"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-app bg-[#000C4A] text-lime"
+            className="landing-navy flex h-10 w-10 shrink-0 items-center justify-center rounded-app text-lime"
           >
             <IconMenu className="h-5 w-5" strokeWidth={2.25} />
           </button>

@@ -28,8 +28,7 @@ const mainNav = [
 const guideNav = { href: "/przewodnik", label: "Przewodnik", Icon: IconGuide } as const;
 
 const SIDEBAR_W = "4.75rem";
-const RAIL =
-  "flex flex-col items-center gap-1.5 rounded-[1.75rem] bg-snow px-2 py-2.5 shadow-[0_10px_28px_rgba(0,12,74,0.07)]";
+const RAIL = "tutor-panel-surface flex flex-col items-center gap-1.5 rounded-[1.75rem] px-2 py-2.5";
 
 function subscribeLg(cb: () => void) {
   const mq = window.matchMedia("(min-width: 1024px)");
@@ -49,7 +48,7 @@ function iconBtn(active: boolean) {
   return [
     "flex h-11 w-11 items-center justify-center rounded-full transition touch-manipulation",
     active
-      ? "bg-[#000C4A] text-lime shadow-[0_6px_16px_rgba(0,12,74,0.28)]"
+      ? "landing-navy text-lime shadow-[0_6px_16px_rgba(0,12,74,0.28)]"
       : "text-depths/55 hover:bg-mist hover:text-depths",
   ].join(" ");
 }
@@ -88,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           href="/panel"
           onClick={closeMobile}
           title="Zaliczone"
-          className={`${logoFont.className} flex h-14 w-14 items-center justify-center rounded-full bg-[#000C4A] text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime shadow-[0_8px_22px_rgba(0,12,74,0.2)]`}
+          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime shadow-[0_8px_22px_rgba(0,12,74,0.2)]`}
         >
           Z
         </Link>
@@ -141,7 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={closeMobile}
             className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition ${
               pathname === "/profil"
-                ? "border-lime bg-[#000C4A] text-lime"
+                ? "border-lime landing-navy text-lime"
                 : "border-transparent bg-mist text-depths"
             }`}
           >
@@ -166,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={`tutor-shell text-depths flex h-dvh max-h-dvh gap-3 overflow-hidden bg-paper p-2 sm:gap-4 sm:p-3 ${dashboardSans.variable}`}
+      className={`tutor-shell tutor-shell-surface text-depths flex h-dvh max-h-dvh gap-3 overflow-hidden p-2 sm:gap-4 sm:p-3 ${dashboardSans.variable}`}
     >
       <button
         type="button"
@@ -204,7 +203,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sticky top-0 z-30 mb-2 flex shrink-0 items-center gap-3 pt-[max(0.15rem,env(safe-area-inset-top))] lg:hidden">
           <button
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-snow text-depths shadow-[0_8px_22px_rgba(0,12,74,0.1)] touch-manipulation"
+            className="tutor-panel-surface inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-depths touch-manipulation"
             aria-label="Otwórz menu"
             aria-expanded={showMobileDrawer}
             onClick={() => setMobileOpen(true)}

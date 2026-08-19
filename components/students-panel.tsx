@@ -5,7 +5,7 @@ export function StudentsPanel({ students }: { students: StudentUi[] }) {
   const count = students.length;
 
   return (
-    <section className="soft-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden p-3 text-depths">
+    <section className="tutor-panel-surface flex h-full min-h-0 min-w-0 flex-col overflow-hidden p-3 text-depths">
       <PanelHeader
         title={`Baza uczniów · ${count}`}
         compact

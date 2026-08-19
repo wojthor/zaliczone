@@ -34,7 +34,7 @@ export function BonusProgressBar({
         </div>
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-mist">
           <div
-            className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "bg-[#000C4A]"}`}
+            className={`h-full rounded-full transition-all ${p.achieved ? "bg-lime" : "landing-navy"}`}
             style={{ width: `${pct}%` }}
           />
         </div>

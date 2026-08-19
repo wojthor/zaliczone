@@ -59,7 +59,7 @@ function tileClasses(status: LessonStatus): string {
     case "UNPAID":
       return "bg-[var(--color-status-unpaid)]";
     default:
-      return "bg-[var(--color-status-planned)]";
+      return "bg-[#B4BCD0]";
   }
 }
 
@@ -238,8 +238,8 @@ export function WeeklySchedule({
               key={dayKey}
               className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-app lg:min-h-0 lg:h-auto ${
                 isToday
-                  ? "border-[3px] border-lime bg-snow px-0.5 shadow-[0_0_0_1px_rgba(213,237,33,0.35)]"
-                  : "card-quiet"
+                  ? "tutor-panel-surface shadow-[inset_0_0_0_2px_#D5ED21]"
+                  : "tutor-panel-soft"
               }`}
             >
               <div className="flex shrink-0 flex-col items-center px-1 py-1.5">
@@ -265,10 +265,12 @@ export function WeeklySchedule({
                     const locked = isLessonLocked(status);
                     const busy = pendingId === lesson.id;
                     const colors = textClasses(status);
+                    const tileSizeClass =
+                      "h-[7.5rem] w-[6.75rem] min-w-[6.75rem] lg:w-full lg:max-w-full";
                     return (
                       <div
                         key={`${lesson.id}-${dateKey}`}
-                        className={`relative flex h-[7.5rem] w-[6.75rem] min-w-[6.75rem] shrink-0 flex-col overflow-hidden rounded-app p-1.5 lg:aspect-square lg:h-auto lg:w-full lg:min-w-0 lg:max-w-full ${tileClasses(status)}`}
+                        className={`relative flex shrink-0 flex-col overflow-hidden rounded-app p-1.5 lg:aspect-square lg:h-auto lg:min-w-0 ${tileSizeClass} ${tileClasses(status)}`}
                       >
                         <div className="flex shrink-0 items-start justify-between gap-1">
                           <span
@@ -333,7 +335,7 @@ export function WeeklySchedule({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col soft-panel p-3 text-depths ${className ?? ""}`}
+      className={`tutor-panel-surface flex min-h-0 min-w-0 w-full flex-1 flex-col p-3 text-depths ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Terminarz" compact titleHref="/terminarz" />}
       {grid}
