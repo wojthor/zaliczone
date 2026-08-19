@@ -100,6 +100,12 @@ export async function getFormerTeachersFolderId(): Promise<string> {
   return createChildFolder(teachersFolderId, FORMER_FOLDER_NAME);
 }
 
+function isDriveNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes("file not found") || msg.includes("404");
+}
+
 async function findOrCreateNamedFolderIn(
   parentId: string,
   name: string,
@@ -247,11 +253,35 @@ export async function ensureTutorDriveFolder(
   }
 
   const { drive } = getDriveClient();
-  const meta = await drive.files.get({
-    fileId: folderId,
-    fields: "id, parents",
-    supportsAllDrives: true,
-  });
+  let meta;
+  try {
+    meta = await drive.files.get({
+      fileId: folderId,
+      fields: "id, parents",
+      supportsAllDrives: true,
+    });
+  } catch (error) {
+    if (!isDriveNotFoundError(error)) throw error;
+
+    const inActive = await findChildFolder(teachersFolderId, name);
+    const formerParent = await getFormerTeachersFolderId();
+    const inFormer = inActive ? null : await findChildFolder(formerParent, name);
+    if (inActive) {
+      folderId = inActive;
+    } else if (inFormer) {
+      folderId = inFormer;
+    } else {
+      const made = await findOrCreateNamedFolderIn(targetParentId, name);
+      folderId = made.folderId;
+      created = created || made.created;
+    }
+
+    meta = await drive.files.get({
+      fileId: folderId,
+      fields: "id, parents",
+      supportsAllDrives: true,
+    });
+  }
   const parents = meta.data.parents ?? [];
   if (!parents.includes(targetParentId)) {
     await moveDriveFolder(folderId, targetParentId);

@@ -101,6 +101,11 @@ async function moveTo(drive, folderId, newParentId) {
   return true;
 }
 
+function isNotFound(err) {
+  const msg = err instanceof Error ? err.message.toLowerCase() : "";
+  return msg.includes("file not found") || msg.includes("404");
+}
+
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const res = await fetch(
@@ -121,6 +126,20 @@ for (const t of tutors) {
   const former = Boolean(t.contract_end && t.contract_end <= today);
   const target = former ? formerFolderId : teachersFolderId;
   let folderId = t.drive_folder_id;
+
+  if (folderId) {
+    try {
+      await drive.files.get({
+        fileId: folderId,
+        fields: "id",
+        supportsAllDrives: true,
+      });
+    } catch (err) {
+      if (!isNotFound(err)) throw err;
+      console.log("RESET", name, "→ brak starego folderu, odtwarzam powiązanie");
+      folderId = null;
+    }
+  }
 
   if (!folderId) {
     const inActive = await findChild(drive, teachersFolderId, name);
