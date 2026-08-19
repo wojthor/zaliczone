@@ -18,13 +18,13 @@ export function PageShell({
   compact = false,
   surface = "snow",
 }: PageShellProps) {
-  const surfaceClass = surface === "luster" ? "bg-mist/80" : "bg-snow";
+  const surfaceClass = surface === "luster" ? "tutor-panel-soft" : "tutor-panel-surface";
   const paddingClass = compact ? "p-4 sm:p-5 lg:p-5" : "p-5 sm:p-7 lg:p-8";
   const gapClass = compact ? "mt-4" : "mt-6";
 
   return (
     <div
-      className={`soft-panel ${surfaceClass} ${paddingClass} ${
+      className={`${surfaceClass} ${paddingClass} ${
         fillViewport ? "flex h-full min-h-0 w-full flex-1 flex-col" : ""
       }`}
     >

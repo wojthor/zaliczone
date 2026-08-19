@@ -44,11 +44,11 @@ export function DashboardLayout({
         <div className="min-h-[min(200px,32svh)] min-w-0 overflow-hidden max-lg:min-h-48 lg:col-span-2 lg:row-start-2 lg:min-h-0">
           <StudentsPanel students={students} />
         </div>
-        <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
-          <GuideShortcutPanel />
-        </div>
         <div className="min-h-[min(220px,36svh)] min-w-0 overflow-hidden max-lg:min-h-56 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <FinanceProfilePanel totalPayout={totalPayout} lessonStats={lessonStats} />
+        </div>
+        <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
+          <GuideShortcutPanel />
         </div>
       </div>
     </div>

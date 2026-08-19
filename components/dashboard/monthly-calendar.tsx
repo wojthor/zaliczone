@@ -15,7 +15,7 @@ const LESSON_DOT_COLORS = {
   PENDING_VERIFICATION: "#000C4A",
   VERIFIED: "#D5ED21",
   UNPAID: "#E23B3B",
-  PLANNED: "#D4D3CE",
+  PLANNED: "#9AA3B8",
 } as const;
 
 function lessonDotColor(lesson: Lesson): string {
@@ -80,30 +80,30 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
   const todayD = today.getDate();
 
   const dayCell =
-    "flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-full text-[0.65rem] font-extrabold tabular-nums leading-none sm:h-8 sm:w-8 sm:text-xs";
+    "flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-full border border-depths/10 text-[0.65rem] font-extrabold tabular-nums leading-none sm:h-8 sm:w-8 sm:text-xs";
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden soft-panel px-3 pb-3 pt-2 text-depths ${className ?? ""}`}
+      className={`tutor-panel-surface flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden px-3 pb-3 pt-2 text-depths ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Kalendarz" compact titleHref="/terminarz" />}
       <div className="mb-2.5 flex shrink-0 justify-center px-0.5">
-        <div className="flex items-center gap-0.5 rounded-app bg-mist px-0.5 py-0.5">
+        <div className="landing-navy flex items-center gap-0.5 rounded-app px-0.5 py-0.5">
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
-            className="text-depths hover:bg-white/70 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold text-lime transition-colors hover:bg-white/10"
             aria-label="Poprzedni miesiąc"
           >
             ‹
           </button>
-          <p className="text-depths min-w-[4.75rem] flex-1 text-center text-[0.65rem] font-semibold leading-none tabular-nums">
+          <p className="min-w-[4.75rem] flex-1 text-center text-[0.65rem] font-semibold leading-none tabular-nums text-lime">
             {label}
           </p>
           <button
             type="button"
             onClick={() => shiftMonth(1)}
-            className="text-depths hover:bg-white/70 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold text-lime transition-colors hover:bg-white/10"
             aria-label="Następny miesiąc"
           >
             ›
@@ -143,7 +143,7 @@ export function MonthlyCalendar({ lessons = [], hideHeader, className }: Monthly
                       ? "bg-lime font-extrabold text-depths"
                       : state === "done"
                         ? "landing-navy font-extrabold text-soft-lime"
-                        : "bg-mist text-depths"
+                        : "bg-[#f5f8ff] text-depths"
                   }`}
                   aria-label={
                     state === "done"

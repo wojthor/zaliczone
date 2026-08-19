@@ -8,7 +8,7 @@ import { DATES } from "@/lib/dates";
  */
 export function GuideShortcutPanel() {
   return (
-    <section className="soft-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden p-2.5 text-depths">
+    <section className="tutor-panel-surface flex h-full min-h-0 min-w-0 flex-col overflow-hidden p-2.5 text-depths">
       <PanelHeader title="Przewodnik" compact />
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
         <div className="min-w-0">

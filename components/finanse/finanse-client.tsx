@@ -102,44 +102,55 @@ export function FinanseClient({
   const hasVerifiedLessons = linesForMonth.length > 0;
   const dateUnlocked = isEwidencjaPdfAvailable(selectedMonthKey);
   const canGenerateEwidencja = hasVerifiedLessons && dateUnlocked;
+  const payoutStatusLabel = payoutForMonth?.status === "PAID"
+    ? "Wypłacono"
+    : payoutForMonth
+      ? "Oczekuje na przelew"
+      : isMonthClosed
+        ? "Miesiąc zamknięty"
+        : isCurrentMonth
+          ? "Wypłata po zamknięciu miesiąca"
+          : "Jeszcze nie oznaczona";
+  const monthPicker = (
+    <label className="grid w-full max-w-full gap-1 sm:w-auto sm:min-w-56">
+      <span className="text-depths/80 text-xs font-semibold">Miesiąc</span>
+      <select
+        className="text-depths rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
+        value={selectedMonthKey}
+        onChange={(e) => setSelectedMonthKey(e.target.value)}
+      >
+        {monthOptions.map((key) => (
+          <option key={key} value={key}>
+            {formatMonthLongPl(key)}
+            {closedMonths.includes(key) ? " · zamknięty" : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
-    <PageShell title="Finanse">
+    <PageShell title="Finanse" titleAside={monthPicker}>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-muted max-w-xl text-sm font-medium">
           Widzisz tu tylko zarobki z lekcji, które placówka już zatwierdziła. Od tej kwoty liczymy
           Twoją wypłatę.
         </p>
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
+        <div className="flex w-full flex-col gap-3 sm:w-auto">
           <label className="grid w-full shrink-0 gap-1 sm:w-auto">
             <span className="text-depths/80 text-xs font-semibold">Stawki</span>
             <button
               type="button"
               onClick={() => setCennikOpen(true)}
-              className="rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-semibold text-depths transition hover:border-[#000C4A]/30"
+              className="landing-navy rounded-full px-4 py-2 text-sm font-semibold text-lime transition hover:brightness-110"
             >
               Cennik
             </button>
           </label>
-          <label className="grid w-full shrink-0 gap-1 sm:w-auto sm:min-w-56">
-            <span className="text-depths/80 text-xs font-semibold">Miesiąc</span>
-            <select
-              className="text-depths rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
-              value={selectedMonthKey}
-              onChange={(e) => setSelectedMonthKey(e.target.value)}
-            >
-              {monthOptions.map((key) => (
-                <option key={key} value={key}>
-                  {formatMonthLongPl(key)}
-                  {closedMonths.includes(key) ? " · zamknięty" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </div>
 
-      <section className="mb-4 flex flex-wrap items-center justify-between gap-3 soft-panel px-4 py-3.5">
+      <section className="tutor-panel-surface mb-4 flex flex-wrap items-center justify-between gap-3 border border-depths/10 px-4 py-3.5">
         <div className="min-w-0">
           <p className="section-label">Ewidencja zajęć</p>
           <p className="text-muted mt-0.5 text-[11px] leading-snug">PDF za {monthLabel}</p>
@@ -149,7 +160,7 @@ export function FinanseClient({
             href={`/finanse/ewidencja?month=${selectedMonthKey}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center rounded-full bg-[#000C4A] px-4 py-2 text-xs font-semibold text-lime"
+            className="landing-navy inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold text-lime"
           >
             Generuj
           </a>
@@ -208,7 +219,19 @@ export function FinanseClient({
       ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-[1.75rem] bg-[#000C4A] p-4 text-luster shadow-[0_12px_32px_rgba(0,12,74,0.18)] sm:col-span-2 lg:col-span-1">
+        <div className="relative rounded-[1.75rem] bg-[#000C4A] p-4 text-luster shadow-[0_12px_32px_rgba(0,12,74,0.18)] sm:col-span-2 lg:col-span-1">
+          <div className="absolute top-4 right-4">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] ${
+                payoutForMonth?.status === "PAID"
+                  ? "bg-lime text-depths"
+                  : "bg-white/10 text-lime"
+              }`}
+            >
+              <span aria-hidden>{payoutForMonth?.status === "PAID" ? "✓" : "•"}</span>
+              {payoutStatusLabel}
+            </span>
+          </div>
           <p className="text-[0.65rem] font-extrabold uppercase tracking-[0.08em] text-lime/80">
             {isCurrentMonth ? "Do wypłaty w tym miesiącu" : "Do wypłaty"}
           </p>
@@ -221,38 +244,26 @@ export function FinanseClient({
           </p>
         </div>
         <div className="soft-panel p-4">
-          <p className="section-label !text-muted">Godziny / uczniowie</p>
+          <p className="section-label !text-muted">
+            {isCurrentMonth ? "Godziny w tym miesiącu" : "Godziny w wybranym miesiącu"}
+          </p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
             {hoursMonth}
             <span className="text-muted text-base font-semibold"> h</span>
           </p>
           <p className="mt-1 text-xs font-medium text-depths/70">
-            {studentsInMonth} uczniów w mies. · {studentCount} w bazie
+            {monthLabel}
           </p>
         </div>
         <div className="soft-panel p-4">
-          <p className="section-label !text-muted">Status wypłaty</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
-            {payoutForMonth ? `${Number(payoutForMonth.amount).toLocaleString("pl-PL")} zł` : "-"}
+          <p className="section-label !text-muted">
+            {isCurrentMonth ? "Uczniowie w tym miesiącu" : "Uczniowie w wybranym miesiącu"}
           </p>
-          <p
-            className={`mt-1 text-xs font-semibold ${
-              payoutForMonth?.status === "PAID"
-                ? "text-depths"
-                : payoutForMonth
-                  ? "text-steel"
-                  : "text-depths/70"
-            }`}
-          >
-            {payoutForMonth?.status === "PAID"
-              ? "Wypłacono"
-              : payoutForMonth
-                ? "Oczekuje na przelew"
-                : isMonthClosed
-                  ? "Miesiąc zamknięty"
-                  : isCurrentMonth
-                    ? "Wypłata po zamknięciu miesiąca"
-                    : "Jeszcze nie oznaczona"}
+          <p className="mt-1 text-2xl font-bold tabular-nums text-depths">
+            {studentsInMonth}
+          </p>
+          <p className="mt-1 text-xs font-medium text-depths/70">
+            {monthLabel} · {studentCount} łącznie w bazie
           </p>
         </div>
       </div>
@@ -269,7 +280,7 @@ export function FinanseClient({
             {linesForMonth.map((line) => (
               <li
                 key={line.id}
-                className="flex flex-col gap-3 rounded-[1.35rem] bg-paper/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                className="tutor-panel-soft flex flex-col gap-3 rounded-[1.35rem] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <div className="min-w-0">
                   <p className="font-semibold text-depths">{line.studentName}</p>

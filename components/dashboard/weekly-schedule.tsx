@@ -59,7 +59,7 @@ function tileClasses(status: LessonStatus): string {
     case "UNPAID":
       return "bg-[var(--color-status-unpaid)]";
     default:
-      return "bg-[var(--color-status-planned)]";
+      return "bg-[#B4BCD0]";
   }
 }
 
@@ -238,8 +238,8 @@ export function WeeklySchedule({
               key={dayKey}
               className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-app lg:min-h-0 lg:h-auto ${
                 isToday
-                  ? "bg-snow shadow-[inset_0_0_0_2px_#D5ED21]"
-                  : "card-quiet"
+                  ? "tutor-panel-surface shadow-[inset_0_0_0_2px_#D5ED21]"
+                  : "tutor-panel-soft"
               }`}
             >
               <div className="flex shrink-0 flex-col items-center px-1 py-1.5">
@@ -335,7 +335,7 @@ export function WeeklySchedule({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 w-full flex-1 flex-col soft-panel p-3 text-depths ${className ?? ""}`}
+      className={`tutor-panel-surface flex min-h-0 min-w-0 w-full flex-1 flex-col p-3 text-depths ${className ?? ""}`}
     >
       {hideHeader ? null : <PanelHeader title="Terminarz" compact titleHref="/terminarz" />}
       {grid}

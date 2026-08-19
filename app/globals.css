@@ -77,6 +77,29 @@
   box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
 }
 
+@utility tutor-shell-surface {
+  background-color: #f5f8ff;
+}
+
+@utility tutor-panel-surface {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 12, 74, 0.12);
+  border-radius: 1.75rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 18px 36px rgba(0, 12, 74, 0.1),
+    0 0 0 1px rgba(235, 241, 255, 0.9);
+}
+
+@utility tutor-panel-soft {
+  background-color: #f8faff;
+  border: 1px solid rgba(0, 12, 74, 0.09);
+  border-radius: 1.35rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.72) inset,
+    0 10px 24px rgba(0, 12, 74, 0.06);
+}
+
 @utility btn-block {
   border-radius: 9999px;
   font-weight: 800;

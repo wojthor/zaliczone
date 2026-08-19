@@ -825,7 +825,7 @@ function TerminarzInner({
         </div>
       </section>
 
-      <section className="flex min-h-[min(280px,46svh)] flex-col gap-3 rounded-app bg-paper p-3 sm:p-4 lg:min-h-[min(52dvh,32rem)]">
+      <section className="flex min-h-[min(280px,46svh)] flex-col gap-3 lg:min-h-[min(52dvh,32rem)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-depths text-base font-extrabold tracking-tight">Plan tygodnia</h2>
           <button
