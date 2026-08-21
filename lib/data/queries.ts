@@ -635,7 +635,7 @@ export async function getTutorStudentsForAdmin(tutorId: string) {
 }
 
 const DOCS_MIGRATION_HINT =
-  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_final_after_0004.sql w Supabase.";
+  "Brak tabel dokumentów lub bucketa Storage. Skontaktuj się z administratorem.";
 
 function isMissingDocsSchema(error: { message?: string; code?: string; details?: string } | null): boolean {
   if (!error) return false;

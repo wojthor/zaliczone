@@ -149,6 +149,53 @@ export async function sendPayoutConfirmationEmail(email: string, month: string, 
   });
 }
 
+/** Zgłoszenie z landingu: uczeń chce korepetycje, a nie ma aktualnie pasującego nauczyciela. */
+export async function sendTutorWaitlistEmail(input: {
+  to: string;
+  requesterEmail: string;
+  level: string;
+  subject: string;
+  days: string[];
+}) {
+  const resend = client();
+  if (!resend) return { skipped: true as const };
+
+  const { to, subjectSuffix } = resolveRecipients(input.to);
+  const daysLabel = input.days.length > 0 ? input.days.join(", ") : "—";
+  const body = `
+    <p style="margin:0 0 16px 0;"><strong>Nowe zgłoszenie z landingu</strong> - brak pasującego korepetytora.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; font-size:14px; line-height:1.55; color:${BRAND.navy};">
+      <tr>
+        <td style="padding:6px 0; color:${BRAND.muted}; width:34%;">E-mail</td>
+        <td style="padding:6px 0;"><a href="mailto:${input.requesterEmail}" style="color:${BRAND.navy}; font-weight:bold;">${input.requesterEmail}</a></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0; color:${BRAND.muted};">Poziom</td>
+        <td style="padding:6px 0; font-weight:bold;">${input.level}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0; color:${BRAND.muted};">Przedmiot</td>
+        <td style="padding:6px 0; font-weight:bold;">${input.subject}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0; color:${BRAND.muted};">Dni</td>
+        <td style="padding:6px 0; font-weight:bold;">${daysLabel}</td>
+      </tr>
+    </table>
+    <p style="margin:20px 0 0 0; font-size:12px; color:${BRAND.muted};">Odpisz na podany adres, gdy pojawi się pasujący nauczyciel.</p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: input.requesterEmail,
+    subject: `Zgłoszenie korepetycji: ${input.subject} · ${input.level}${subjectSuffix}`,
+    html: emailShell(body, `Zgłoszenie od ${input.requesterEmail}`),
+  });
+
+  return { skipped: false as const };
+}
+
 function monthKeyFix(month: string): string {
   return month.includes("-") ? month : month;
 }

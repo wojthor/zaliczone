@@ -297,7 +297,7 @@ export async function ensureTutorDriveFolder(
     const msg = `${error.message}`.toLowerCase();
     if (msg.includes("drive_folder_id") || msg.includes("column") || error.code === "PGRST204") {
       throw new Error(
-        "Brak kolumny drive_folder_id. Uruchom migrację supabase/migrations/0012_drive_folder_id.sql.",
+        "Brak kolumny drive_folder_id. Skontaktuj się z administratorem.",
       );
     }
     throw error;

@@ -7,7 +7,7 @@ import { TAG, bustTag, documentsTag } from "@/lib/cache";
 import type { DocumentFile, DocumentFolder } from "@/lib/types/database";
 
 const MIGRATION_HINT =
-  "Brak tabel dokumentów lub bucketa Storage. Uruchom migrację supabase/migrations/0005_final_after_0004.sql w Supabase.";
+  "Brak tabel dokumentów lub bucketa Storage. Skontaktuj się z administratorem.";
 
 type DocsError = { message?: string; code?: string; details?: string } | null;
 

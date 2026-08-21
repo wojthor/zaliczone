@@ -6,6 +6,7 @@ import { logoFont } from "@/lib/logo-font";
 import { dashboardSans } from "@/lib/dashboard-fonts";
 import { SUBJECTS } from "@/lib/subjects";
 import { COMPANY } from "@/lib/company";
+import { submitTutorWaitlist } from "@/lib/actions/waitlist";
 import type { PublicTutorCard } from "@/lib/data/queries";
 
 const LEVELS = [
@@ -28,90 +29,6 @@ type TutorWithPhoto = PublicTutorCard & {
   photoUrl?: string | null;
   email?: string | null;
 };
-
-/** Stockowe portrety (Unsplash) - podgląd kafelków do czasu własnych zdjęć. */
-const STOCK_PHOTOS = [
-  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=900&q=80",
-] as const;
-
-function stockPhotoFor(id: string, index: number): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i) * (i + 1)) % STOCK_PHOTOS.length;
-  return STOCK_PHOTOS[(hash + index) % STOCK_PHOTOS.length]!;
-}
-
-/** Demo - zawsze widać kogoś na liście (dopóki nie ma zdjęć / pełnych profili). */
-const DEMO_TUTORS: TutorWithPhoto[] = [
-  {
-    id: "demo-1",
-    name: "Anna Kowalska",
-    subjects: ["Matematyka", "Fizyka"],
-    phone: "+48 501 234 567",
-    email: "anna.kowalska@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "AK",
-  },
-  {
-    id: "demo-2",
-    name: "Piotr Nowak",
-    subjects: ["Angielski", "Niemiecki"],
-    phone: "+48 502 345 678",
-    email: "piotr.nowak@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "PN",
-  },
-  {
-    id: "demo-3",
-    name: "Maja Wiśniewska",
-    subjects: ["Chemia", "Biologia"],
-    phone: "+48 503 456 789",
-    email: "maja.wisniewska@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "MW",
-  },
-  {
-    id: "demo-4",
-    name: "Jakub Zieliński",
-    subjects: ["Polski", "Historia"],
-    phone: "+48 504 567 890",
-    email: "jakub.zielinski@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "JZ",
-  },
-  {
-    id: "demo-5",
-    name: "Zofia Lewandowska",
-    subjects: ["Matematyka", "Informatyka"],
-    phone: "+48 505 678 901",
-    email: "zofia.lewandowska@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "ZL",
-  },
-  {
-    id: "demo-6",
-    name: "Tomasz Kamiński",
-    subjects: ["Fizyka", "Chemia"],
-    phone: "+48 506 789 012",
-    email: "tomasz.kaminski@zaliczone.pl",
-    olxUrl: null,
-    photoUrl: null,
-    initials: "TK",
-  },
-];
 
 function Chip({
   active,
@@ -251,37 +168,63 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
   const [days, setDays] = useState<string[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [showAllTutors, setShowAllTutors] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
+  const [waitlistDone, setWaitlistDone] = useState(false);
+  const [waitlistPending, setWaitlistPending] = useState(false);
   const [, startTransition] = useTransition();
 
-  const pool = useMemo((): TutorWithPhoto[] => {
-    const real = tutors.filter((t) => !t.id.startsWith("demo-"));
-    const useDemo = real.length === 0;
-    const base: TutorWithPhoto[] = useDemo ? DEMO_TUTORS : real;
-    return base.map((t, i) => ({
-      ...t,
-      photoUrl: t.photoUrl || (useDemo ? stockPhotoFor(t.id, i) : null),
-      email: t.email ?? null,
-      phone: t.phone || (useDemo ? (DEMO_TUTORS[i % DEMO_TUTORS.length]?.phone ?? null) : t.phone),
-    }));
-  }, [tutors]);
+  const realTutors = useMemo(
+    () => tutors.filter((t) => !t.id.startsWith("demo-")),
+    [tutors],
+  );
+  const hasRealTutors = realTutors.length > 0;
 
+  const pool = useMemo(
+    (): TutorWithPhoto[] =>
+      realTutors.map((t) => ({
+        ...t,
+        photoUrl: t.photoUrl ?? null,
+        email: t.email ?? null,
+        phone: t.phone ?? null,
+      })),
+    [realTutors],
+  );
+
+  /** Tylko realni nauczyciele - bez demo i bez „pokaż wszystkich gdy zero”. */
   const matched = useMemo(() => {
-    const bySubject = subject
-      ? pool.filter((t) => t.subjects.some((s) => s.toLowerCase() === subject.toLowerCase()))
-      : pool;
-    return bySubject.length > 0 ? bySubject : pool;
-  }, [pool, subject]);
+    if (!hasRealTutors) return [];
+    if (!subject) return pool;
+    return pool.filter((t) =>
+      t.subjects.some((s) => s.toLowerCase() === subject.toLowerCase()),
+    );
+  }, [hasRealTutors, pool, subject]);
 
-  /** Tylko przedmioty, które aktualnie ma ktoś z korepetytorów w puli (real lub demo). */
+  const needsWaitlist = !hasRealTutors || (Boolean(subject) && matched.length === 0);
+
+  /** Przedmioty z realnych nauczycieli; gdy nikogo nie ma - pełna lista, żeby dało się wysłać zgłoszenie. */
   const availableSubjects = useMemo(() => {
+    if (!hasRealTutors) return [...SUBJECTS];
     const present = new Set<string>();
-    pool.forEach((t) => t.subjects.forEach((s) => present.add(s)));
+    realTutors.forEach((t) => t.subjects.forEach((s) => present.add(s)));
     const ordered = SUBJECTS.filter((s) => present.has(s));
     const extra = Array.from(present).filter((s) => !(SUBJECTS as readonly string[]).includes(s));
     return [...ordered, ...extra];
-  }, [pool]);
+  }, [hasRealTutors, realTutors]);
+
+  useEffect(() => {
+    if (subject && !availableSubjects.some((s) => s.toLowerCase() === subject.toLowerCase())) {
+      setSubject(null);
+    }
+  }, [availableSubjects, subject]);
 
   const canSearch = Boolean(level && subject && days.length > 0);
+
+  const selectedDayLabels = useMemo(
+    () => DAYS.filter((d) => days.includes(d.id)).map((d) => d.label),
+    [days],
+  );
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -313,12 +256,53 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
     setDays((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   }
 
+  function openWaitlistModal() {
+    setWaitlistError(null);
+    setWaitlistDone(false);
+    setWaitlistEmail("");
+    setWaitlistOpen(true);
+  }
+
+  function closeWaitlistModal() {
+    if (waitlistPending) return;
+    setWaitlistOpen(false);
+    setWaitlistError(null);
+    setWaitlistDone(false);
+  }
+
   function runSearch() {
     if (!canSearch) return;
+    if (needsWaitlist) {
+      openWaitlistModal();
+      return;
+    }
     startTransition(() => {
       setShowAllTutors(false);
       setShowResults(true);
     });
+  }
+
+  async function sendWaitlist() {
+    if (!level || !subject || days.length === 0) return;
+    setWaitlistPending(true);
+    setWaitlistError(null);
+    try {
+      const result = await submitTutorWaitlist({
+        email: waitlistEmail,
+        level,
+        subject,
+        days: selectedDayLabels,
+      });
+      if (!result.ok) {
+        setWaitlistError(result.error);
+        return;
+      }
+      setWaitlistDone(true);
+    } catch {
+      setWaitlistError("Nie udało się wysłać zgłoszenia. Spróbuj ponownie.");
+    } finally {
+      setWaitlistPending(false);
+    }
   }
 
   function backToForm() {
@@ -600,7 +584,7 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                     disabled={!canSearch}
                     className="inline-flex w-full items-center justify-center rounded-full bg-lime px-6 py-3.5 text-sm font-extrabold uppercase tracking-wide text-depths transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                   >
-                    Dobierz korepetytora
+                    {needsWaitlist ? "Wyślij zgłoszenie" : "Dobierz korepetytora"}
                   </button>
                 </div>
               ) : (
@@ -647,7 +631,9 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
 
                   <div>
                     <a
-                      href={`mailto:${COMPANY.email}?subject=${encodeURIComponent("Rekrutacja - chcę udzielać korepetycji")}`}
+                      href="https://docs.google.com/forms/d/e/1FAIpQLSf503Taccb7QHgKZVqVb6KmMlpcTJiLTSSiHFHLvl523zpXhA/viewform"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex w-full items-center justify-center rounded-full bg-lime px-6 py-3.5 text-sm font-extrabold uppercase tracking-wide text-depths transition hover:brightness-105 sm:w-auto"
                     >
                       Aplikuj
@@ -659,6 +645,122 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
           </div>
         )}
       </section>
+
+      {waitlistOpen ? (
+        <div className="fixed inset-0 z-70 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#000C4A]/55 backdrop-blur-[2px]"
+            aria-label="Zamknij zgłoszenie"
+            onClick={closeWaitlistModal}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Zgłoszenie zapotrzebowania"
+            className="confirm-dialog-in relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-white/10 bg-[#000C4A] text-luster sm:rounded-[1.75rem]"
+          >
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
+            <div className="relative px-5 pt-4 pb-5 sm:px-6 sm:pt-6">
+              <button
+                type="button"
+                onClick={closeWaitlistModal}
+                disabled={waitlistPending}
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-xl font-light leading-none text-luster/60 transition hover:bg-white/10 hover:text-luster disabled:opacity-40"
+                aria-label="Zamknij"
+              >
+                ×
+              </button>
+
+              {waitlistDone ? (
+                <div className="pr-8">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-lime/80">
+                    Wysłane
+                  </p>
+                  <h2 className="dash-sans mt-2 text-xl font-bold tracking-tight text-snow">
+                    Dziękujemy
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-luster/80">
+                    Dostaliśmy Twoje zgłoszenie. Napiszemy na{" "}
+                    <span className="font-semibold text-snow">{waitlistEmail.trim()}</span>, gdy
+                    pojawi się pasujący korepetytor.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={closeWaitlistModal}
+                    className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-lime px-6 py-3 text-sm font-extrabold uppercase tracking-wide text-depths"
+                  >
+                    Zamknij
+                  </button>
+                </div>
+              ) : (
+                <div className="pr-8">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-lime/80">
+                    Zgłoszenie
+                  </p>
+                  <h2 className="dash-sans mt-2 text-xl font-bold tracking-tight text-snow">
+                    Wyślij zapotrzebowanie
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-luster/75">
+                    Potwierdź kryteria i podaj e-mail. Wyślemy zgłoszenie do zespołu ZALICZONE.
+                  </p>
+
+                  <dl className="mt-5 space-y-2.5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-lime/70">
+                        Poziom
+                      </dt>
+                      <dd className="text-right font-semibold text-snow">{level}</dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-lime/70">
+                        Przedmiot
+                      </dt>
+                      <dd className="text-right font-semibold text-snow">{subject}</dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-lime/70">
+                        Dni
+                      </dt>
+                      <dd className="text-right font-semibold text-snow">
+                        {selectedDayLabels.join(", ")}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <label className="mt-5 grid gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-lime/75">
+                      Twój e-mail
+                    </span>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      value={waitlistEmail}
+                      onChange={(e) => setWaitlistEmail(e.target.value)}
+                      placeholder="np. jan@email.pl"
+                      className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm text-snow placeholder:text-luster/40 focus:border-lime/60 focus:outline-none"
+                    />
+                  </label>
+
+                  {waitlistError ? (
+                    <p className="mt-3 text-sm font-semibold text-[#ffb4a8]">{waitlistError}</p>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => void sendWaitlist()}
+                    disabled={waitlistPending || !waitlistEmail.trim()}
+                    className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-lime px-6 py-3.5 text-sm font-extrabold uppercase tracking-wide text-depths transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {waitlistPending ? "Wysyłanie…" : "Wyślij zgłoszenie"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <footer id="kontakt" className="scroll-mt-8 border-t border-mist bg-paper px-4 py-10 text-depths sm:px-6">
         <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-3 sm:items-center">

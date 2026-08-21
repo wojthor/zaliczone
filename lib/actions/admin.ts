@@ -454,7 +454,7 @@ export async function updateTutorPitIdentity(
     const msg = `${error.message} ${error.details ?? ""}`.toLowerCase();
     if (msg.includes("column") || msg.includes("schema cache") || error.code === "PGRST204") {
       throw new Error(
-        "Brak kolumn PIT w bazie. Uruchom migrację supabase/migrations/0010_tutor_pit_fields.sql w Supabase.",
+        "Brak kolumn PIT w bazie. Skontaktuj się z administratorem.",
       );
     }
     throw error;
@@ -489,7 +489,7 @@ export async function updateTutorTaxYearEntry(
     const msg = `${readErr.message}`.toLowerCase();
     if (msg.includes("column") || msg.includes("schema cache") || readErr.code === "PGRST204") {
       throw new Error(
-        "Brak kolumn PIT w bazie. Uruchom migrację supabase/migrations/0010_tutor_pit_fields.sql w Supabase.",
+        "Brak kolumn PIT w bazie. Skontaktuj się z administratorem.",
       );
     }
     throw readErr;
