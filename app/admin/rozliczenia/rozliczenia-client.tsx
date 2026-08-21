@@ -55,7 +55,7 @@ export function RozliczeniaClient({
   const [movingId, setMovingId] = useState<string | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
-  const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(-1);
+  const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(0);
   const [paymentDates, setPaymentDates] = useState<Record<string, string>>({});
   const [verifyTarget, setVerifyTarget] = useState<{
     id: string;

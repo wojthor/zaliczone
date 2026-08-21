@@ -1,18 +1,8 @@
 import { Resend } from "resend";
 
-/**
- * Domena zaliczone.pl nie jest jeszcze zweryfikowana w Resend - do tego czasu Resend
- * pozwala wysyłać wyłącznie z adresu sandboksowego `onboarding@resend.dev` i wyłącznie
- * na zweryfikowany adres właściciela konta. Gdy domena zostanie zweryfikowana, zmień
- * `SANDBOX_MODE` na false i `FROM` niżej wróci na docelowy adres.
- */
-const SANDBOX_MODE = true;
-const SANDBOX_RECIPIENT = "voj.torres9@gmail.com";
-
-const FROM = SANDBOX_MODE
-  ? "ZALICZONE <onboarding@resend.dev>"
-  : "ZALICZONE <powiadomienia@zaliczone.pl>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zaliczone.pl";
+/** Nadawca z zweryfikowanej domeny Resend (zaliczone.edu.pl). */
+const FROM = "ZALICZONE <powiadomienia@zaliczone.edu.pl>";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zaliczone.edu.pl";
 
 /** Kolory tożsamości ZALICZONE - te same wartości co w app/globals.css (@theme). */
 const BRAND = {
@@ -32,19 +22,9 @@ function client() {
   return new Resend(key);
 }
 
-/**
- * W sandboksie każdy e-mail leci na `SANDBOX_RECIPIENT` niezależnie od zamierzonego
- * odbiorcy - dopisujemy prawdziwego odbiorcę do tematu, żeby dało się to rozróżnić
- * w skrzynce testowej.
- */
 function resolveRecipients(intended: string | string[]): { to: string[]; subjectSuffix: string } {
   const intendedList = Array.isArray(intended) ? intended : [intended];
-  if (!SANDBOX_MODE) return { to: intendedList, subjectSuffix: "" };
-  const alreadySandbox = intendedList.length === 1 && intendedList[0] === SANDBOX_RECIPIENT;
-  return {
-    to: [SANDBOX_RECIPIENT],
-    subjectSuffix: alreadySandbox ? "" : ` (dla: ${intendedList.join(", ")})`,
-  };
+  return { to: intendedList, subjectSuffix: "" };
 }
 
 function formatMonthPl(monthKey: string): string {
