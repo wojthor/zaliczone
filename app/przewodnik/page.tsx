@@ -16,7 +16,7 @@ const GUIDE_VIDEO = {
 function VideoBlock() {
   return (
     <article className="min-w-0 w-full">
-      <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-[#000C4A] shadow-[0_12px_32px_rgba(0,12,74,0.16)]">
+      <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-[#000C4A]">
         {GUIDE_VIDEO.embedUrl ? (
           <iframe
             title={GUIDE_VIDEO.title}

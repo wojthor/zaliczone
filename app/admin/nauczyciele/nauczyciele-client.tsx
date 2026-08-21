@@ -82,7 +82,7 @@ function TutorCard({ t, compact = false }: { t: AdminTutorSummary; compact?: boo
     .join("");
 
   return (
-    <li className="rounded-app border border-panel-frame/50 bg-snow p-3.5 sm:p-4">
+    <li className="admin-card p-3.5 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex min-w-0 items-start gap-3 sm:w-[38%] sm:max-w-md sm:flex-none">
           {t.photoUrl ? (
@@ -250,7 +250,8 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight">Nauczyciele</h1>
-          <p className="dash-sans text-muted mt-1 text-sm">
+          <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
+          <p className="dash-sans text-muted mt-1.5 text-sm">
             Aktywna kadra i archiwum byłych pracowników. Edycja i dane do PIT - w profilu.
           </p>
         </div>
@@ -266,7 +267,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
       </div>
 
       <div
-        className="dash-sans inline-flex rounded-app border border-panel-frame/40 bg-snow p-1 text-xs font-bold"
+        className="dash-sans inline-flex admin-card !rounded-full p-1 text-xs font-bold"
         role="tablist"
         aria-label="Lista nauczycieli"
       >
@@ -341,7 +342,7 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
             aria-label="Zamknij"
             onClick={() => setModalOpen(false)}
           />
-          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-app border border-mist bg-snow shadow-2xl sm:rounded-app">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-app border border-mist bg-snow sm:rounded-app">
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             {creds ? (
               <div className="add-tutor-success-pop p-6">

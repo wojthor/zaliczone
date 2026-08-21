@@ -278,7 +278,7 @@ function CurrentMonthCalendar({ monthLabel }: { monthLabel: string }) {
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+      <article className="admin-card p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <p className="dash-sans text-depths text-sm font-bold capitalize">{monthLabel}</p>
           <Link
@@ -336,7 +336,7 @@ function CurrentMonthCalendar({ monthLabel }: { monthLabel: string }) {
         </div>
       </article>
 
-      <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+      <article className="admin-card p-4">
         <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">
           Terminy · odhacz zrobione
         </p>
@@ -540,7 +540,8 @@ export function AdminDashboardClient({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight sm:text-3xl">Główna</h1>
-          <p className="dash-sans text-muted mt-1 text-sm capitalize">{todayLabel}</p>
+          <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
+          <p className="dash-sans text-muted mt-1.5 text-sm capitalize">{todayLabel}</p>
         </div>
         <div className="dash-sans rounded-full border border-panel-frame/40 bg-snow px-3.5 py-1.5 text-xs font-semibold text-muted">
           Miesiąc <span className="text-depths ml-1 font-bold capitalize">{monthLabel}</span>
@@ -573,7 +574,7 @@ export function AdminDashboardClient({
           <FinanceTile label="Nieopłacone" tone="red">
             −{formatPln(unpaidMonthSumPln)}
           </FinanceTile>
-          <article className="rounded-3xl border border-panel-frame/35 bg-snow p-4 sm:p-5">
+          <article className="admin-card !rounded-3xl p-4 sm:p-5">
             <p className="dash-sans text-muted text-[10px] font-bold uppercase tracking-[0.16em]">Podział</p>
             <div className="mt-2.5">
               <RevenueSplitDonut
@@ -590,18 +591,18 @@ export function AdminDashboardClient({
         <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Zespół i lekcje</h2>
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="flex flex-col gap-3">
-            <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <article className="admin-card p-4">
               <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Nauczyciele</p>
               <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{tutorCount}</p>
             </article>
 
-            <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+            <article className="admin-card p-4">
               <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Uczniowie</p>
               <p className="dash-mono text-depths mt-1 text-2xl font-bold tabular-nums">{studentCount}</p>
             </article>
           </div>
 
-          <article className="rounded-app border border-panel-frame/35 bg-snow p-4 lg:col-span-2">
+          <article className="admin-card p-4 lg:col-span-2">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:border-r sm:border-panel-frame/25 sm:pr-4">
                 <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">

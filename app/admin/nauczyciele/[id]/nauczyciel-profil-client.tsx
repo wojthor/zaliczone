@@ -208,6 +208,7 @@ export function NauczycielProfilClient({
               <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight sm:text-3xl">
                 {tutor.name}
               </h1>
+              <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
               <p className="mt-2 flex flex-wrap items-center gap-1.5">
             <span
               className={
@@ -386,7 +387,7 @@ export function NauczycielProfilClient({
 
       {/* Dwa obszary: finanse | uczniowie */}
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-app bg-snow p-4">
+        <div className="admin-card p-4">
           <h2 className="section-label">Bieżący miesiąc</h2>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4">
             <Metric label="Lekcje" value={String(monthStats.lessons)} />
@@ -407,7 +408,7 @@ export function NauczycielProfilClient({
           <BonusProgressBar hoursDone={monthStats.hours} minimal className="mt-4 w-full max-w-none" />
         </div>
 
-        <div className="rounded-app bg-snow p-4">
+        <div className="admin-card p-4">
           <div className="flex items-baseline justify-between gap-2 border-b-2 border-paper pb-2">
             <h2 className="section-label">Uczniowie</h2>
             <span className="dash-mono text-muted text-sm font-medium">{students.length}</span>
@@ -513,7 +514,7 @@ function LessonList({
   const amount = "text-depths";
 
   return (
-    <article className="rounded-app bg-snow p-4">
+    <article className="admin-card p-4">
       <div className="flex items-baseline justify-between gap-2 border-b-2 border-paper pb-2">
         <h3 className="section-label">{title}</h3>
         <span className="dash-mono text-muted text-sm font-medium">{lines.length}</span>

@@ -104,7 +104,7 @@ function ChecklistCard({
   const bar = accent === "lime" ? "bg-lime" : "bg-butter";
 
   return (
-    <article className="rounded-app border border-panel-frame/35 bg-snow p-4 sm:p-5">
+    <article className="admin-card p-4 sm:p-5">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="dash-sans text-depths text-base font-bold tracking-tight">{title}</h3>
@@ -307,7 +307,7 @@ function CompactMonthCalendar({
   }, [viewYear, viewMonth]);
 
   return (
-    <div className="w-full max-w-[17rem] shrink-0 rounded-app border border-panel-frame/35 bg-snow p-2.5">
+    <div className="w-full max-w-[17rem] shrink-0 admin-card p-2.5">
       <div className="mb-1.5 flex items-center justify-between gap-1">
         <button
           type="button"
@@ -835,7 +835,8 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight sm:text-3xl">Kalendarz</h1>
-          <p className="dash-sans text-muted mt-1 max-w-xl text-sm">
+          <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
+          <p className="dash-sans text-muted mt-1.5 max-w-xl text-sm">
             Pytania → w toku (podzadania) → zrobione. Dopiero po odhaczeniu wszystkich podzadań pytanie ląduje w
             Zrobione.
           </p>
@@ -854,7 +855,7 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
 
       <div className="grid gap-3 lg:grid-cols-3">
         {/* 1. Pytania */}
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+        <article className="admin-card p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Pytania</p>
             <div className="flex items-center gap-2">
@@ -961,7 +962,7 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
         </article>
 
         {/* 2. W toku */}
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+        <article className="admin-card p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">W toku</p>
             <span className="dash-mono text-[10px] font-bold tabular-nums text-depths">{inProgress.length}</span>
@@ -1001,7 +1002,7 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
         </article>
 
         {/* 3. Zrobione */}
-        <article className="rounded-app border border-panel-frame/35 bg-snow p-4">
+        <article className="admin-card p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Zrobione</p>
             <span className="dash-mono text-[10px] font-bold tabular-nums text-depths">{completed.length}</span>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { adminRejectLessonPayment, adminVerifyLesson } from "@/lib/actions/admin";
 import { formatDateDdMm } from "@/lib/data/mappers";
 import type { FinanceLineUi } from "@/lib/types/database";
-import { isIsoDateInWeek, dateLabelToIsoKey } from "@/lib/date/week-utils";
+import { isIsoDateInWeek, dateLabelToIsoKey, toMondayIso } from "@/lib/date/week-utils";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { WeekNavigator, useWeekMondayIso } from "@/components/week-navigator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -70,6 +70,17 @@ export function RozliczeniaClient({
     setVerified(dedupeById(verifiedLines.map(ensureDateIso)));
     setUnpaid(dedupeById(unpaidLines.map(ensureDateIso)));
   }, [pendingLines, verifiedLines, unpaidLines]);
+
+  /** Deep-link z globalnego wyszukiwania (?q=<uczeń>&date=<iso>) - ustawia filtr i tydzień. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    const date = params.get("date");
+    if (q) setQuery(q);
+    if (date) setWeekMondayIso(toMondayIso(new Date(`${date}T12:00:00`)));
+    if (q || date) router.replace("/admin/rozliczenia", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setPaymentDates((prev) => {
@@ -210,6 +221,7 @@ export function RozliczeniaClient({
     <div className="flex h-auto min-h-0 min-w-0 flex-col gap-3 overflow-visible sm:gap-4 lg:h-full lg:overflow-hidden">
       <div className="min-w-0 shrink-0 space-y-2">
         <h1 className="dash-sans text-depths text-lg font-bold tracking-tight sm:text-xl">Lekcje</h1>
+        <span className="block h-1 w-8 rounded-full bg-lime" aria-hidden />
         <p className="dash-sans text-muted text-[0.7rem] leading-snug sm:text-xs">
           Przy zatwierdzaniu wpisz <strong>datę wpływu</strong> z wyciągu bankowego. Po zatwierdzeniu
           nie da się jej już zmienić.
@@ -236,7 +248,7 @@ export function RozliczeniaClient({
         </div>
       </div>
 
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-3 lg:overflow-hidden">
         <PaymentsPanel
           title="Do zatwierdzenia"
           subtitle="Sprawdź przelew i ustaw datę wpływu."
@@ -253,36 +265,34 @@ export function RozliczeniaClient({
           onReject={markUnpaid}
         />
 
-        <div className="grid min-h-0 min-w-0 grid-cols-1 gap-3 lg:grid-rows-2 lg:overflow-hidden">
-          <PaymentsPanel
-            title="Zatwierdzone"
-            subtitle="Data wpływu zablokowana. Idą do wypłat i księgowości."
-            empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
-            groups={verifiedByDay}
-            variant="verified"
-            count={verifiedInWeek.length}
-            movingId={movingId}
-            pulseId={pulseId}
-            leavingId={leavingId}
-            paymentDates={paymentDates}
-            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-          />
+        <PaymentsPanel
+          title="Zatwierdzone"
+          subtitle="Data wpływu zablokowana. Idą do wypłat i księgowości."
+          empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
+          groups={verifiedByDay}
+          variant="verified"
+          count={verifiedInWeek.length}
+          movingId={movingId}
+          pulseId={pulseId}
+          leavingId={leavingId}
+          paymentDates={paymentDates}
+          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+        />
 
-          <PaymentsPanel
-            title="Nieopłacone"
-            subtitle="Po wpływie ustaw datę i zatwierdź ponownie."
-            empty="Brak nieopłaconych lekcji w wybranym tygodniu."
-            groups={unpaidByDay}
-            variant="unpaid"
-            count={unpaidInWeek.length}
-            movingId={movingId}
-            pulseId={pulseId}
-            leavingId={leavingId}
-            paymentDates={paymentDates}
-            onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
-            onVerify={(id) => openVerifyModal(id, "unpaid")}
-          />
-        </div>
+        <PaymentsPanel
+          title="Nieopłacone"
+          subtitle="Po wpływie ustaw datę i zatwierdź ponownie."
+          empty="Brak nieopłaconych lekcji w wybranym tygodniu."
+          groups={unpaidByDay}
+          variant="unpaid"
+          count={unpaidInWeek.length}
+          movingId={movingId}
+          pulseId={pulseId}
+          leavingId={leavingId}
+          paymentDates={paymentDates}
+          onPaymentDateChange={(id, iso) => setPaymentDates((prev) => ({ ...prev, [id]: iso }))}
+          onVerify={(id) => openVerifyModal(id, "unpaid")}
+        />
       </div>
 
       <ConfirmDialog
@@ -439,7 +449,7 @@ function PaymentsPanel({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-app border bg-snow ${accent} p-3 sm:p-4 max-h-[min(22rem,55dvh)] lg:max-h-none lg:h-full`}
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-3xl border bg-snow ${accent} p-3 sm:p-4 max-h-[min(22rem,55dvh)] lg:max-h-none lg:h-full`}
     >
       <div className="mb-2 flex shrink-0 items-start justify-between gap-2">
         <div className="min-w-0">

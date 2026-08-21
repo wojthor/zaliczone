@@ -35,19 +35,19 @@ export function DashboardLayout({
       {alerts.length > 0 ? <AlertsBanner alerts={alerts} role="TUTOR" /> : null}
       <BonusProgressBar hoursDone={verifiedHoursThisMonth} compact showCelebration />
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 lg:min-h-0 lg:grid-cols-4 lg:grid-rows-2 lg:overflow-hidden">
-        <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">
+        <div className="flex min-h-[min(320px,50svh)] min-w-0 flex-col max-lg:h-auto lg:col-span-3 lg:row-start-1 lg:h-full lg:min-h-0">
           <WeeklySchedule lessons={lessons} />
         </div>
-        <div className="flex min-h-[min(260px,40svh)] min-w-0 flex-col overflow-hidden max-lg:h-auto lg:col-span-1 lg:row-start-1 lg:h-full lg:min-h-0">
+        <div className="flex min-h-[min(260px,40svh)] min-w-0 flex-col max-lg:h-auto lg:col-span-1 lg:row-start-1 lg:h-full lg:min-h-0">
           <MonthlyCalendar lessons={lessons} />
         </div>
-        <div className="min-h-[min(200px,32svh)] min-w-0 overflow-hidden max-lg:min-h-48 lg:col-span-2 lg:row-start-2 lg:min-h-0">
+        <div className="min-h-[min(200px,32svh)] min-w-0 max-lg:min-h-48 lg:col-span-2 lg:row-start-2 lg:min-h-0">
           <StudentsPanel students={students} />
         </div>
-        <div className="min-h-[min(220px,36svh)] min-w-0 overflow-hidden max-lg:min-h-56 lg:col-span-1 lg:row-start-2 lg:min-h-0">
+        <div className="min-h-[min(220px,36svh)] min-w-0 max-lg:min-h-56 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <FinanceProfilePanel totalPayout={totalPayout} lessonStats={lessonStats} />
         </div>
-        <div className="min-h-[min(180px,30svh)] min-w-0 overflow-hidden max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
+        <div className="min-h-[min(180px,30svh)] min-w-0 max-lg:min-h-44 lg:col-span-1 lg:row-start-2 lg:min-h-0">
           <GuideShortcutPanel />
         </div>
       </div>

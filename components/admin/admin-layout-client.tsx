@@ -7,38 +7,137 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   IconCalendar,
   IconChecklist,
-  IconChevronLeft,
-  IconClose,
   IconDashboard,
   IconDollar,
-  IconFileDoc,
   IconGuide,
   IconLogout,
   IconMenu,
-  IconPayroll,
   IconUsers,
   IconWallet,
 } from "@/components/icons";
+import { GlobalSearchButton, GlobalSearchModal } from "@/components/search/global-search";
 import { signOut } from "@/lib/data/mutations";
 import { dashboardMono, dashboardSans } from "@/lib/dashboard-fonts";
 import { logoFont } from "@/lib/logo-font";
 
-export const SIDEBAR_COLLAPSED_COOKIE = "admin_sidebar_collapsed";
-
-const SIDEBAR_OPEN_W = "18rem";
-const SIDEBAR_COLLAPSED_W = "4.5rem";
-
 const ADMIN_NAV = [
-  { href: "/admin", label: "Główna", Icon: IconDashboard },
-  { href: "/admin/kalendarz", label: "Kalendarz", Icon: IconCalendar },
-  { href: "/admin/rozliczenia", label: "Lekcje", Icon: IconChecklist },
-  { href: "/admin/wyplaty", label: "Wypłaty", Icon: IconWallet },
-  { href: "/admin/ksiegowosc", label: "Księgowość", Icon: IconGuide },
-  { href: "/admin/nauczyciele", label: "Nauczyciele", Icon: IconUsers },
-  { href: "/admin/premie", label: "Premie", Icon: IconPayroll },
-  { href: "/admin/cennik", label: "Cennik i przedmioty", Icon: IconDollar },
-  { href: "/admin/dokumenty", label: "Dokumenty", Icon: IconFileDoc },
+  {
+    href: "/admin",
+    label: "Główna",
+    Icon: IconDashboard,
+    keywords: [
+      "dashboard",
+      "pulpit koordynatora",
+      "statystyki",
+      "podsumowanie",
+      "start",
+      "alerty",
+      "powiadomienia",
+      "przegląd miesiąca",
+    ],
+  },
+  {
+    href: "/admin/kalendarz",
+    label: "Kalendarz",
+    Icon: IconCalendar,
+    keywords: [
+      "terminy",
+      "deadline",
+      "harmonogram",
+      "miesiąc",
+      "zamknięcie miesiąca",
+      "blokady",
+      "ewidencja",
+      "daty",
+      "kalendarz płatności",
+    ],
+  },
+  {
+    href: "/admin/rozliczenia",
+    label: "Lekcje",
+    Icon: IconChecklist,
+    keywords: [
+      "weryfikacja",
+      "zatwierdź",
+      "zatwierdzanie",
+      "do zatwierdzenia",
+      "zatwierdzone",
+      "nieopłacone",
+      "rozliczenia",
+      "płatności uczniów",
+      "status lekcji",
+      "odrzuć",
+    ],
+  },
+  {
+    href: "/admin/wyplaty",
+    label: "Wypłaty",
+    Icon: IconWallet,
+    keywords: [
+      "przelew",
+      "wypłać",
+      "lista płac",
+      "wynagrodzenie",
+      "nauczycielom",
+      "pit",
+      "podatki",
+      "rozliczenie nauczyciela",
+    ],
+  },
+  {
+    href: "/admin/ksiegowosc",
+    label: "Księgowość",
+    Icon: IconGuide,
+    keywords: [
+      "koszty",
+      "przychody",
+      "sprzedaż",
+      "pit-11",
+      "ewidencja",
+      "dokumenty księgowe",
+      "raport",
+      "podsumowanie finansowe firmy",
+      "zamknięcie miesiąca",
+    ],
+  },
+  {
+    href: "/admin/nauczyciele",
+    label: "Nauczyciele",
+    Icon: IconUsers,
+    keywords: [
+      "nauczyciel",
+      "korepetytor",
+      "lista nauczycieli",
+      "profil nauczyciela",
+      "kontrakt",
+      "telefon",
+      "dysk google",
+      "dokumenty",
+      "przedmioty nauczyciela",
+      "zatrudnienie",
+    ],
+  },
+  {
+    href: "/admin/cennik",
+    label: "Cennik i przedmioty",
+    Icon: IconDollar,
+    keywords: [
+      "stawki",
+      "ceny",
+      "cennik",
+      "poziomy nauczania",
+      "wniosek o przedmiot",
+      "nowy przedmiot",
+      "zatwierdź przedmiot",
+      "cena za godzinę",
+    ],
+  },
 ] as const;
+
+const ADMIN_SEARCH_HINTS = ["zatwierdź", "wypłaty", "cennik", "nauczyciel", "ewidencja"];
+
+const SIDEBAR_W = "4.75rem";
+const RAIL = "tutor-panel-surface flex flex-col items-center gap-1.5 rounded-[1.75rem] px-2 py-2.5";
 
 function subscribeLg(cb: () => void) {
   const mq = window.matchMedia("(min-width: 1024px)");
@@ -54,29 +153,28 @@ function useLgUp() {
   );
 }
 
-function SidebarTooltip({ label }: { label: string }) {
-  return (
-    <span className="sidebar-tooltip landing-navy rounded-app px-2.5 py-1.5 text-xs font-semibold text-luster shadow-lg">
-      {label}
-    </span>
-  );
+function iconBtn(active: boolean) {
+  return [
+    "relative flex h-11 w-11 items-center justify-center rounded-full transition touch-manipulation",
+    active
+      ? "landing-navy text-lime"
+      : "text-depths/55 hover:bg-mist hover:text-depths",
+  ].join(" ");
 }
 
 export function AdminLayoutClient({
   children,
-  initialCollapsed = false,
   alertCount = 0,
 }: {
   children: ReactNode;
-  initialCollapsed?: boolean;
   alertCount?: number;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const pathname = usePathname();
   const isLg = useLgUp();
-  const effectiveCollapsed = isLg && collapsed;
+  const showMobileDrawer = !isLg && mobileOpen;
   const isPrintDoc =
     pathname.startsWith("/admin/ksiegowosc/ewidencja") ||
     pathname.startsWith("/admin/ksiegowosc/koszty") ||
@@ -92,12 +190,6 @@ export function AdminLayoutClient({
     };
   }, [mobileOpen, isLg]);
 
-  function toggleCollapsed() {
-    const next = !collapsed;
-    setCollapsed(next);
-    document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
-  }
-
   async function handleLogout() {
     await signOut();
     router.replace("/login");
@@ -108,46 +200,77 @@ export function AdminLayoutClient({
     return <>{children}</>;
   }
 
-  const navItems = (collapsedLook: boolean, closeOnClick: boolean) => (
-    <nav className="space-y-0.5">
-      {ADMIN_NAV.map(({ href, label, Icon }) => {
-        const active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={closeOnClick ? () => setMobileOpen(false) : undefined}
-            className={`group relative flex items-center gap-2 rounded-app py-2 text-sm transition-colors ${
-              collapsedLook ? "justify-center px-2" : "px-2.5"
-            } ${active ? "nav-active" : "font-semibold text-luster hover:bg-white/10"}`}
-          >
-            <Icon className="h-4.5 w-4.5 shrink-0" />
-            {!collapsedLook ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
-            {href === "/admin" && alertCount > 0 ? (
-              <span
-                className={`flex items-center justify-center rounded-full bg-[#E23B3B] text-[10px] font-extrabold text-white ${
-                  collapsedLook
-                    ? "absolute right-0.5 top-0.5 h-4 min-w-4 px-0.5"
-                    : "h-5 min-w-5 px-1"
-                }`}
+  const closeMobile = () => {
+    if (!isLg) setMobileOpen(false);
+  };
+
+  const sidebarInner = (
+    <>
+      <div className="flex flex-col items-center gap-3">
+        <Link
+          href="/admin"
+          onClick={closeMobile}
+          title="Zaliczone"
+          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime`}
+        >
+          Z
+        </Link>
+
+        <div className={RAIL}>
+          <GlobalSearchButton onClick={() => setSearchOpen(true)} />
+        </div>
+
+        <nav className={RAIL} aria-label="Nawigacja koordynatora">
+          {ADMIN_NAV.map(({ href, label, Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={label}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                onClick={closeMobile}
+                className={iconBtn(active)}
               >
-                {alertCount > 9 ? "9+" : alertCount}
-              </span>
-            ) : null}
-            {collapsedLook ? <SidebarTooltip label={label} /> : null}
-          </Link>
-        );
-      })}
-    </nav>
+                <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={2.1} />
+                {href === "/admin" && alertCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E23B3B] px-0.5 text-[9px] font-extrabold text-white">
+                    {alertCount > 9 ? "9+" : alertCount}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="mt-auto flex flex-col items-center gap-3 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div className={RAIL}>
+          <button
+            type="button"
+            title="Wyloguj"
+            aria-label="Wyloguj"
+            onClick={() => {
+              closeMobile();
+              void handleLogout();
+            }}
+            className={iconBtn(false)}
+          >
+            <IconLogout className="h-[1.15rem] w-[1.15rem]" strokeWidth={2.1} />
+          </button>
+        </div>
+      </div>
+    </>
   );
 
-  const showMobileDrawer = !isLg && mobileOpen;
-
   return (
-    <div className={`text-depths flex h-[calc(100dvh-0.75rem)] gap-2 ${dashboardSans.variable} ${dashboardMono.variable}`}>
+    <div
+      className={`tutor-shell-surface text-depths flex h-dvh max-h-dvh gap-3 overflow-hidden p-2 sm:gap-4 sm:p-3 ${dashboardSans.variable} ${dashboardMono.variable}`}
+    >
       <button
         type="button"
-        className="mobile-drawer-backdrop fixed inset-0 z-40 bg-depths/50 backdrop-blur-[2px] lg:hidden"
+        className="mobile-drawer-backdrop fixed inset-0 z-40 bg-depths/35 backdrop-blur-[2px] lg:hidden"
         data-open={mobileOpen ? "true" : "false"}
         aria-label="Zamknij menu"
         aria-hidden={!showMobileDrawer}
@@ -155,80 +278,56 @@ export function AdminLayoutClient({
         onClick={() => setMobileOpen(false)}
       />
 
+      <GlobalSearchModal
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        navItems={ADMIN_NAV}
+        personLabel="Nauczyciele"
+        placeholder="Szukaj nauczyciela, lekcji, strony…"
+        hints={ADMIN_SEARCH_HINTS}
+      />
+
+      {/* Desktop: floating segmented icon rail - ten sam komponent co w panelu korepetytora */}
       <aside
-        className="mobile-drawer-panel landing-navy flex h-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-app p-3 text-luster max-lg:top-1 max-lg:bottom-1 max-lg:left-1 max-lg:w-[min(17rem,calc(100vw-1rem))] max-lg:shadow-xl lg:static lg:shadow-none"
-        data-mobile-open={mobileOpen ? "true" : "false"}
-        style={{ width: isLg ? (effectiveCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_OPEN_W) : undefined }}
+        className="relative z-20 hidden h-full min-h-0 w-19 shrink-0 flex-col gap-3 lg:flex"
+        style={{ width: SIDEBAR_W }}
+        aria-label="Nawigacja"
       >
-        <div
-          className={`mb-3 flex items-center border-b border-white/10 pb-3 ${
-            effectiveCollapsed ? "flex-col gap-2" : "justify-between gap-2"
-          }`}
-        >
-          <div className={effectiveCollapsed ? "text-center" : ""}>
-            <p className={`${logoFont.className} text-lime font-black italic tracking-tight ${effectiveCollapsed ? "text-xl" : "text-2xl"}`}>
-              {effectiveCollapsed ? "Z" : "ZALICZONE"}
-            </p>
-            {!effectiveCollapsed ? (
-              <p className="text-steel text-[10px] font-semibold uppercase tracking-[0.2em]">Koordynator</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (mobileOpen) setMobileOpen(false);
-              else toggleCollapsed();
-            }}
-            aria-label={mobileOpen ? "Zamknij menu" : effectiveCollapsed ? "Rozwiń menu" : "Zwiń menu"}
-            className="group relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-luster transition-colors hover:bg-white/10"
-          >
-            <IconClose className="h-4.5 w-4.5 lg:hidden" />
-            <IconChevronLeft
-              className={`hidden h-4 w-4 transition-transform duration-300 lg:block ${effectiveCollapsed ? "rotate-180" : ""}`}
-            />
-            {effectiveCollapsed ? <SidebarTooltip label="Rozwiń menu" /> : null}
-          </button>
-        </div>
-
-        <div className="lg:hidden">{navItems(false, true)}</div>
-        <div className="hidden lg:block">{navItems(effectiveCollapsed, false)}</div>
-
-        <div className="mt-auto border-t border-white/10 pt-3">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`group relative flex w-full items-center gap-2 rounded-app py-2 text-sm font-semibold text-luster transition-colors hover:bg-white/10 ${
-              effectiveCollapsed ? "justify-center px-2" : "px-2.5"
-            }`}
-          >
-            <IconLogout className="h-4.5 w-4.5 shrink-0" />
-            {!effectiveCollapsed ? <span>Wyloguj</span> : null}
-            {effectiveCollapsed ? <SidebarTooltip label="Wyloguj" /> : null}
-          </button>
-          {!effectiveCollapsed ? (
-            <p className="text-steel mt-2 px-2.5 text-[10px] leading-snug">
-              Panel korepetytora: wyloguj się i zaloguj jako{" "}
-              <span className="text-luster font-semibold">teacher@zaliczone.pl</span>
-            </p>
-          ) : null}
-        </div>
+        {sidebarInner}
       </aside>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-app bg-snow p-3 sm:p-6">
-        <div className="mb-3 flex shrink-0 items-center gap-2 lg:hidden">
+
+      {/* Mobile drawer: ten sam segmentowy rail */}
+      <aside
+        className="mobile-drawer-panel fixed top-2 bottom-2 left-2 z-50 flex w-19 flex-col gap-3 lg:hidden"
+        data-mobile-open={mobileOpen ? "true" : "false"}
+        aria-label="Nawigacja"
+      >
+        {sidebarInner}
+      </aside>
+
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="sticky top-0 z-30 mb-2 flex shrink-0 items-center gap-3 pt-[max(0.15rem,env(safe-area-inset-top))] lg:hidden">
           <button
             type="button"
-            onClick={() => setMobileOpen(true)}
+            className="tutor-panel-surface inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-depths touch-manipulation"
             aria-label="Otwórz menu"
-            className="landing-navy flex h-10 w-10 shrink-0 items-center justify-center rounded-app text-lime"
+            aria-expanded={showMobileDrawer}
+            onClick={() => setMobileOpen(true)}
           >
             <IconMenu className="h-5 w-5" strokeWidth={2.25} />
           </button>
-          <p className={`${logoFont.className} text-depths min-w-0 truncate text-base font-extrabold italic uppercase tracking-tight`}>
+          <p
+            className={`${logoFont.className} text-depths min-w-0 truncate text-lg font-extrabold italic uppercase tracking-tight`}
+          >
             Zaliczone · Koordynator
           </p>
         </div>
-        <div className={`min-h-0 flex-1 ${isRozliczenia ? "overflow-y-auto lg:overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
-      </div>
+        <div className="tutor-panel-surface flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
+          <div className={`min-h-0 flex-1 ${isRozliczenia ? "overflow-y-auto lg:overflow-hidden" : "overflow-y-auto"}`}>
+            {children}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

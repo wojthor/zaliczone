@@ -105,7 +105,7 @@ export function EwidencjaPrintView({
         <div className="mx-auto flex max-w-4xl items-center gap-2 px-3 py-2.5 sm:px-6">
           <Link
             href="/finanse"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-[#000C4A] shadow-sm"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-[#000C4A]"
             aria-label="Wróć do finansów"
           >
             ←
@@ -127,7 +127,7 @@ export function EwidencjaPrintView({
       </div>
 
       <div className="mx-auto max-w-4xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-10 print:max-w-none print:px-4 print:pb-4 print:pt-4">
-        <article className="rounded-xl bg-white p-4 shadow-sm sm:p-6 print:rounded-none print:p-0 print:shadow-none">
+        <article className="rounded-xl bg-white p-4 sm:p-6 print:rounded-none print:p-0">
           <header className="border-b-2 border-black pb-3">
             <h1 className="text-base font-bold uppercase leading-snug tracking-wide sm:text-xl">
               Ewidencja zajęć dydaktycznych
@@ -187,7 +187,7 @@ export function EwidencjaPrintView({
                       </p>
                       <p className="mt-0.5 text-xs text-neutral-500">{row.classLevel}</p>
                     </div>
-                    <span className="shrink-0 rounded-md bg-white px-2 py-1 text-sm font-extrabold tabular-nums text-[#000C4A] shadow-sm ring-1 ring-neutral-200">
+                    <span className="shrink-0 rounded-md bg-white px-2 py-1 text-sm font-extrabold tabular-nums text-[#000C4A] ring-1 ring-neutral-200">
                       {hoursFromMinutes(row.minutes)} h
                     </span>
                   </div>
@@ -274,12 +274,6 @@ export function EwidencjaPrintView({
               <p className="mt-1 text-xs">Data i podpis zleceniodawcy</p>
             </div>
           </section>
-
-          <p className="mt-6 text-[11px] leading-relaxed text-neutral-600 sm:mt-8 print:mt-8">
-            Liczymy tu tylko lekcje, które koordynator już zatwierdził. Każda godzina to osobny
-            wiersz w tabeli. Poziom bierzemy z karty ucznia, przedmiot - z samej lekcji. Wydrukuj,
-            podpisz i wyślij skan koordynatorowi.
-          </p>
         </article>
       </div>
 

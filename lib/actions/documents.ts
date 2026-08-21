@@ -68,7 +68,6 @@ function collectDescendantFolderIds(folders: DocumentFolder[], rootId: string): 
 
 function revalidateDocsPaths(tutorId?: string | null) {
   revalidatePath("/profil");
-  revalidatePath("/admin/dokumenty");
   bustTag(TAG.documents);
   if (tutorId) bustTag(documentsTag(tutorId));
 }

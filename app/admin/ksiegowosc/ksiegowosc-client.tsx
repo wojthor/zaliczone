@@ -777,7 +777,8 @@ export function KsiegowoscClient({
               </span>
             ) : null}
           </div>
-          <p className="text-muted mt-0.5 text-[0.7rem] capitalize leading-snug sm:text-xs">
+          <span className="mt-1.5 block h-1 w-8 rounded-full bg-lime" aria-hidden />
+          <p className="text-muted mt-1.5 text-[0.7rem] capitalize leading-snug sm:text-xs">
             {periodLabel} - ewidencja sprzedaży bezrachunkowej (tylko VERIFIED).
           </p>
         </div>
@@ -926,7 +927,7 @@ export function KsiegowoscClient({
         />
       ) : (
         <div className="space-y-3">
-          <p className="rounded-xl bg-snow px-4 py-3 text-sm font-medium text-depths shadow-sm ring-1 ring-panel-frame/40">
+          <p className="rounded-xl bg-snow px-4 py-3 text-sm font-medium text-depths ring-1 ring-panel-frame/40">
             Prowadzisz pełną KPiR od{" "}
             <span className="dash-mono font-bold">
               {jdgRegistrationDate ? formatExpenseDate(jdgRegistrationDate) : "-"}
@@ -1320,7 +1321,7 @@ export function KsiegowoscClient({
       </section>
 
       {!isMonthClosed ? (
-      <section className="rounded-app bg-snow p-3 sm:p-4">
+      <section className="card-quiet p-3 sm:p-4">
         <h2 className="dash-sans text-depths text-sm font-semibold">
           {viewMode === "year"
             ? `Zestawienie roczne z podziałem miesięcznym · ${selectedYear}`
@@ -1421,7 +1422,7 @@ export function KsiegowoscClient({
       ) : null}
 
       {!isMonthClosed ? (
-      <section className="rounded-app bg-snow p-4 sm:p-5">
+      <section className="card-quiet p-4 sm:p-5">
         <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia - Zrób to sam</h2>
         <p className="text-muted mt-1 text-xs">
           Tylko to, co dotyczy Twojej firmy ·{" "}
@@ -1656,7 +1657,7 @@ export function KsiegowoscClient({
             </p>
           </section>
         ) : (
-          <section className="rounded-app bg-snow p-4 sm:p-5">
+          <section className="card-quiet p-4 sm:p-5">
             <div>
               <h2 className="section-label text-base">Kreator zamknięcia miesiąca</h2>
               <p className="text-muted mt-1 text-xs capitalize">
@@ -1710,7 +1711,7 @@ export function KsiegowoscClient({
           </section>
         )
       ) : (
-        <section className="rounded-app bg-snow p-4 sm:p-5">
+        <section className="card-quiet p-4 sm:p-5">
           <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Zamknięcia w roku {selectedYear}</h2>
           <p className="text-muted mt-1 text-xs">
             Zamknięcie dotyczy zawsze konkretnego miesiąca - tu widzisz statusy. Przełącz na widok miesięczny, aby

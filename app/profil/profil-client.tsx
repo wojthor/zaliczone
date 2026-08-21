@@ -171,7 +171,7 @@ export function ProfilClient({
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-snow shadow-sm transition-transform ${
+                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-snow transition-transform ${
                       acceptingStudents ? "translate-x-5 bg-[#000C4A]" : "translate-x-0"
                     }`}
                   />

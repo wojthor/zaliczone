@@ -14,18 +14,130 @@ import {
   IconUsers,
   IconWallet,
 } from "@/components/icons";
+import { GlobalSearchButton, GlobalSearchModal } from "@/components/search/global-search";
 import { signOut } from "@/lib/data/mutations";
 import { logoFont } from "@/lib/logo-font";
 import { dashboardSans } from "@/lib/dashboard-fonts";
 
 const mainNav = [
-  { href: "/panel", label: "Dashboard", Icon: IconDashboard },
-  { href: "/terminarz", label: "Terminarz", Icon: IconCalendar },
-  { href: "/uczniowie", label: "Uczniowie", Icon: IconUsers },
-  { href: "/finanse", label: "Finanse", Icon: IconWallet },
+  {
+    href: "/panel",
+    label: "Dashboard",
+    Icon: IconDashboard,
+    keywords: [
+      "panel główny",
+      "start",
+      "strona główna",
+      "pulpit",
+      "podsumowanie",
+      "dzisiejsze lekcje",
+      "najbliższa lekcja",
+      "statystyki",
+    ],
+  },
+  {
+    href: "/terminarz",
+    label: "Terminarz",
+    Icon: IconCalendar,
+    keywords: [
+      "kalendarz",
+      "grafik",
+      "harmonogram",
+      "plan zajęć",
+      "plan tygodnia",
+      "lekcje",
+      "zajęcia",
+      "dodaj lekcję",
+      "nowa lekcja",
+      "edytuj lekcję",
+      "cykliczne",
+      "tydzień",
+      "zaplanowane",
+    ],
+  },
+  {
+    href: "/uczniowie",
+    label: "Uczniowie",
+    Icon: IconUsers,
+    keywords: [
+      "uczeń",
+      "dodaj ucznia",
+      "edytuj ucznia",
+      "kontakt",
+      "telefon",
+      "stawka ucznia",
+      "przedmioty ucznia",
+      "klasa",
+      "poziom ucznia",
+      "notatki",
+      "zablokowany",
+      "historia lekcji",
+    ],
+  },
+  {
+    href: "/finanse",
+    label: "Finanse",
+    Icon: IconWallet,
+    keywords: [
+      "zarobki",
+      "pieniądze",
+      "wypłata",
+      "rozliczenia",
+      "ewidencja",
+      "ewidencja godzin",
+      "pdf",
+      "historia płatności",
+      "ile zarobiłem",
+      "premia",
+      "bonus",
+      "podatki",
+      "pit",
+      "stawka godzinowa",
+      "miesiąc rozliczeniowy",
+    ],
+  },
 ] as const;
 
-const guideNav = { href: "/przewodnik", label: "Przewodnik", Icon: IconGuide } as const;
+const guideNav = {
+  href: "/przewodnik",
+  label: "Przewodnik",
+  Icon: IconGuide,
+  keywords: [
+    "pomoc",
+    "faq",
+    "instrukcja",
+    "jak korzystać",
+    "zasady",
+    "regulamin",
+    "wskazówki",
+    "onboarding",
+    "często zadawane pytania",
+    "terminy",
+  ],
+} as const;
+
+const profilNav = {
+  href: "/profil",
+  label: "Profil",
+  Icon: IconUser,
+  keywords: [
+    "dane osobowe",
+    "ustawienia",
+    "konto bankowe",
+    "numer konta",
+    "hasło",
+    "zmień hasło",
+    "pesel",
+    "dokumenty",
+    "dane do umowy",
+    "umowa",
+    "kontrakt",
+  ],
+} as const;
+
+const SEARCH_NAV_ITEMS = [...mainNav, guideNav, profilNav];
+
+const SEARCH_HINTS = ["ewidencja", "wypłata", "uczeń", "lekcja", "hasło"];
 
 const SIDEBAR_W = "4.75rem";
 const RAIL = "tutor-panel-surface flex flex-col items-center gap-1.5 rounded-[1.75rem] px-2 py-2.5";
@@ -48,7 +160,7 @@ function iconBtn(active: boolean) {
   return [
     "flex h-11 w-11 items-center justify-center rounded-full transition touch-manipulation",
     active
-      ? "landing-navy text-lime shadow-[0_6px_16px_rgba(0,12,74,0.28)]"
+      ? "landing-navy text-lime"
       : "text-depths/55 hover:bg-mist hover:text-depths",
   ].join(" ");
 }
@@ -56,6 +168,7 @@ function iconBtn(active: boolean) {
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
   const dashboardLocked = pathname === "/panel";
   const isLg = useLgUp();
@@ -87,10 +200,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           href="/panel"
           onClick={closeMobile}
           title="Zaliczone"
-          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime shadow-[0_8px_22px_rgba(0,12,74,0.2)]`}
+          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime`}
         >
           Z
         </Link>
+
+        <div className={RAIL}>
+          <GlobalSearchButton onClick={() => setSearchOpen(true)} />
+        </div>
 
         <nav className={RAIL} aria-label="Główne menu">
           {mainNav.map(({ href, label, Icon }) => {
@@ -175,6 +292,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-hidden={!showMobileDrawer}
         tabIndex={showMobileDrawer ? 0 : -1}
         onClick={() => setMobileOpen(false)}
+      />
+
+      <GlobalSearchModal
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        navItems={SEARCH_NAV_ITEMS}
+        personLabel="Uczniowie"
+        placeholder="Szukaj ucznia, lekcji, strony…"
+        hints={SEARCH_HINTS}
       />
 
       {/* Desktop: floating segmented icon rail */}

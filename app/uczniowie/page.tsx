@@ -5,6 +5,7 @@ import {
   getCurrentUserProfile,
   getOpenTutorAlerts,
   getPriceTiers,
+  getTutorLessons,
   getTutorStudents,
 } from "@/lib/data/queries";
 
@@ -13,11 +14,12 @@ export default async function UczniowiePage() {
   if (!profile) redirect("/login");
   if (profile.role === "ADMIN") redirect("/admin");
 
-  const [students, priceTiers, alerts, activeSubjects] = await Promise.all([
+  const [students, priceTiers, alerts, activeSubjects, lessons] = await Promise.all([
     getTutorStudents(profile.id),
     getPriceTiers(),
     getOpenTutorAlerts(profile.id),
     getCachedActiveSubjects(profile.id),
+    getTutorLessons(profile.id),
   ]);
 
   return (
@@ -26,6 +28,7 @@ export default async function UczniowiePage() {
       activeSubjects={activeSubjects}
       priceTiers={priceTiers}
       alerts={alerts}
+      lessons={lessons}
     />
   );
 }

@@ -880,7 +880,6 @@ export async function adminVerifyLesson(
   revalidatePath("/admin/wyplaty");
   revalidatePath("/finanse");
   revalidatePath("/terminarz");
-  revalidatePath("/admin/premie");
   revalidatePath("/panel");
 }
 
@@ -927,7 +926,6 @@ export async function adminRejectLessonPayment(lessonId: string) {
   staleTag(TAG.dashboardStats);
   revalidatePath("/admin/rozliczenia");
   revalidatePath("/terminarz");
-  revalidatePath("/admin/premie");
   revalidatePath("/panel");
 }
 

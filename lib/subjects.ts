@@ -7,7 +7,6 @@ export const SUBJECTS = [
   "Matematyka",
   "Fizyka",
   "Chemia",
-  "Chemia organiczna",
   "Biologia",
   "Angielski",
   "Niemiecki",

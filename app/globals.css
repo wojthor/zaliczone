@@ -51,10 +51,6 @@
   color: var(--color-lime);
   border-radius: 1.75rem;
   border: 1px solid rgba(213, 237, 33, 0.12);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.14) inset,
-    0 12px 32px rgba(0, 12, 74, 0.18),
-    0 0 32px rgba(255, 255, 255, 0.12);
 }
 
 @utility card-feature-alt {
@@ -62,19 +58,18 @@
   color: var(--color-soft-lime);
   border-radius: 1.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 12px 32px rgba(0, 12, 74, 0.16);
 }
 
 @utility card-quiet {
   background-color: var(--color-snow);
+  border: 1px solid rgba(0, 12, 74, 0.1);
   border-radius: 1.75rem;
-  box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
 }
 
 @utility soft-panel {
   background-color: var(--color-snow);
+  border: 1px solid rgba(0, 12, 74, 0.1);
   border-radius: 1.75rem;
-  box-shadow: 0 10px 28px rgba(0, 12, 74, 0.06);
 }
 
 @utility tutor-shell-surface {
@@ -85,19 +80,20 @@
   background-color: #ffffff;
   border: 1px solid rgba(0, 12, 74, 0.12);
   border-radius: 1.75rem;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 18px 36px rgba(0, 12, 74, 0.1),
-    0 0 0 1px rgba(235, 241, 255, 0.9);
 }
 
 @utility tutor-panel-soft {
   background-color: #f8faff;
   border: 1px solid rgba(0, 12, 74, 0.09);
   border-radius: 1.35rem;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.72) inset,
-    0 10px 24px rgba(0, 12, 74, 0.06);
+}
+
+/* Karta w panelu admina - ten sam język co tutor-panel-surface/soft, tylko
+   jeden stopień "w głąb" (mniejszy promień), bo osadzona wewnątrz PageShell-owej karty. */
+@utility admin-card {
+  background-color: var(--color-snow);
+  border: 1px solid rgba(0, 12, 74, 0.1);
+  border-radius: 1.5rem;
 }
 
 @utility btn-block {
@@ -126,10 +122,6 @@
     radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), transparent 42%),
     linear-gradient(165deg, #000c4a 0%, #001a6e 45%, #00082f 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.16) inset,
-    0 10px 26px rgba(0, 12, 74, 0.2),
-    0 0 26px rgba(255, 255, 255, 0.1);
 }
 
 @utility badge-action {
@@ -144,10 +136,6 @@
   text-transform: uppercase;
   padding: 0.15rem 0.55rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.14) inset,
-    0 8px 22px rgba(0, 12, 74, 0.18),
-    0 0 22px rgba(255, 255, 255, 0.08);
 }
 
 @utility badge-done {
@@ -194,10 +182,6 @@
   color: var(--color-lime);
   font-weight: 800;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.16) inset,
-    0 10px 24px rgba(0, 12, 74, 0.18),
-    0 0 24px rgba(255, 255, 255, 0.1);
 }
 
 .dash-sans {
@@ -247,21 +231,35 @@
 
 @keyframes rowConfirmPulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 55%, transparent);
     transform: scale(1);
   }
   40% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-lime) 45%, transparent);
     transform: scale(1.02);
   }
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 0%, transparent);
     transform: scale(1);
   }
 }
 
 .row-confirm-pulse {
   animation: rowConfirmPulse 0.32s ease-out;
+}
+
+/* Pasek wyszukiwania - wysuwa się z sidebaru (nie wyskakuje jak modal na środku). */
+@keyframes searchSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-1.25rem) scaleX(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+.search-slide-in {
+  transform-origin: left center;
+  animation: searchSlideIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes confirmDialogIn {

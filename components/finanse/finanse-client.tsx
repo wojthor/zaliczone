@@ -86,7 +86,6 @@ export function FinanseClient({
     () => payouts.find((p) => p.month === selectedMonthKey) ?? null,
     [payouts, selectedMonthKey],
   );
-  const isMonthClosed = closedMonths.includes(selectedMonthKey);
 
   useEffect(() => {
     if (!cennikOpen) return;
@@ -102,15 +101,7 @@ export function FinanseClient({
   const hasVerifiedLessons = linesForMonth.length > 0;
   const dateUnlocked = isEwidencjaPdfAvailable(selectedMonthKey);
   const canGenerateEwidencja = hasVerifiedLessons && dateUnlocked;
-  const payoutStatusLabel = payoutForMonth?.status === "PAID"
-    ? "Wypłacono"
-    : payoutForMonth
-      ? "Oczekuje na przelew"
-      : isMonthClosed
-        ? "Miesiąc zamknięty"
-        : isCurrentMonth
-          ? "Wypłata po zamknięciu miesiąca"
-          : "Jeszcze nie oznaczona";
+  const isPayoutMarkedPaid = payoutForMonth?.status === "PAID";
   const monthPicker = (
     <label className="grid w-full max-w-full gap-1 sm:w-auto sm:min-w-56">
       <span className="text-depths/80 text-xs font-semibold">Miesiąc</span>
@@ -174,7 +165,7 @@ export function FinanseClient({
       {cennikOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij cennik" onClick={() => setCennikOpen(false)} />
-          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-app border border-panel-frame/70 bg-snow/95 shadow-2xl sm:rounded-app">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-app border border-panel-frame/70 bg-snow/95 sm:rounded-app">
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             <div className="relative shrink-0 px-5 pt-3 sm:px-8 sm:pt-8">
               <button
@@ -187,26 +178,30 @@ export function FinanseClient({
               </button>
               <h2 className="pr-12 text-lg font-medium tracking-tight text-depths">Cennik</h2>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Twoja stawka godzinowa za zajęcia (umowa zlecenia).
+                Aktualne stawki za godzinę zajęć (umowa zlecenia).
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8 sm:pb-8">
             {priceTiers.length === 0 ? (
               <p className="mt-6 text-sm font-medium text-muted">Brak pozycji w cenniku.</p>
             ) : (
-              <table className="mt-6 w-full border-collapse text-left">
+              <table className="table-fixed mt-6 w-full min-w-0 border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-panel-frame/35 text-xs font-medium text-muted">
-                    <th className="pb-3 pr-2">Zajęcia</th>
-                    <th className="pb-3 pl-2 text-right">Twoja stawka</th>
+                  <tr className="border-b-2 border-paper">
+                    <th className="section-label !text-muted pb-2.5">Poziom</th>
+                    <th className="section-label !text-muted pb-2.5 text-right">Cena</th>
+                    <th className="section-label !text-muted pb-2.5 text-right">Twoja stawka</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {priceTiers.map((row, index) => (
-                    <tr key={row.id || row.label} className={index > 0 ? "border-t border-panel-frame/35" : ""}>
-                      <th className="py-3.5 pr-2 text-sm font-medium leading-snug text-depths">{row.label}</th>
-                      <td className="pl-2 py-3.5 text-right text-sm font-semibold tabular-nums text-depths">
-                        {Number(row.worker_rate_pln)} zł / godz.
+                  {priceTiers.map((row) => (
+                    <tr key={row.id || row.label} className="border-b-2 border-paper last:border-0">
+                      <th className="dash-sans text-depths py-2.5 text-sm font-bold">{row.label}</th>
+                      <td className="dash-mono py-2.5 text-right text-sm font-bold">
+                        {Number(row.client_rate_pln)} zł
+                      </td>
+                      <td className="dash-mono py-2.5 text-right text-sm font-bold">
+                        {Number(row.worker_rate_pln)} zł
                       </td>
                     </tr>
                   ))}
@@ -219,23 +214,19 @@ export function FinanseClient({
       ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative rounded-[1.75rem] bg-[#000C4A] p-4 text-luster shadow-[0_12px_32px_rgba(0,12,74,0.18)] sm:col-span-2 lg:col-span-1">
-          <div className="absolute top-4 right-4">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] ${
-                payoutForMonth?.status === "PAID"
-                  ? "bg-lime text-depths"
-                  : "bg-white/10 text-lime"
-              }`}
-            >
-              <span aria-hidden>{payoutForMonth?.status === "PAID" ? "✓" : "•"}</span>
-              {payoutStatusLabel}
-            </span>
+        <div className="rounded-[1.75rem] bg-[#000C4A] p-4 text-luster sm:col-span-2 lg:col-span-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="text-[0.65rem] font-extrabold uppercase tracking-[0.08em] text-lime/80">
+              {isCurrentMonth ? "Do wypłaty w tym miesiącu" : "Do wypłaty"}
+            </p>
+            {isPayoutMarkedPaid ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-depths">
+                <span aria-hidden>✓</span>
+                Wypłacono
+              </span>
+            ) : null}
           </div>
-          <p className="text-[0.65rem] font-extrabold uppercase tracking-[0.08em] text-lime/80">
-            {isCurrentMonth ? "Do wypłaty w tym miesiącu" : "Do wypłaty"}
-          </p>
-          <p className="mt-1 text-2xl font-black tabular-nums text-lime">
+          <p className="mt-2 text-2xl font-black tabular-nums text-lime">
             {expectedPayoutPln.toLocaleString("pl-PL")} zł
           </p>
           <p className="mt-1 text-xs capitalize text-luster/65">

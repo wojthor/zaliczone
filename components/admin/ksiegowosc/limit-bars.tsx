@@ -28,7 +28,7 @@ type LimitBarProps = {
   alertDetail?: string | null;
 };
 
-/** Wspólny pasek limitu - styl zbliżony do FinanceTile (rounded-xl, shadow-sm, paleta Ops-Ledger). */
+/** Wspólny pasek limitu - styl zbliżony do FinanceTile (rounded-xl, paleta Ops-Ledger). */
 export function LimitProgressBar({
   aktualnaWartosc,
   limit,
@@ -45,7 +45,7 @@ export function LimitProgressBar({
   const valueOnDark = tone === "danger";
 
   return (
-    <article className="rounded-xl bg-snow p-4 shadow-sm ring-1 ring-panel-frame/40 sm:p-5">
+    <article className="rounded-xl bg-snow p-4 ring-1 ring-panel-frame/40 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="dash-sans text-depths text-[10px] font-extrabold uppercase tracking-[0.05em]">
           {label}

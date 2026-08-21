@@ -7,5 +7,5 @@ export const COMPANY = {
   owner: "Martyna Wilczyńska",
   nip: "………………",
   address: "ul. Słonimskiego 1/48 Gdańsk",
-  email: "kontakt@zaliczone.pl",
+  email: "kontakt@zaliczone.edu.pl",
 } as const;

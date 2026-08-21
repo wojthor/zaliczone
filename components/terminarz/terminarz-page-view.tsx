@@ -2,6 +2,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { LessonCompletionProvider } from "@/components/dashboard/lesson-completion-context";
@@ -224,7 +225,7 @@ function LessonModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij" onClick={onClose} />
       <div
-        className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(40rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:max-h-[min(90dvh,40rem)] sm:max-w-[min(40rem,94vw)] sm:rounded-app"
+        className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(40rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow sm:max-h-[min(90dvh,40rem)] sm:max-w-[min(40rem,94vw)] sm:rounded-app"
         role="dialog"
         aria-modal="true"
         aria-labelledby="lesson-modal-title"
@@ -587,6 +588,19 @@ function TerminarzInner({
     setModal({ type: "closed" });
   }
 
+  /** Deep-link z globalnego wyszukiwania (?lesson=<id>) - filtruje listę i (jeśli można) otwiera edycję. */
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("lesson");
+    if (!id) return;
+    const found = lessons.find((l) => l.id === id);
+    if (found) {
+      setListSearch(found.studentName);
+      openEdit(found);
+    }
+    router.replace("/terminarz", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessons]);
+
   async function saveModal() {
     if (!draft.subject || !draft.studentId || !draft.start || !draft.end || saving) return;
 
@@ -930,9 +944,17 @@ function TerminarzInner({
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-extrabold text-depths">
-                          {lesson.studentName}
-                        </p>
+                        {lesson.studentId ? (
+                          <Link
+                            href="/uczniowie"
+                            className="truncate text-sm font-extrabold text-depths underline-offset-2 hover:text-depths hover:underline"
+                            title="Przejdź do uczniów"
+                          >
+                            {lesson.studentName}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-sm font-extrabold text-depths">{lesson.studentName}</p>
+                        )}
                         <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
                       </div>
                       <p className="truncate text-xs text-muted">
@@ -1012,7 +1034,7 @@ function TerminarzInner({
             onClick={() => !deleteBusy && setDeleteTarget(null)}
           />
           <div
-            className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:rounded-app"
+            className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-t-app bg-snow sm:rounded-app"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-lesson-title"

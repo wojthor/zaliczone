@@ -238,7 +238,7 @@ export function WeeklySchedule({
               key={dayKey}
               className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-app lg:min-h-0 lg:h-auto ${
                 isToday
-                  ? "tutor-panel-surface shadow-[inset_0_0_0_2px_#D5ED21]"
+                  ? "tutor-panel-surface outline-2 outline-lime -outline-offset-2"
                   : "tutor-panel-soft"
               }`}
             >

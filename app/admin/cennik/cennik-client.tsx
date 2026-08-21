@@ -127,7 +127,8 @@ export function CennikClient({
       <div className="flex items-end justify-between gap-2">
         <div>
           <h1 className="dash-sans text-depths text-2xl font-bold tracking-tight">Cennik i przedmioty</h1>
-          <p className="dash-sans text-muted mt-1 text-sm">
+          <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
+          <p className="dash-sans text-muted mt-1.5 text-sm">
             Cennik zapisujemy od razu. Nauczyciele zobaczą nowe stawki w Finansach.
           </p>
         </div>
@@ -143,7 +144,7 @@ export function CennikClient({
         </button>
       </div>
 
-      <section className="rounded-app bg-snow px-4 py-4 sm:px-5 sm:py-5">
+      <section className="card-quiet px-4 py-4 sm:px-5 sm:py-5">
         <h2 className="section-label">Aktualny cennik</h2>
         <div className="mt-4 min-w-0 overflow-x-auto">
           <table className="table-fixed w-full min-w-0 border-collapse text-left">
@@ -216,7 +217,7 @@ export function CennikClient({
             onClick={() => setOpen(false)}
             aria-label="zamknij"
           />
-          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-app border border-panel-frame/40 bg-snow shadow-2xl sm:rounded-app">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-app border border-panel-frame/40 bg-snow sm:rounded-app">
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             <div className="shrink-0 px-4 pt-3 sm:px-5 sm:pt-5">
               <h3 className="dash-sans text-depths text-lg font-bold">Edycja cennika</h3>

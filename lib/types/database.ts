@@ -47,6 +47,11 @@ export type DbStudent = {
   blocked?: boolean;
   blocked_at?: string | null;
   blocked_reason?: string | null;
+  /** Migracja 0017 - dane kontaktowe i notatki ucznia. */
+  phone?: string | null;
+  email?: string | null;
+  school_class?: string | null;
+  notes?: string | null;
 };
 
 export type AlertKind = "UNPAID_STREAK" | "STOP_TEACHING" | "STUDENT_BLOCKED";

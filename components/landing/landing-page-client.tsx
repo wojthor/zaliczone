@@ -8,7 +8,12 @@ import { SUBJECTS } from "@/lib/subjects";
 import { COMPANY } from "@/lib/company";
 import type { PublicTutorCard } from "@/lib/data/queries";
 
-const LEVELS = ["Szkoła podstawowa", "Liceum / technikum", "Matura", "Studia"] as const;
+const LEVELS = [
+  "Szkoła podstawowa",
+  "Szkoła średnia",
+  "Matura podstawowa",
+  "Matura rozszerzona",
+] as const;
 const DAYS = [
   { id: "pon", label: "Pon" },
   { id: "wt", label: "Wt" },
@@ -266,6 +271,15 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
       : pool;
     return bySubject.length > 0 ? bySubject : pool;
   }, [pool, subject]);
+
+  /** Tylko przedmioty, które aktualnie ma ktoś z korepetytorów w puli (real lub demo). */
+  const availableSubjects = useMemo(() => {
+    const present = new Set<string>();
+    pool.forEach((t) => t.subjects.forEach((s) => present.add(s)));
+    const ordered = SUBJECTS.filter((s) => present.has(s));
+    const extra = Array.from(present).filter((s) => !(SUBJECTS as readonly string[]).includes(s));
+    return [...ordered, ...extra];
+  }, [pool]);
 
   const canSearch = Boolean(level && subject && days.length > 0);
 
@@ -555,7 +569,7 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                       Jaki przedmiot?
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {SUBJECTS.map((s) => (
+                      {availableSubjects.map((s) => (
                         <Chip key={s} active={subject === s} onClick={() => setSubject(s)}>
                           {s}
                         </Chip>

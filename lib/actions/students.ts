@@ -9,9 +9,19 @@ type InsertStudentInput = {
   subjects: string[];
   classLevel: string;
   ratePln: number;
+  schoolClass?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
 };
 
 type UpdateStudentInput = InsertStudentInput;
+
+/** Pusty string -> null, żeby w bazie nie zostawały puste ciągi zamiast braku danych. */
+function nullIfEmpty(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 export async function insertStudent(input: InsertStudentInput) {
   const supabase = await createClient();
@@ -28,6 +38,10 @@ export async function insertStudent(input: InsertStudentInput) {
       subjects: input.subjects,
       class_level: input.classLevel,
       rate_pln: input.ratePln,
+      school_class: nullIfEmpty(input.schoolClass),
+      phone: nullIfEmpty(input.phone),
+      email: nullIfEmpty(input.email),
+      notes: nullIfEmpty(input.notes),
     })
     .select("*")
     .single();
@@ -59,6 +73,10 @@ export async function updateStudent(studentId: string, input: UpdateStudentInput
       subjects: input.subjects,
       class_level: input.classLevel,
       rate_pln: input.ratePln,
+      school_class: nullIfEmpty(input.schoolClass),
+      phone: nullIfEmpty(input.phone),
+      email: nullIfEmpty(input.email),
+      notes: nullIfEmpty(input.notes),
     })
     .eq("id", studentId)
     .eq("tutor_id", user.id);

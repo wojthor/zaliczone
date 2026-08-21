@@ -112,7 +112,7 @@ export function ConfirmDialog({
         onClick={phase === "confirm" ? onCancel : undefined}
         aria-label="Zamknij"
       />
-      <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-t-app bg-snow text-center shadow-2xl sm:rounded-app">
+      <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-t-app bg-snow text-center sm:rounded-app">
         <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-4 sm:pt-6">
         <span className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-snow ${ring}`}>

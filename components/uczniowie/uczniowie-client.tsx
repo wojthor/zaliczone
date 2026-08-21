@@ -1,13 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { insertStudent, updateStudent, deleteStudent } from "@/lib/actions/students";
 import { AlertsBanner } from "@/components/alerts/alerts-banner";
+import { LessonStatusBadge } from "@/components/lesson/lesson-status-badge";
+import type { Lesson } from "@/components/dashboard/lesson-data";
 import type { AppAlert, StudentUi } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
+
+function formatLessonDatePl(dateIso: string | undefined): string {
+  if (!dateIso) return "Bez daty";
+  const d = new Date(`${dateIso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "Bez daty";
+  return new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "long" }).format(d);
+}
 
 type SortMode = "newest" | "oldest" | "az" | "za";
 
@@ -54,11 +63,13 @@ export function UczniowieClient({
   activeSubjects,
   priceTiers,
   alerts = [],
+  lessons = [],
 }: {
   initialStudents: StudentUi[];
   activeSubjects: string[];
   priceTiers: PriceTier[];
   alerts?: AppAlert[];
+  lessons?: Lesson[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -70,6 +81,25 @@ export function UczniowieClient({
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<NewStudentDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
+  const [lessonsModalStudent, setLessonsModalStudent] = useState<StudentUi | null>(null);
+
+  const lessonsByStudent = useMemo(() => {
+    const map = new Map<string, Lesson[]>();
+    for (const lesson of lessons) {
+      if (!lesson.studentId) continue;
+      const list = map.get(lesson.studentId);
+      if (list) list.push(lesson);
+      else map.set(lesson.studentId, [lesson]);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.start.localeCompare(a.start));
+    }
+    return map;
+  }, [lessons]);
+
+  const lessonsModalItems = lessonsModalStudent
+    ? (lessonsByStudent.get(lessonsModalStudent.id) ?? [])
+    : [];
 
   const draftRate = useMemo(
     () => cennik.find((row) => row.label === draft.classLabel)?.forClientPln ?? null,
@@ -125,6 +155,16 @@ export function UczniowieClient({
     setModalOpen(true);
   }
 
+  /** Deep-link z globalnego wyszukiwania (?student=<id>) - otwiera edycję konkretnego ucznia. */
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("student");
+    if (!id) return;
+    const found = items.find((s) => s.id === id);
+    if (found) openEdit(found);
+    router.replace("/uczniowie", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function saveStudent() {
     if (!draft.name.trim() || !draft.classLabel || draft.selectedSubjects.length === 0 || saving) return;
     setSaving(true);
@@ -134,6 +174,10 @@ export function UczniowieClient({
         subjects: draft.selectedSubjects,
         classLevel: draft.classLabel,
         ratePln: draftRate ?? 0,
+        schoolClass: draft.schoolClass,
+        phone: draft.phone,
+        email: draft.email,
+        notes: draft.notes,
       };
       if (editId) {
         await updateStudent(editId, payload);
@@ -146,6 +190,10 @@ export function UczniowieClient({
                   subjectsLine: payload.subjects.join(", "),
                   classLabel: payload.classLevel,
                   ratePerHourPln: payload.ratePln,
+                  schoolClass: draft.schoolClass.trim() || "-",
+                  phone: draft.phone.trim() || "-",
+                  email: draft.email.trim() || "-",
+                  notes: draft.notes.trim() || "-",
                 }
               : s,
           ),
@@ -168,6 +216,7 @@ export function UczniowieClient({
             ratePerHourPln: Number(row.rate_pln),
             nextLesson: draft.nextLesson.trim() || "Brak zaplanowanej lekcji",
             createdAtTs: Date.now(),
+            blocked: false,
           },
           ...prev,
         ]);
@@ -340,14 +389,20 @@ export function UczniowieClient({
                     Usuń
                   </button>
                 ) : (
-                  <div className="flex gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => openEdit(student)}
-                      className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime shadow-none"
-                      style={{ boxShadow: "none" }}
+                      className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime"
                     >
                       Edytuj
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLessonsModalStudent(student)}
+                      className="rounded-full border border-panel-frame/45 bg-snow px-3 py-1.5 text-xs font-semibold text-depths transition hover:bg-mist"
+                    >
+                      Lekcje
                     </button>
                     <button
                       type="button"
@@ -372,7 +427,7 @@ export function UczniowieClient({
             aria-label="Zamknij"
             onClick={() => setModalOpen(false)}
           />
-          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(42rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow shadow-2xl sm:max-w-[min(42rem,94vw)] sm:rounded-app">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(42rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow sm:max-w-[min(42rem,94vw)] sm:rounded-app">
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-6">
               <h2 className="text-depths text-lg font-semibold tracking-tight">
@@ -506,6 +561,62 @@ export function UczniowieClient({
               >
                 {saving ? <Spinner /> : null}
                 {saving ? "Zapisywanie…" : editId ? "Zapisz" : "Dodaj"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {lessonsModalStudent ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#000C4A]/50"
+            aria-label="Zamknij"
+            onClick={() => setLessonsModalStudent(null)}
+          />
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(38rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow sm:max-w-[min(38rem,94vw)] sm:rounded-app">
+            <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
+            <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-6">
+              <h2 className="text-depths text-lg font-semibold tracking-tight">
+                Lekcje - {lessonsModalStudent.name}
+              </h2>
+              <p className="text-muted mt-0.5 text-xs font-semibold">
+                {lessonsModalItems.length}{" "}
+                {lessonsModalItems.length === 1 ? "lekcja" : "lekcji"} w historii
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+              {lessonsModalItems.length === 0 ? (
+                <p className="text-muted py-6 text-center text-sm">
+                  Brak zapisanych lekcji z tym uczniem.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {lessonsModalItems.map((lesson) => (
+                    <li
+                      key={lesson.id}
+                      className="soft-panel flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-extrabold text-depths">{lesson.subject}</p>
+                        <p className="text-muted text-xs">
+                          {formatLessonDatePl(lesson.date)} · {lesson.start}–{lesson.end}
+                        </p>
+                      </div>
+                      <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex shrink-0 justify-end border-t border-panel-frame/30 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
+              <button
+                type="button"
+                className="rounded-full bg-luster px-4 py-2.5 text-sm font-semibold text-depths touch-manipulation"
+                onClick={() => setLessonsModalStudent(null)}
+              >
+                Zamknij
               </button>
             </div>
           </div>

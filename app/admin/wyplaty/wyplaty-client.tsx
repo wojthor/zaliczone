@@ -179,7 +179,8 @@ export function WyplatyClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="dash-sans text-depths text-xl font-bold tracking-tight sm:text-2xl">Wypłaty i Bilans</h1>
-          <p className="dash-sans text-muted mt-1 max-w-2xl text-xs leading-relaxed sm:text-sm">
+          <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
+          <p className="dash-sans text-muted mt-1.5 max-w-2xl text-xs leading-relaxed sm:text-sm">
             Wyłącznie lekcje VERIFIED · model marżowy 70% tutor / 30% agencja.
           </p>
         </div>
@@ -218,7 +219,7 @@ export function WyplatyClient({
         </FinanceTile>
       </FinanceTilesRow>
 
-      <section className="rounded-app bg-snow p-3 sm:p-4">
+      <section className="admin-card p-3 sm:p-4">
         <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h2 className="section-label leading-snug">

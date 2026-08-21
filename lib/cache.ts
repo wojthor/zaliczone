@@ -65,5 +65,4 @@ export function revalidateLessonPages() {
   revalidatePath("/terminarz");
   revalidatePath("/admin/rozliczenia");
   revalidatePath("/finanse");
-  revalidatePath("/admin/premie");
 }
