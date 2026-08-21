@@ -792,7 +792,11 @@ function DeadlinesBoard({ systemDeadlines }: { systemDeadlines: DeadlineItem[] }
       persistCustomDeadlines(nextCustom);
       setStatus(existing, "done");
       setStatuses((prev) => {
-        const next = { ...prev, [`${editDate}:${clone.id}`]: "todo", [deadlineKey(existing)]: "done" };
+        const next: Record<string, DeadlineStatus> = {
+          ...prev,
+          [`${editDate}:${clone.id}`]: "todo",
+          [deadlineKey(existing)]: "done",
+        };
         persistStatuses(next);
         return next;
       });

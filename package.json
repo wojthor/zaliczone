@@ -2,6 +2,10 @@
   "name": "zaliczone",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "dev:clean": "rm -rf .next && next dev --webpack",

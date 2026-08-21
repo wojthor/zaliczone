@@ -10,8 +10,6 @@ import {
 } from "@/lib/google-drive/tutor-folders";
 import type { TutorDriveFilesResult } from "@/lib/google-drive/types";
 
-export type { TutorDriveFilesResult };
-
 async function requireUser() {
   const supabase = await createClient();
   const {

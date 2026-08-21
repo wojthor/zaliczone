@@ -346,7 +346,16 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
     )
     .eq("role", "TUTOR");
 
-  let rows = data;
+  let rows: Array<{
+    id: string;
+    full_name: string | null;
+    active_subjects: string[] | null;
+    phone: string | null;
+    olx_url: string | null;
+    photo_url?: string | null;
+    accepting_students: boolean | null;
+    contract_end: string | null;
+  }> | null = data;
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("photo_url") || error.code === "PGRST204") {
@@ -358,7 +367,7 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
         console.error("[getPublicTutorCards]", retry.error.message);
         return [];
       }
-      rows = retry.data;
+      rows = (retry.data ?? []).map((row) => ({ ...row, photo_url: null }));
     } else {
       console.error("[getPublicTutorCards]", error.message);
       return [];
