@@ -1,16 +1,20 @@
 import { Resend } from "resend";
 
 /** Nadawca z zweryfikowanej domeny Resend (zaliczone.edu.pl). */
-const FROM = "ZALICZONE <powiadomienia@zaliczone.edu.pl>";
+const FROM = "ZALICZONE <kontakt@zaliczone.edu.pl>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zaliczone.edu.pl";
 
-/** Kolory tożsamości ZALICZONE - te same wartości co w app/globals.css (@theme). */
+/** Kolory tożsamości ZALICZONE — te same wartości co w app/globals.css (@theme). */
 const BRAND = {
   navy: "#000c4a",
-  lime: "#d7fe51",
-  butter: "#f7e9ad",
-  luster: "#ebeffe",
-  muted: "#5a6278",
+  navyMid: "#001a6e",
+  navyDeep: "#00082f",
+  lime: "#d5ed21",
+  softLime: "#dffd6f",
+  paper: "#f6f5f0",
+  snow: "#ffffff",
+  mist: "#e8e8e6",
+  muted: "#5f5e5a",
 };
 
 function client() {
@@ -33,12 +37,24 @@ function formatMonthPl(monthKey: string): string {
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
 }
 
+function pillButton(href: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 0 0;">
+      <tr>
+        <td align="center" style="background-color:${BRAND.lime}; border-radius:9999px;">
+          <a href="${href}" style="display:inline-block; padding:14px 32px; font-weight:800; font-size:13px; letter-spacing:0.05em; text-transform:uppercase; color:${BRAND.navy}; text-decoration:none;">
+            ${label}
+          </a>
+        </td>
+      </tr>
+    </table>`;
+}
+
 /**
- * Wspólna „skórka" e-maili ZALICZONE - tabelaryczny layout (zgodność z klientami
- * pocztowymi), navy nagłówek z wordmarkiem w kursywie (bez obrazka - nie ma logo
- * w public/), reszta treści wstrzykiwana jako `bodyHtml`.
+ * Wspólna „skórka" e-maili ZALICZONE — tabelaryczny layout (zgodność z klientami
+ * pocztowymi), granatowy nagłówek jak ekran logowania, karta jak w panelu.
  */
 function emailShell(bodyHtml: string, preheader: string): string {
+  const headerGradient = `linear-gradient(165deg, ${BRAND.navy} 0%, ${BRAND.navyMid} 45%, ${BRAND.navyDeep} 100%)`;
   return `<!DOCTYPE html>
 <html lang="pl">
   <head>
@@ -46,27 +62,33 @@ function emailShell(bodyHtml: string, preheader: string): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ZALICZONE</title>
   </head>
-  <body style="margin:0; padding:0; background-color:${BRAND.luster}; font-family:Arial, Helvetica, sans-serif;">
+  <body style="margin:0; padding:0; background-color:${BRAND.paper}; font-family:Arial, Helvetica, sans-serif;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">${preheader}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${BRAND.luster}; padding:24px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${BRAND.paper}; padding:32px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#ffffff; border-radius:14px; overflow:hidden;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background-color:${BRAND.snow}; border:1px solid rgba(0,12,74,0.1); border-radius:28px; overflow:hidden;">
             <tr>
-              <td align="center" style="background-color:${BRAND.navy}; padding:28px 24px;">
-                <span style="font-style:italic; font-weight:800; font-size:26px; letter-spacing:-0.03em; color:${BRAND.lime}; text-transform:uppercase;">
+              <td align="center" style="background:${headerGradient}; padding:36px 28px 32px 28px;">
+                <span style="font-style:italic; font-weight:800; font-size:32px; letter-spacing:-0.04em; color:${BRAND.lime}; text-transform:uppercase; line-height:1;">
                   Zaliczone
                 </span>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 28px 8px 28px; color:${BRAND.navy}; font-size:15px; line-height:1.6;">
+              <td style="height:4px; background-color:${BRAND.lime}; font-size:0; line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 12px 32px; color:${BRAND.navy}; font-size:15px; line-height:1.65;">
                 ${bodyHtml}
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 28px 28px 28px; color:${BRAND.muted}; font-size:12px; line-height:1.5;">
-                Pozdrawiamy,<br />Zespół ZALICZONE
+              <td style="padding:8px 32px 32px 32px; color:${BRAND.muted}; font-size:12px; line-height:1.55; border-top:1px solid ${BRAND.mist};">
+                <p style="margin:20px 0 0 0;">Pozdrawiamy,<br /><strong style="color:${BRAND.navy};">Zespół ZALICZONE</strong></p>
+                <p style="margin:16px 0 0 0; font-size:11px; color:${BRAND.muted};">
+                  <a href="${APP_URL}" style="color:${BRAND.navy}; text-decoration:none;">zaliczone.edu.pl</a>
+                </p>
               </td>
             </tr>
           </table>
@@ -88,25 +110,28 @@ export async function sendTutorWelcomeEmail(
   const greetingName = fullName?.trim() ? fullName.trim().split(" ")[0] : null;
   const { to, subjectSuffix } = resolveRecipients(email);
   const body = `
-    <p style="margin:0 0 16px 0;">Cześć${greetingName ? `, ${greetingName}` : ""}!</p>
-    <p style="margin:0 0 16px 0;">Koordynator założył Ci konto w <strong>ZALICZONE</strong>. Kliknij przycisk poniżej, żeby ustawić hasło i wejść do panelu.</p>
-    <table role="presentation" cellpadding="0" cellspacing="0">
-      <tr>
-        <td align="center" style="background-color:${BRAND.lime}; border-radius:8px;">
-          <a href="${inviteUrl}" style="display:inline-block; padding:12px 28px; font-weight:bold; font-size:14px; color:${BRAND.navy}; text-decoration:none;">
-            Ustaw hasło
-          </a>
-        </td>
-      </tr>
-    </table>
-    <p style="margin:20px 0 0 0; font-size:12px; color:${BRAND.muted};">Link jest jednorazowy. Jeśli nie działa, poproś koordynatora o nowe zaproszenie.</p>
+    <p style="margin:0 0 8px 0; font-size:11px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:${BRAND.muted};">
+      Panel korepetytora
+    </p>
+    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; letter-spacing:-0.02em; line-height:1.25; color:${BRAND.navy};">
+      Cześć${greetingName ? `, ${greetingName}` : ""}!
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Masz dostęp do panelu <strong>ZALICZONE</strong>. Ustaw hasło poniżej — potem od razu wejdziesz do konta.
+    </p>
+    ${pillButton(inviteUrl, "Ustaw hasło")}
+    <p style="margin:24px 0 0 0; padding:16px 18px; background-color:${BRAND.paper}; border:1px solid rgba(0,12,74,0.08); border-radius:16px; font-size:12px; color:${BRAND.muted}; line-height:1.55;">
+      Link działa jednorazowo. Gdy wygasa, napisz na
+      <a href="mailto:kontakt@zaliczone.edu.pl" style="color:${BRAND.navy}; font-weight:700; text-decoration:none;">kontakt@zaliczone.edu.pl</a>
+      — wyślemy nowy.
+    </p>
   `;
 
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `Zaproszenie do ZALICZONE${subjectSuffix}`,
-    html: emailShell(body, "Ustaw hasło i wejdź do panelu korepetytora."),
+    subject: `Ustaw hasło do panelu ZALICZONE${subjectSuffix}`,
+    html: emailShell(body, "Ustaw hasło i wejdź do panelu ZALICZONE."),
   });
 }
 
