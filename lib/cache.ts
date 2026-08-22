@@ -50,6 +50,7 @@ export const TAG = {
   notifications: "notifications",
   documents: "documents",
   dashboardStats: "dashboard-stats",
+  publicTutors: "public-tutors",
 } as const;
 
 /** Lekcja zmienia godziny VERIFIED / listę zajęć — bonus liczy się z tych samych godzin. */

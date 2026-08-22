@@ -48,6 +48,25 @@ function storagePathFromPublicUrl(url: string): string | null {
   return decodeURIComponent(url.slice(idx + marker.length).split("?")[0] ?? "");
 }
 
+function bustTutorPhotoCaches(tutorId: string) {
+  bustTag(TAG.dashboardStats);
+  bustTag(TAG.publicTutors);
+  revalidatePath("/admin/nauczyciele");
+  revalidatePath(`/admin/nauczyciele/${tutorId}`);
+  revalidatePath("/");
+}
+
+function tutorPhotoMime(file: File): string | null {
+  if ((TUTOR_PHOTO.mimeTypes as readonly string[]).includes(file.type)) {
+    return file.type;
+  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  return null;
+}
+
 /** Upload / podmiana zdjęcia nauczyciela (landing, proporcje 3:4). */
 export async function uploadTutorPhoto(
   tutorId: string,
@@ -59,7 +78,8 @@ export async function uploadTutorPhoto(
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("Wybierz plik zdjęcia.");
   }
-  if (!(TUTOR_PHOTO.mimeTypes as readonly string[]).includes(file.type)) {
+  const mime = tutorPhotoMime(file);
+  if (!mime) {
     throw new Error("Dozwolone formaty: JPG, PNG, WebP.");
   }
   if (file.size > TUTOR_PHOTO.maxBytes) {
@@ -73,14 +93,13 @@ export async function uploadTutorPhoto(
     .eq("id", tutorId)
     .maybeSingle();
 
-  const ext =
-    file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
   const path = `${tutorId}/${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: upErr } = await supabase.storage
     .from(TUTOR_PHOTO.bucket)
-    .upload(path, buffer, { contentType: file.type, upsert: true });
+    .upload(path, buffer, { contentType: mime, upsert: true });
   if (upErr) {
     throw new Error(
       upErr.message.includes("Bucket") || upErr.message.includes("not found")
@@ -104,9 +123,7 @@ export async function uploadTutorPhoto(
     await supabase.storage.from(TUTOR_PHOTO.bucket).remove([oldPath]);
   }
 
-  revalidatePath("/admin/nauczyciele");
-  revalidatePath(`/admin/nauczyciele/${tutorId}`);
-  revalidatePath("/");
+  bustTutorPhotoCaches(tutorId);
   return { photoUrl: publicUrl };
 }
 
@@ -130,9 +147,7 @@ export async function clearTutorPhoto(tutorId: string): Promise<void> {
     .eq("id", tutorId);
   if (error) throw error;
 
-  revalidatePath("/admin/nauczyciele");
-  revalidatePath(`/admin/nauczyciele/${tutorId}`);
-  revalidatePath("/");
+  bustTutorPhotoCaches(tutorId);
 }
 
 export async function createTutorAccount(input: {

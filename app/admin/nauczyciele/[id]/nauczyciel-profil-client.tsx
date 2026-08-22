@@ -36,6 +36,14 @@ function minutesFromLabel(label: string): number {
   return match ? Number(match[1]) : 60;
 }
 
+function formatPhotoUploadError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : "Nie udało się zapisać zdjęcia.";
+  if (msg.includes("Body exceeded") || msg.includes("413")) {
+    return "Plik jest za duży. Użyj JPG, PNG lub WebP do 5 MB (najlepiej ok. 900×1200 px).";
+  }
+  return msg;
+}
+
 export function NauczycielProfilClient({
   tutor,
   students,
@@ -146,7 +154,8 @@ export function NauczycielProfilClient({
         setFeedback("Zdjęcie zapisane.");
         router.refresh();
       } catch (e) {
-        setFeedback(e instanceof Error ? e.message : "Nie udało się zapisać zdjęcia.");
+        setFeedback(formatPhotoUploadError(e));
+        setPhotoFile(null);
       } finally {
         setPhotoBusy(false);
       }
@@ -198,7 +207,10 @@ export function NauczycielProfilClient({
               file={photoFile}
               onFileChange={(f) => {
                 setPhotoFile(f);
-                if (f) savePhoto(f);
+                if (f) {
+                  setFeedback("");
+                  savePhoto(f);
+                }
               }}
               onClearSaved={tutor.photoUrl ? removePhoto : undefined}
               clearing={photoBusy}
