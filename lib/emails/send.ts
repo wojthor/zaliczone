@@ -123,7 +123,7 @@ export async function sendTutorWelcomeEmail(
     <p style="margin:24px 0 0 0; padding:16px 18px; background-color:${BRAND.paper}; border:1px solid rgba(0,12,74,0.08); border-radius:16px; font-size:12px; color:${BRAND.muted}; line-height:1.55;">
       Link działa jednorazowo. Gdy wygasa, napisz na
       <a href="mailto:kontakt@zaliczone.edu.pl" style="color:${BRAND.navy}; font-weight:700; text-decoration:none;">kontakt@zaliczone.edu.pl</a>
-      — wyślemy nowy.
+      - wyślemy nowy.
     </p>
   `;
 
