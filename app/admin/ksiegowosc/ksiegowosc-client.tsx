@@ -6,6 +6,7 @@ import { closeMonth, createOperatingExpense, deleteOperatingExpense, switchToJDG
 import { getSignedDownloadUrl } from "@/lib/actions/documents";
 import { IconLock } from "@/components/icons";
 import { canCloseMonth } from "@/lib/dates";
+import { sumTutorPayoutWithBonusFromCennik } from "@/lib/data/mappers";
 import {
   NDG_QUARTERLY_LIMIT,
   PIT_TAX_FREE_AMOUNT,
@@ -27,6 +28,7 @@ import {
   znajdzDatePrzekroczeniaLimitu,
 } from "@/lib/podatki";
 import type { BusinessSettings, FinanceLineUi, LegalMode, OperatingExpense, Payout } from "@/lib/types/database";
+import type { PriceTier } from "@/lib/types/messages";
 import { FinanceTile, FinanceTilesRow } from "@/components/admin/finance-tile";
 import { QuarterlyLimitBar, VatLimitBar } from "@/components/admin/ksiegowosc/limit-bars";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -68,18 +70,36 @@ function monthKeysInclusive(fromKey: string, toKey: string): string[] {
   return out;
 }
 
+function payrollCostsForMonth(
+  monthKey: string,
+  financeLines: FinanceLineUi[],
+  payouts: Payout[],
+  closedMonths: string[],
+  tiers: { label: string; worker_rate_pln: number }[],
+): number {
+  const lines = financeLines.filter((l) => l.monthKey === monthKey);
+  const paid = Math.round(
+    payouts
+      .filter((p) => p.month === monthKey && p.status === "PAID")
+      .reduce((s, p) => s + Number(p.amount), 0) * 100,
+  ) / 100;
+  const accrued = sumTutorPayoutWithBonusFromCennik(lines, tiers);
+  const closed = closedMonths.includes(monthKey);
+  return closed && paid > 0 ? paid : accrued;
+}
+
 function taxableIncomeForMonth(
   monthKey: string,
   financeLines: FinanceLineUi[],
   payouts: Payout[],
   expenses: OperatingExpense[],
+  closedMonths: string[],
+  tiers: { label: string; worker_rate_pln: number }[],
 ): number {
   const gross = financeLines
     .filter((l) => l.monthKey === monthKey)
     .reduce((s, l) => s + l.amountPln, 0);
-  const payroll = payouts
-    .filter((p) => p.month === monthKey && p.status === "PAID")
-    .reduce((s, p) => s + Number(p.amount), 0);
+  const payroll = payrollCostsForMonth(monthKey, financeLines, payouts, closedMonths, tiers);
   const operating = expenses
     .filter((e) => e.month === monthKey)
     .reduce((s, e) => s + Number(e.amount_pln), 0);
@@ -193,6 +213,7 @@ export function KsiegowoscClient({
   initialMonthKey,
   monthSummary,
   businessSettings,
+  priceTiers,
 }: {
   financeLines: FinanceLineUi[];
   payouts: Payout[];
@@ -201,6 +222,7 @@ export function KsiegowoscClient({
   initialMonthKey: string;
   monthSummary: MonthSummary;
   businessSettings: BusinessSettings;
+  priceTiers: PriceTier[];
 }) {
   const router = useRouter();
   const [pendingExpense, startExpense] = useTransition();
@@ -376,7 +398,30 @@ export function KsiegowoscClient({
 
   const totals = useMemo(() => {
     const gross = periodLines.reduce((s, l) => s + l.amountPln, 0);
-    const payoutCosts = paidPayoutsSum;
+    const payoutCosts =
+      viewMode === "month"
+        ? payrollCostsForMonth(
+            selectedMonthKey,
+            financeLines,
+            payouts,
+            effectiveClosedMonths,
+            priceTiers,
+          )
+        : (() => {
+            const keys = new Set<string>();
+            for (const line of periodLines) keys.add(line.monthKey);
+            for (const payout of payouts) {
+              if (payout.month.startsWith(`${selectedYear}-`)) keys.add(payout.month);
+            }
+            return Math.round(
+              [...keys].reduce(
+                (sum, mk) =>
+                  sum +
+                  payrollCostsForMonth(mk, financeLines, payouts, effectiveClosedMonths, priceTiers),
+                0,
+              ) * 100,
+            ) / 100;
+          })();
     const allCosts = Math.round((payoutCosts + extraCostsSum) * 100) / 100;
     const agencyShare = Math.round((gross - allCosts) * 100) / 100;
     return {
@@ -386,7 +431,17 @@ export function KsiegowoscClient({
       agencyShare,
       lessonCount: periodLines.length,
     };
-  }, [periodLines, paidPayoutsSum, extraCostsSum]);
+  }, [
+    periodLines,
+    extraCostsSum,
+    viewMode,
+    selectedMonthKey,
+    selectedYear,
+    financeLines,
+    payouts,
+    effectiveClosedMonths,
+    priceTiers,
+  ]);
 
   const monthBreakdown = useMemo((): MonthBreakdown[] => {
     if (viewMode !== "year") return [];
@@ -415,13 +470,20 @@ export function KsiegowoscClient({
               .filter((p) => p.month === monthKey && p.status === "PAID")
               .reduce((s, p) => s + Number(p.amount), 0) * 100,
           ) / 100;
+        const payrollCosts = payrollCostsForMonth(
+          monthKey,
+          financeLines,
+          payouts,
+          effectiveClosedMonths,
+          priceTiers,
+        );
         const extraCosts =
           Math.round(
             localExpenses
               .filter((e) => e.month === monthKey)
               .reduce((s, e) => s + Number(e.amount_pln), 0) * 100,
           ) / 100;
-        const allCosts = Math.round((paidPayouts + extraCosts) * 100) / 100;
+        const allCosts = Math.round((payrollCosts + extraCosts) * 100) / 100;
         const agencyShare = Math.round((gross - allCosts) * 100) / 100;
         return {
           monthKey,
@@ -435,7 +497,7 @@ export function KsiegowoscClient({
         };
       })
       .filter((row) => row.lessonCount > 0 || row.paidPayouts > 0 || row.closed || row.tutorShare > 0);
-  }, [viewMode, selectedYear, financeLines, payouts, localExpenses, effectiveClosedMonths]);
+  }, [viewMode, selectedYear, financeLines, payouts, localExpenses, effectiveClosedMonths, priceTiers]);
 
   const monthSummaryRows = useMemo((): MonthBreakdown[] => {
     if (viewMode !== "month") return [];
@@ -448,13 +510,20 @@ export function KsiegowoscClient({
           .filter((p) => p.month === selectedMonthKey && p.status === "PAID")
           .reduce((s, p) => s + Number(p.amount), 0) * 100,
       ) / 100;
+    const payrollCosts = payrollCostsForMonth(
+      selectedMonthKey,
+      financeLines,
+      payouts,
+      effectiveClosedMonths,
+      priceTiers,
+    );
     const extraCosts =
       Math.round(
         localExpenses
           .filter((e) => e.month === selectedMonthKey)
           .reduce((s, e) => s + Number(e.amount_pln), 0) * 100,
       ) / 100;
-    const allCosts = Math.round((paidPayouts + extraCosts) * 100) / 100;
+    const allCosts = Math.round((payrollCosts + extraCosts) * 100) / 100;
     const agencyShare = Math.round((gross - allCosts) * 100) / 100;
     return [
       {
@@ -468,7 +537,7 @@ export function KsiegowoscClient({
         closed: effectiveClosedMonths.includes(selectedMonthKey),
       },
     ];
-  }, [viewMode, selectedMonthKey, financeLines, payouts, localExpenses, effectiveClosedMonths]);
+  }, [viewMode, selectedMonthKey, financeLines, payouts, localExpenses, effectiveClosedMonths, priceTiers]);
 
   const periodSummaryRows = viewMode === "year" ? monthBreakdown : monthSummaryRows;
 
@@ -507,7 +576,7 @@ export function KsiegowoscClient({
         : selectedMonthKey;
     const toKey = yearEnd < fromKey ? fromKey : yearEnd;
     return monthKeysInclusive(fromKey, toKey).map((mk) =>
-      taxableIncomeForMonth(mk, financeLines, payouts, localExpenses),
+      taxableIncomeForMonth(mk, financeLines, payouts, localExpenses, effectiveClosedMonths, priceTiers),
     );
   }, [
     legalMode,
@@ -519,6 +588,8 @@ export function KsiegowoscClient({
     financeLines,
     payouts,
     localExpenses,
+    effectiveClosedMonths,
+    priceTiers,
   ]);
 
   const suggestedPit = useMemo(() => {
@@ -563,7 +634,7 @@ export function KsiegowoscClient({
   const netProfit = useMemo(() => {
     const raw =
       totals.gross -
-      paidPayoutsSum -
+      totals.tutorShare -
       summaryPit -
       summaryZusWlasciciel -
       summaryZusPracownicy -
@@ -572,7 +643,7 @@ export function KsiegowoscClient({
     return Math.round(raw * 100) / 100;
   }, [
     totals.gross,
-    paidPayoutsSum,
+    totals.tutorShare,
     summaryPit,
     summaryZusWlasciciel,
     summaryZusPracownicy,
@@ -633,10 +704,11 @@ export function KsiegowoscClient({
     const year = selectedMonthKey.slice(0, 4);
     const toKey = viewMode === "month" ? selectedMonthKey : `${selectedYear}-12`;
     return monthKeysInclusive(`${year}-01`, toKey).reduce(
-      (s, mk) => s + taxableIncomeForMonth(mk, financeLines, payouts, localExpenses),
+      (s, mk) =>
+        s + taxableIncomeForMonth(mk, financeLines, payouts, localExpenses, effectiveClosedMonths, priceTiers),
       0,
     );
-  }, [selectedMonthKey, selectedYear, viewMode, financeLines, payouts, localExpenses]);
+  }, [selectedMonthKey, selectedYear, viewMode, financeLines, payouts, localExpenses, effectiveClosedMonths, priceTiers]);
 
   const pitFreePct = Math.min(
     100,

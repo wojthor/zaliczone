@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { createTutorAccount, uploadTutorPhoto } from "@/lib/actions/admin";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
-import { SubjectMultiSelect } from "@/components/admin/subject-multi-select";
+import { SubjectLevelMultiSelect } from "@/components/admin/subject-level-multi-select";
 import { TutorPhotoField } from "@/components/admin/tutor-photo-field";
 import { EMPLOYMENT_TYPES } from "@/lib/types/pit";
 import type { AdminTutorSummary } from "@/lib/types/database";
@@ -158,7 +158,13 @@ function TutorCard({ t, compact = false }: { t: AdminTutorSummary; compact?: boo
   );
 }
 
-export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutorSummary[] }) {
+export function NauczycieleClient({
+  initialTutors,
+  priceLevels,
+}: {
+  initialTutors: AdminTutorSummary[];
+  priceLevels: string[];
+}) {
   const router = useRouter();
   const tutors = initialTutors;
   const [modalOpen, setModalOpen] = useState(false);
@@ -435,9 +441,12 @@ export function NauczycieleClient({ initialTutors }: { initialTutors: AdminTutor
                       </label>
                     </div>
                     <div className="grid gap-1.5">
-                      <span className="dash-sans text-xs font-semibold text-depths/80">Przedmioty</span>
-                      <SubjectMultiSelect
+                      <span className="dash-sans text-xs font-semibold text-depths/80">
+                        Przedmioty i poziomy
+                      </span>
+                      <SubjectLevelMultiSelect
                         selected={form.subjects}
+                        levels={priceLevels}
                         onChange={(subjects) => setForm((f) => ({ ...f, subjects }))}
                       />
                     </div>

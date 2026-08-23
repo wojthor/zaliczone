@@ -8,6 +8,7 @@ import { setAcceptingStudents } from "@/lib/actions/profile";
 import { insertSubjectRequest } from "@/lib/actions/students";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { SUBJECTS } from "@/lib/subjects";
+import { formatTutorOffering } from "@/lib/tutor-offerings";
 import type { TutorDriveFilesResult } from "@/lib/google-drive/types";
 import type { Profile, SubjectRequest } from "@/lib/types/database";
 
@@ -16,17 +17,20 @@ export function ProfilClient({
   email,
   subjectRequests,
   driveDocuments,
+  priceLevels,
 }: {
   profile: Profile;
   email: string;
   subjectRequests: SubjectRequest[];
   driveDocuments: TutorDriveFilesResult;
+  priceLevels: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [subjectBusy, setSubjectBusy] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState("");
   const [acceptingStudents, setAcceptingStudentsLocal] = useState(
     profile.accepting_students !== false,
   );
@@ -44,25 +48,27 @@ export function ProfilClient({
     () => subjectRequests.filter((r) => r.status === "REJECTED"),
     [subjectRequests],
   );
-  const pendingSubjects = useMemo(() => pendingRequests.map((r) => r.subject), [pendingRequests]);
+  const pendingKeys = useMemo(() => pendingRequests.map((r) => r.subject), [pendingRequests]);
 
-  const availableSuggestions = useMemo(
-    () =>
-      SUBJECTS.filter(
-        (subject) => !activeSubjects.includes(subject) && !pendingSubjects.includes(subject),
-      ),
-    [activeSubjects, pendingSubjects],
-  );
+  const canSubmit =
+    Boolean(selectedSubject && selectedLevel) &&
+    !activeSubjects.includes(formatTutorOffering(selectedSubject, selectedLevel)) &&
+    !pendingKeys.includes(formatTutorOffering(selectedSubject, selectedLevel));
 
   function submitSubject() {
-    if (!selectedSubject) return;
+    if (!canSubmit) return;
     const subject = selectedSubject;
+    const level = selectedLevel;
     startTransition(async () => {
       setSubjectBusy(true);
       try {
-        await insertSubjectRequest(subject);
-        toast.success("Wysłano wniosek", `${subject} czeka na akceptację koordynatora.`);
+        await insertSubjectRequest(subject, level);
+        toast.success(
+          "Wysłano wniosek",
+          `${formatTutorOffering(subject, level)} czeka na akceptację koordynatora.`,
+        );
         setSelectedSubject("");
+        setSelectedLevel("");
         router.refresh();
       } catch (e) {
         toast.error(
@@ -187,9 +193,9 @@ export function ProfilClient({
         </section>
 
         <section className="soft-panel p-4 sm:p-5">
-          <h2 className="section-label">Przedmioty</h2>
+          <h2 className="section-label">Przedmioty i poziomy</h2>
           <div className="mt-4">
-            <p className="section-label !text-muted">Aktywne</p>
+            <p className="section-label !text-muted">Aktywne uprawnienia</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {activeSubjects.length > 0 ? (
                 activeSubjects.map((subject) => (
@@ -201,31 +207,56 @@ export function ProfilClient({
                   </span>
                 ))
               ) : (
-                <p className="text-muted text-sm">Brak aktywnych przedmiotów.</p>
+                <p className="text-muted text-sm">
+                  Brak uprawnień. Poproś koordynatora albo zgłoś przedmiot z poziomem poniżej.
+                </p>
               )}
             </div>
           </div>
 
           <div className="mt-5 grid gap-2">
-            <label className="grid gap-1">
-              <span className="section-label !text-muted">Zgłoś nowy przedmiot</span>
-              <select
-                className="text-depths w-full rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-              >
-                <option value="">Wybierz</option>
-                {availableSuggestions.map((subject) => (
-                  <option key={subject} value={subject}>
-                    {subject}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="section-label !text-muted">Zgłoś przedmiot + poziom</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="grid gap-1">
+                <span className="text-muted text-[0.65rem] font-bold uppercase tracking-wide">
+                  Przedmiot
+                </span>
+                <select
+                  className="text-depths w-full rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                >
+                  <option value="">Wybierz</option>
+                  {SUBJECTS.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1">
+                <span className="text-muted text-[0.65rem] font-bold uppercase tracking-wide">
+                  Poziom
+                </span>
+                <select
+                  className="text-depths w-full rounded-full border border-panel-frame/50 bg-snow px-4 py-2 text-sm font-medium"
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value)}
+                  disabled={priceLevels.length === 0}
+                >
+                  <option value="">Wybierz</option>
+                  {priceLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <button
               type="button"
               onClick={submitSubject}
-              disabled={!selectedSubject || pending}
+              disabled={!canSubmit || pending}
               className="inline-flex w-fit items-center gap-2 rounded-full bg-[#000C4A] px-4 py-2 text-sm font-semibold text-lime disabled:opacity-50"
             >
               {subjectBusy ? <Spinner className="h-3.5 w-3.5" /> : null}

@@ -10,6 +10,7 @@ import { LessonStatusBadge } from "@/components/lesson/lesson-status-badge";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 import type { AppAlert, StudentUi } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
+import { levelsAllowedForSubjects, subjectsFromOfferings } from "@/lib/tutor-offerings";
 
 function formatLessonDatePl(dateIso: string | undefined): string {
   if (!dateIso) return "Bez daty";
@@ -74,6 +75,7 @@ export function UczniowieClient({
   const router = useRouter();
   const toast = useToast();
   const cennik = useMemo(() => tiersToCennik(priceTiers), [priceTiers]);
+  const subjectOptions = useMemo(() => subjectsFromOfferings(activeSubjects), [activeSubjects]);
   const [items, setItems] = useState<StudentUi[]>(initialStudents);
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [subjectFilter, setSubjectFilter] = useState("");
@@ -101,10 +103,18 @@ export function UczniowieClient({
     ? (lessonsByStudent.get(lessonsModalStudent.id) ?? [])
     : [];
 
-  const draftRate = useMemo(
-    () => cennik.find((row) => row.label === draft.classLabel)?.forClientPln ?? null,
-    [cennik, draft.classLabel],
-  );
+  const allowedLevels = useMemo(() => {
+    const allowed = new Set(
+      levelsAllowedForSubjects(activeSubjects, draft.selectedSubjects ?? []),
+    );
+    return cennik.map((row) => row.label).filter((label) => allowed.has(label));
+  }, [activeSubjects, cennik, draft.selectedSubjects]);
+
+  useEffect(() => {
+    if (draft.classLabel && !allowedLevels.includes(draft.classLabel)) {
+      setDraft((prev) => ({ ...prev, classLabel: "" }));
+    }
+  }, [allowedLevels, draft.classLabel]);
 
   const filtered = useMemo(() => {
     let result = [...items];
@@ -169,11 +179,13 @@ export function UczniowieClient({
     if (!draft.name.trim() || !draft.classLabel || draft.selectedSubjects.length === 0 || saving) return;
     setSaving(true);
     try {
+      const ratePln =
+        cennik.find((row) => row.label === draft.classLabel)?.forClientPln ?? 0;
       const payload = {
         name: draft.name.trim(),
         subjects: draft.selectedSubjects,
         classLevel: draft.classLabel,
-        ratePln: draftRate ?? 0,
+        ratePln,
         schoolClass: draft.schoolClass,
         phone: draft.phone,
         email: draft.email,
@@ -289,7 +301,7 @@ export function UczniowieClient({
               onChange={(e) => setSubjectFilter(e.target.value)}
             >
               <option value="">Wszystkie</option>
-              {activeSubjects.map((subject) => (
+              {subjectOptions.map((subject) => (
                 <option key={subject} value={subject}>
                   {subject}
                 </option>
@@ -349,12 +361,6 @@ export function UczniowieClient({
               </p>
 
               <dl className="grid flex-1 content-evenly gap-1 text-xs">
-                <div className="flex items-baseline justify-between gap-2">
-                  <dt className="text-muted shrink-0">Stawka</dt>
-                  <dd className="text-right font-extrabold tabular-nums text-depths">
-                    {student.ratePerHourPln} zł / h
-                  </dd>
-                </div>
                 <div className="flex items-baseline justify-between gap-2">
                   <dt className="text-muted shrink-0">Lekcja</dt>
                   <dd className="min-w-0 text-right font-semibold leading-snug text-depths">
@@ -447,13 +453,13 @@ export function UczniowieClient({
 
               <div className="grid gap-1">
                 <span className="text-depths/80 text-xs font-semibold">Przedmioty</span>
-                {activeSubjects.length === 0 ? (
+                {subjectOptions.length === 0 ? (
                   <p className="text-muted rounded-app bg-luster/60 px-3 py-2 text-sm">
                     Brak aktywnych przedmiotów - poproś o dodanie w Profilu
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {activeSubjects.map((subject) => {
+                    {subjectOptions.map((subject) => {
                       const active = (draft.selectedSubjects ?? []).includes(subject);
                       return (
                         <button
@@ -472,29 +478,28 @@ export function UczniowieClient({
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-depths/80 text-xs font-semibold">Poziom</span>
-                  <select
-                    className="text-depths rounded-app bg-luster px-3 py-2 text-sm"
-                    value={draft.classLabel}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, classLabel: e.target.value }))}
-                  >
-                    <option value="">Wybierz</option>
-                    {cennik.map((row) => (
-                      <option key={row.label} value={row.label}>
-                        {row.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-depths/80 text-xs font-semibold">Stawka (zł / h)</span>
-                  <div className="rounded-app bg-luster px-3 py-2 text-sm font-semibold text-depths">
-                    {draftRate ? `${draftRate} zł / h` : "Wybierz poziom"}
-                  </div>
-                </label>
-              </div>
+              <label className="grid gap-1">
+                <span className="text-depths/80 text-xs font-semibold">Poziom</span>
+                <select
+                  className="text-depths rounded-app bg-luster px-3 py-2 text-sm"
+                  value={draft.classLabel}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, classLabel: e.target.value }))}
+                  disabled={(draft.selectedSubjects ?? []).length === 0}
+                >
+                  <option value="">
+                    {(draft.selectedSubjects ?? []).length === 0
+                      ? "Najpierw wybierz przedmiot"
+                      : allowedLevels.length === 0
+                        ? "Brak uprawnień do poziomu"
+                        : "Wybierz"}
+                  </option>
+                  {allowedLevels.map((label) => (
+                    <option key={label} value={label}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
@@ -557,7 +562,7 @@ export function UczniowieClient({
                 type="button"
                 className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
                 onClick={saveStudent}
-                disabled={saving || activeSubjects.length === 0}
+                disabled={saving || subjectOptions.length === 0}
               >
                 {saving ? <Spinner /> : null}
                 {saving ? "Zapisywanie…" : editId ? "Zapisz" : "Dodaj"}

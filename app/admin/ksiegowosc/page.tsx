@@ -1,21 +1,22 @@
 import { KsiegowoscClient } from "./ksiegowosc-client";
 import { ADMIN_PIT_RATE } from "@/lib/dates";
+import { sumTutorPayoutWithBonusFromCennik } from "@/lib/data/mappers";
 import {
   getAllLessonLines,
   getAllOperatingExpenses,
   getAllPayouts,
   getBusinessSettings,
   getClosedMonths,
+  getPriceTiers,
 } from "@/lib/data/queries";
 
-function previousMonthKey(d = new Date()): string {
-  const prev = new Date(d.getFullYear(), d.getMonth() - 1, 15);
-  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+function currentMonthKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function resolveMonthKey(raw: string | undefined): string {
   if (raw && /^\d{4}-\d{2}$/.test(raw)) return raw;
-  return previousMonthKey();
+  return currentMonthKey();
 }
 
 export default async function KsiegowoscPage({
@@ -28,12 +29,13 @@ export default async function KsiegowoscPage({
 
   // Wszystkie lekcje (każdy status) - potrzebne do walidacji Warunku 1 kreatora zamknięcia,
   // nie tylko VERIFIED jak wcześniej. Payouts/koszty/zamknięcia/ustawienia pobierane równolegle.
-  const [allLessons, payouts, closedMonths, operatingExpenses, businessSettings] = await Promise.all([
+  const [allLessons, payouts, closedMonths, operatingExpenses, businessSettings, priceTiers] = await Promise.all([
     getAllLessonLines(),
     getAllPayouts(),
     getClosedMonths(),
     getAllOperatingExpenses(),
     getBusinessSettings(),
+    getPriceTiers(),
   ]);
 
   const financeLines = allLessons.filter((l) => l.status === "VERIFIED");
@@ -45,10 +47,13 @@ export default async function KsiegowoscPage({
   const monthExpenses = operatingExpenses.filter((e) => e.month === monthKey);
 
   const grossRevenuePln = Math.round(monthVerifiedLines.reduce((s, l) => s + l.amountPln, 0) * 100) / 100;
-  const payrollCostsPln =
+  const accruedPayrollPln = sumTutorPayoutWithBonusFromCennik(monthVerifiedLines, priceTiers);
+  const paidPayrollPln =
     Math.round(
       monthPayouts.filter((p) => p.status === "PAID").reduce((s, p) => s + Number(p.amount), 0) * 100,
     ) / 100;
+  const monthClosed = closedMonths.includes(monthKey);
+  const payrollCostsPln = monthClosed && paidPayrollPln > 0 ? paidPayrollPln : accruedPayrollPln;
   const operatingCostsPln =
     Math.round(monthExpenses.reduce((s, e) => s + Number(e.amount_pln), 0) * 100) / 100;
   const taxableIncomePln = Math.max(0, Math.round((grossRevenuePln - (payrollCostsPln + operatingCostsPln)) * 100) / 100);
@@ -67,6 +72,7 @@ export default async function KsiegowoscPage({
       operatingExpenses={operatingExpenses}
       initialMonthKey={monthKey}
       businessSettings={businessSettings}
+      priceTiers={priceTiers}
       monthSummary={{
         grossRevenuePln,
         payrollCostsPln,

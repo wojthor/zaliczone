@@ -37,6 +37,7 @@ import type {
   AppAlert,
   AppNotification,
 } from "@/lib/types/database";
+import { parseTutorOfferings, subjectsFromOfferings } from "@/lib/tutor-offerings";
 import type { CompanySalesMonth, PriceTier } from "@/lib/types/messages";
 import type {
   TutorPitYearSummary,
@@ -232,14 +233,13 @@ export async function getAllTutorProfiles(): Promise<Profile[]> {
 
 async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]> {
   const supabase = createServiceClient();
-  const [tutorsRes, financeLines, pendingLines, emailMap, studentCounts, allSubjects, payouts] =
+  const [tutorsRes, financeLines, pendingLines, emailMap, studentCounts, payouts] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("role", "TUTOR").order("full_name"),
       getAllVerifiedFinanceLines(),
       getPendingAndUnpaidLines(),
       getTutorEmailMap(),
       supabase.from("students").select("tutor_id"),
-      supabase.from("students").select("tutor_id, subjects"),
       supabase.from("payouts").select("*").eq("month", mk),
     ]);
 
@@ -249,13 +249,6 @@ async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]
   const studentsByTutor = new Map<string, number>();
   for (const row of studentCounts.data ?? []) {
     studentsByTutor.set(row.tutor_id, (studentsByTutor.get(row.tutor_id) ?? 0) + 1);
-  }
-
-  const subjectsByTutor = new Map<string, Set<string>>();
-  for (const row of allSubjects.data ?? []) {
-    const set = subjectsByTutor.get(row.tutor_id) ?? new Set<string>();
-    for (const subject of row.subjects ?? []) set.add(subject);
-    subjectsByTutor.set(row.tutor_id, set);
   }
 
   const payoutByTutor = new Map<string, Payout>();
@@ -277,11 +270,6 @@ async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]
     }, 0);
     const hoursDoneMonth = Math.round((minutesThisMonth / 60) * 10) / 10;
 
-    const subjectSet = new Set<string>([
-      ...(subjectsByTutor.get(tutor.id) ?? []),
-      ...(tutor.active_subjects ?? []),
-    ]);
-
     return {
       id: tutor.id,
       name: tutor.full_name ?? "Nieznany",
@@ -296,7 +284,7 @@ async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]
       hoursDoneMonth,
       pendingPln,
       paidPln,
-      subjects: [...subjectSet],
+      subjects: tutor.active_subjects ?? [],
       payoutStatusForMonth: payout?.status ?? null,
       acceptingStudents: tutor.accepting_students !== false,
       pesel: tutor.pesel ?? null,
@@ -329,7 +317,10 @@ export async function getAdminTutorSummaries(monthKey?: string): Promise<AdminTu
 export type PublicTutorCard = {
   id: string;
   name: string;
+  /** Same przedmioty (bez poziomów) — do wyświetlania i filtra. */
   subjects: string[];
+  /** Poziomy z cennika, do których ma uprawnienie. */
+  levels: string[];
   phone: string | null;
   email: string | null;
   olxUrl: string | null;
@@ -390,10 +381,19 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
           .slice(0, 2)
           .map((p) => p[0]?.toUpperCase() ?? "")
           .join("") || "?";
+      const offerings = row.active_subjects as string[] | null;
+      const levels = [
+        ...new Set(
+          parseTutorOfferings(offerings)
+            .map((o) => o.level)
+            .filter(Boolean),
+        ),
+      ];
       return {
         id: row.id as string,
         name,
-        subjects: (row.active_subjects as string[] | null) ?? [],
+        subjects: subjectsFromOfferings(offerings),
+        levels,
         phone: (row.phone as string | null) ?? null,
         email: emailMap.get(row.id as string) ?? null,
         olxUrl: (row.olx_url as string | null) ?? null,

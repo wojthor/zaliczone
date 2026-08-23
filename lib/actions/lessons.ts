@@ -6,6 +6,7 @@ import { isLessonLocked } from "@/lib/data/mappers";
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { lessonTimesOverlap, normalizeLessonTime } from "@/lib/lessons/time-overlap";
 import { bustLessonAndBonus, revalidateLessonPages } from "@/lib/cache";
+import { subjectsFromOfferings } from "@/lib/tutor-offerings";
 import type { LessonStatus } from "@/lib/types/database";
 
 function revalidateLessonViews(teacherId: string, month?: string | null) {
@@ -31,7 +32,7 @@ async function assertTutorMayTeachSubject(tutorId: string, subject: string) {
     .eq("id", tutorId)
     .maybeSingle();
   if (error) throw error;
-  const allowed = data?.active_subjects ?? [];
+  const allowed = subjectsFromOfferings(data?.active_subjects ?? []);
   if (!subject.trim() || !allowed.includes(subject)) {
     throw new Error("Możesz ustawić tylko przedmiot, do którego masz uprawnienia.");
   }

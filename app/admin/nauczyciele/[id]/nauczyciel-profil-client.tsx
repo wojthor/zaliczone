@@ -11,7 +11,7 @@ import {
 } from "@/lib/actions/admin";
 import { unblockStudent } from "@/lib/actions/alerts";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
-import { SubjectMultiSelect } from "@/components/admin/subject-multi-select";
+import { SubjectLevelMultiSelect } from "@/components/admin/subject-level-multi-select";
 import { TutorPhotoField } from "@/components/admin/tutor-photo-field";
 import { TutorPitPanel } from "@/components/admin/tutor-pit-panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -51,6 +51,7 @@ export function NauczycielProfilClient({
   unpaid,
   verified,
   pitYearSummary,
+  priceLevels,
 }: {
   tutor: AdminTutorSummary;
   students: AdminStudentRow[];
@@ -58,6 +59,7 @@ export function NauczycielProfilClient({
   unpaid: FinanceLineUi[];
   verified: FinanceLineUi[];
   pitYearSummary: TutorPitYearSummary;
+  priceLevels: string[];
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
@@ -379,9 +381,12 @@ export function NauczycielProfilClient({
               />
             </label>
             <div className="grid gap-1.5 sm:col-span-2">
-              <span className="dash-sans text-xs font-semibold text-depths/80">Przedmioty</span>
-              <SubjectMultiSelect
+              <span className="dash-sans text-xs font-semibold text-depths/80">
+                Przedmioty i poziomy
+              </span>
+              <SubjectLevelMultiSelect
                 selected={form.subjects}
+                levels={priceLevels}
                 onChange={(subjects) => setForm((f) => ({ ...f, subjects }))}
               />
             </div>

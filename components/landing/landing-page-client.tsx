@@ -9,12 +9,6 @@ import { COMPANY } from "@/lib/company";
 import { submitTutorWaitlist } from "@/lib/actions/waitlist";
 import type { PublicTutorCard } from "@/lib/data/queries";
 
-const LEVELS = [
-  "Szkoła podstawowa",
-  "Szkoła średnia",
-  "Matura podstawowa",
-  "Matura rozszerzona",
-] as const;
 const DAYS = [
   { id: "pon", label: "Pon" },
   { id: "wt", label: "Wt" },
@@ -161,7 +155,13 @@ const TESTIMONIALS = [
   },
 ] as const;
 
-export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
+export function LandingPageClient({
+  tutors,
+  priceLevels,
+}: {
+  tutors: PublicTutorCard[];
+  priceLevels: string[];
+}) {
   const [heroPanel, setHeroPanel] = useState<"match" | "recruit" | "about">("match");
   const [level, setLevel] = useState<string | null>(null);
   const [subject, setSubject] = useState<string | null>(null);
@@ -195,11 +195,16 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
   /** Tylko realni nauczyciele - bez demo i bez „pokaż wszystkich gdy zero”. */
   const matched = useMemo(() => {
     if (!hasRealTutors) return [];
-    if (!subject) return pool;
-    return pool.filter((t) =>
-      t.subjects.some((s) => s.toLowerCase() === subject.toLowerCase()),
-    );
-  }, [hasRealTutors, pool, subject]);
+    return pool.filter((t) => {
+      if (subject && !t.subjects.some((s) => s.toLowerCase() === subject.toLowerCase())) {
+        return false;
+      }
+      if (level && !(t.levels ?? []).some((l) => l.toLowerCase() === level.toLowerCase())) {
+        return false;
+      }
+      return Boolean(subject);
+    });
+  }, [hasRealTutors, pool, subject, level]);
 
   const needsWaitlist = !hasRealTutors || (Boolean(subject) && matched.length === 0);
 
@@ -540,7 +545,7 @@ export function LandingPageClient({ tutors }: { tutors: PublicTutorCard[] }) {
                       Jaki poziom?
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {LEVELS.map((l) => (
+                      {priceLevels.map((l) => (
                         <Chip key={l} active={level === l} onClick={() => setLevel(l)}>
                           {l}
                         </Chip>

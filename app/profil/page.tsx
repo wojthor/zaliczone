@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserProfile, getTutorSubjectRequests } from "@/lib/data/queries";
+import {
+  getCurrentUserProfile,
+  getPriceTiers,
+  getTutorSubjectRequests,
+} from "@/lib/data/queries";
 import { getTutorDriveFilesForViewer } from "@/lib/actions/drive";
 import { ProfilClient } from "./profil-client";
 
@@ -10,10 +14,11 @@ export default async function ProfilPage() {
   if (profile.role === "ADMIN") redirect("/admin");
 
   const supabase = await createClient();
-  const [subjectRequests, driveDocuments, auth] = await Promise.all([
+  const [subjectRequests, driveDocuments, auth, tiers] = await Promise.all([
     getTutorSubjectRequests(profile.id),
     getTutorDriveFilesForViewer(),
     supabase.auth.getUser(),
+    getPriceTiers(),
   ]);
   const user = auth.data.user;
 
@@ -23,6 +28,7 @@ export default async function ProfilPage() {
       email={user?.email ?? "-"}
       subjectRequests={subjectRequests}
       driveDocuments={driveDocuments}
+      priceLevels={tiers.map((t) => t.label)}
     />
   );
 }

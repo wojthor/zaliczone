@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { markPayoutPaid, unmarkPayoutPaid } from "@/lib/actions/admin";
+import { tutorPayoutFromCennik } from "@/lib/data/mappers";
 import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
+import type { PriceTier } from "@/lib/types/messages";
 import { FinanceTile, FinanceTilesRow } from "@/components/admin/finance-tile";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { listaPlacTitles, previousMonthKey } from "./lista-plac/lista-plac-shared";
@@ -51,6 +53,7 @@ function buildRollups(
   lines: FinanceLineUi[],
   payouts: Payout[],
   bankAccounts: Record<string, string | null>,
+  priceTiers: PriceTier[],
 ): TutorRollup[] {
   const payoutMap = new Map(payouts.map((p) => [p.tutor_id, p]));
   const map = new Map<string, TutorRollup>();
@@ -70,7 +73,7 @@ function buildRollups(
     prev.lessonCount += 1;
     prev.hours += minutesFromLabel(line.label) / 60;
     prev.clientTotalPln += line.amountPln;
-    prev.lessonsPayoutPln += Math.round(line.amountPln * TUTOR_SHARE_OF_CLIENT_PAYMENT * 100) / 100;
+    prev.lessonsPayoutPln += tutorPayoutFromCennik(line, priceTiers, TUTOR_SHARE_OF_CLIENT_PAYMENT);
     map.set(line.tutorId, prev);
   }
   for (const row of map.values()) {
@@ -95,10 +98,12 @@ export function WyplatyClient({
   financeLines,
   payouts,
   bankAccounts,
+  priceTiers,
 }: {
   financeLines: FinanceLineUi[];
   payouts: Payout[];
   bankAccounts: Record<string, string | null>;
+  priceTiers: PriceTier[];
 }) {
   const router = useRouter();
   const [confirmRow, setConfirmRow] = useState<TutorRollup | null>(null);
@@ -132,7 +137,7 @@ export function WyplatyClient({
 
   const { rollups, totals } = useMemo(() => {
     const przychod = linesForMonth.reduce((s, l) => s + l.amountPln, 0);
-    const r = buildRollups(linesForMonth, payoutsForMonth, bankAccounts);
+    const r = buildRollups(linesForMonth, payoutsForMonth, bankAccounts, priceTiers);
     const rowTotal = (x: TutorRollup) =>
       Math.round((x.lessonsPayoutPln + x.bonusPln) * 100) / 100;
     const koszty = Math.round(r.reduce((acc, x) => acc + rowTotal(x), 0) * 100) / 100;
@@ -146,7 +151,7 @@ export function WyplatyClient({
       ) / 100;
     const zysk = Math.round((przychod - koszty) * 100) / 100;
     return { rollups: r, totals: { przychod, koszty, doWyplaty, wyplacone, zysk } };
-  }, [linesForMonth, payoutsForMonth, bankAccounts]);
+  }, [linesForMonth, payoutsForMonth, bankAccounts, priceTiers]);
 
   const monthLabel = formatMonthLongPl(workMonthKey);
   const payrollTitles = useMemo(() => listaPlacTitles(selectedMonthKey), [selectedMonthKey]);

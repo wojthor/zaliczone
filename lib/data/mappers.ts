@@ -1,4 +1,5 @@
 import type { Lesson } from "@/components/dashboard/lesson-data";
+import { bonusProgress } from "@/lib/dates";
 import type {
   DbLesson,
   DbLessonWithRelations,
@@ -75,6 +76,27 @@ export function sumTutorPayoutFromCennik(
   fallbackShare = 0.7,
 ): number {
   return Math.round(lines.reduce((sum, line) => sum + tutorPayoutFromCennik(line, tiers, fallbackShare), 0) * 100) / 100;
+}
+
+export function sumTutorPayoutWithBonusFromCennik(
+  lines: Pick<FinanceLineUi, "tutorId" | "classLevel" | "durationMinutes" | "label" | "amountPln">[],
+  tiers: { label: string; worker_rate_pln: number }[],
+  fallbackShare = 0.7,
+): number {
+  const byTutor = new Map<string, typeof lines>();
+  for (const line of lines) {
+    const list = byTutor.get(line.tutorId) ?? [];
+    list.push(line);
+    byTutor.set(line.tutorId, list);
+  }
+  let total = 0;
+  for (const tutorLines of byTutor.values()) {
+    const lessonsPayout = sumTutorPayoutFromCennik(tutorLines, tiers, fallbackShare);
+    const hours = financeLinesHours(tutorLines);
+    const bonus = bonusProgress(hours);
+    total += lessonsPayout + (bonus.achieved ? bonus.bonusPln : 0);
+  }
+  return Math.round(total * 100) / 100;
 }
 
 /** Godziny z linii finansowych (VERIFIED). */

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { UczniowieClient } from "@/components/uczniowie/uczniowie-client";
 import {
-  getCachedActiveSubjects,
   getCurrentUserProfile,
   getOpenTutorAlerts,
   getPriceTiers,
@@ -14,13 +13,13 @@ export default async function UczniowiePage() {
   if (!profile) redirect("/login");
   if (profile.role === "ADMIN") redirect("/admin");
 
-  const [students, priceTiers, alerts, activeSubjects, lessons] = await Promise.all([
+  const [students, priceTiers, alerts, lessons] = await Promise.all([
     getTutorStudents(profile.id),
     getPriceTiers(),
     getOpenTutorAlerts(profile.id),
-    getCachedActiveSubjects(profile.id),
     getTutorLessons(profile.id),
   ]);
+  const activeSubjects = profile.active_subjects ?? [];
 
   return (
     <UczniowieClient

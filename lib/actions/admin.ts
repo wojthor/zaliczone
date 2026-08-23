@@ -17,6 +17,7 @@ import {
 import { assertMonthOpen, monthKeyFromDate } from "@/lib/actions/guards";
 import { TUTOR_SHARE, bonusProgress, canCloseMonth } from "@/lib/dates";
 import { TUTOR_PHOTO } from "@/lib/tutor-photo";
+import { formatTutorOffering, parseTutorOfferings } from "@/lib/tutor-offerings";
 import {
   TAG,
   bustLessonAndBonus,
@@ -26,6 +27,13 @@ import {
   staleTag,
   subjectsTag,
 } from "@/lib/cache";
+
+/** Tylko pary z poziomem — sam przedmiot bez poziomu nie daje uprawnień do stawki. */
+function normalizeTutorOfferings(raw: string[] | undefined): string[] {
+  return parseTutorOfferings(raw)
+    .filter((o) => o.subject && o.level)
+    .map((o) => formatTutorOffering(o.subject, o.level));
+}
 
 async function requireAdmin(): Promise<void> {
   const supabase = await createClient();
@@ -200,11 +208,13 @@ export async function createTutorAccount(input: {
     throw new Error("Brak linku zaproszenia z Supabase.");
   }
 
+  const offerings = normalizeTutorOfferings(input.activeSubjects);
+
   const profileRow: Record<string, unknown> = {
     id: userId,
     role: "TUTOR",
     full_name: input.fullName,
-    active_subjects: input.activeSubjects ?? [],
+    active_subjects: offerings,
     phone: input.phone?.trim() || null,
     bank_account: input.bankAccount?.trim() || null,
     olx_url: input.olxUrl?.trim() || null,
@@ -230,7 +240,7 @@ export async function createTutorAccount(input: {
         id: userId,
         role: "TUTOR",
         full_name: input.fullName,
-        active_subjects: input.activeSubjects ?? [],
+        active_subjects: offerings,
         phone: input.phone?.trim() || null,
         bank_account: input.bankAccount?.trim() || null,
         olx_url: input.olxUrl?.trim() || null,
@@ -282,7 +292,7 @@ export async function updateTutorProfile(
     .from("profiles")
     .update({
       full_name: input.fullName,
-      active_subjects: input.activeSubjects,
+      active_subjects: normalizeTutorOfferings(input.activeSubjects),
       phone: input.phone ?? null,
       bank_account: input.bankAccount ?? null,
       olx_url: input.olxUrl ?? null,
@@ -327,6 +337,7 @@ export async function updateTutorProfile(
   revalidatePath("/terminarz");
   revalidatePath("/uczniowie");
   revalidatePath("/profil");
+  revalidatePath("/");
 }
 
 export async function updateTutorContactFields(
@@ -543,10 +554,14 @@ export async function approveSubjectRequest(requestId: string, subject: string, 
     .single();
 
   const current: string[] = profile?.active_subjects ?? [];
-  const merged = [...new Set([...current, subject])];
+  const offering = subject.includes(" · ") ? subject : subject;
+  const merged = [...new Set([...current, offering])];
 
   await supabase.from("subject_requests").update({ status: "APPROVED" }).eq("id", requestId);
-  await supabase.from("profiles").update({ active_subjects: merged }).eq("id", tutorId);
+  await supabase
+    .from("profiles")
+    .update({ active_subjects: normalizeTutorOfferings(merged) })
+    .eq("id", tutorId);
 
   bustTag(subjectsTag(tutorId));
   bustTag(TAG.cennik);

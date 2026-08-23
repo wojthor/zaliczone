@@ -2,6 +2,7 @@ import {
   getAdminTutorSummaries,
   getAllVerifiedFinanceLines,
   getPendingVerificationLines,
+  getPriceTiers,
   getTutorPitYearSummary,
   getTutorStudentsForAdmin,
   getUnpaidFinanceLines,
@@ -28,7 +29,7 @@ export default async function TutorDetailsPage({
   const monthKey = currentMonthKey();
   const pitYear = Number(sp.pitYear) || new Date().getFullYear();
 
-  const [tutors, verifiedLines, pendingLines, unpaidLines, students, pitYearSummary] =
+  const [tutors, verifiedLines, pendingLines, unpaidLines, students, pitYearSummary, tiers] =
     await Promise.all([
       getAdminTutorSummaries(monthKey),
       getAllVerifiedFinanceLines(),
@@ -36,6 +37,7 @@ export default async function TutorDetailsPage({
       getUnpaidFinanceLines(),
       getTutorStudentsForAdmin(id) as Promise<AdminStudentRow[]>,
       getTutorPitYearSummary(id, pitYear),
+      getPriceTiers(),
     ]);
 
   const tutor = tutors.find((t) => t.id === id);
@@ -65,6 +67,7 @@ export default async function TutorDetailsPage({
       unpaid={forTutor(unpaidLines)}
       verified={forTutor(verifiedLines).filter((l) => l.monthKey === monthKey)}
       pitYearSummary={pitYearSummary}
+      priceLevels={tiers.map((t) => t.label)}
     />
   );
 }

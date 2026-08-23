@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { AdminDashboardClient } from "./admin-dashboard-client";
-import { TUTOR_SHARE, bonusProgress } from "@/lib/dates";
+import { sumTutorPayoutWithBonusFromCennik } from "@/lib/data/mappers";
 import {
   getAllOperatingExpenses,
   getAllTutorProfiles,
   getCachedCoordinatorDashboardLines,
   getOpenAdminAlerts,
+  getPriceTiers,
 } from "@/lib/data/queries";
 import type { FinanceLineUi } from "@/lib/types/database";
 
@@ -34,31 +35,19 @@ function daysUntilIso(iso: string, today = new Date()): number {
   return Math.round((target.getTime() - start.getTime()) / 86_400_000);
 }
 
-/** Suma wynagrodzeń tutorów (lekcje + premia) dla podanego zbioru linii VERIFIED. */
-function computeTutorCostForLines(lines: FinanceLineUi[]): number {
-  const tutorCostById = new Map<string, { hours: number; lessonsPln: number }>();
-  for (const line of lines) {
-    const prev = tutorCostById.get(line.tutorId) ?? { hours: 0, lessonsPln: 0 };
-    const match = line.label.match(/(\d+)\s*min/);
-    const minutes = match ? Number(match[1]) : 60;
-    prev.hours += minutes / 60;
-    prev.lessonsPln += Math.round(line.amountPln * TUTOR_SHARE * 100) / 100;
-    tutorCostById.set(line.tutorId, prev);
-  }
-  let total = 0;
-  for (const row of tutorCostById.values()) {
-    const hours = Math.round(row.hours * 10) / 10;
-    const bonus = bonusProgress(hours);
-    total += row.lessonsPln + (bonus.achieved ? bonus.bonusPln : 0);
-  }
-  return Math.round(total * 100) / 100;
+/** Suma wynagrodzeń tutorów (lekcje wg cennika + premia) dla linii VERIFIED. */
+function computeTutorCostForLines(
+  lines: FinanceLineUi[],
+  tiers: { label: string; worker_rate_pln: number }[],
+): number {
+  return sumTutorPayoutWithBonusFromCennik(lines, tiers);
 }
 
 export default async function AdminHomePage() {
   const today = new Date();
   const monthKey = currentMonthKey(today);
 
-  const [dashboardLines, tutors, operatingExpenses, alerts, studentCountRes] = await Promise.all([
+  const [dashboardLines, tutors, operatingExpenses, alerts, studentCountRes, priceTiers] = await Promise.all([
     getCachedCoordinatorDashboardLines(),
     getAllTutorProfiles(),
     getAllOperatingExpenses(),
@@ -66,6 +55,7 @@ export default async function AdminHomePage() {
     createClient().then((supabase) =>
       supabase.from("students").select("*", { count: "exact", head: true }),
     ),
+    getPriceTiers(),
   ]);
   const pendingLessons = dashboardLines.pending;
   const unpaidLessons = dashboardLines.unpaid;
@@ -80,7 +70,7 @@ export default async function AdminHomePage() {
   const verifiedMonthSumPln = verifiedThisMonth.reduce((s, l) => s + l.amountPln, 0);
   const unpaidMonthSumPln = unpaidThisMonth.reduce((s, l) => s + l.amountPln, 0);
 
-  const tutorCostPln = computeTutorCostForLines(verifiedThisMonth);
+  const tutorCostPln = computeTutorCostForLines(verifiedThisMonth, priceTiers);
   const otherOperatingCostPln =
     Math.round(
       operatingExpenses
