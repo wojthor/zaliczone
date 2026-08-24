@@ -21,51 +21,40 @@ export default function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (signInError || !data.user) {
-      if (signInError) {
-        console.error("Błąd logowania:", signInError.message);
+      if (signInError || !data.user) {
+        setError("Niepoprawne dane. Spróbuj ponownie.");
+        setLoading(false);
+        return;
       }
-      const raw = signInError?.message?.toLowerCase() ?? "";
-      const isNetwork =
-        raw.includes("fetch") || raw.includes("network") || raw.includes("failed to fetch");
-      const isBadCredentials =
-        raw.includes("invalid login") ||
-        raw.includes("invalid credentials") ||
-        raw.includes("wrong password") ||
-        raw.includes("user not found");
-      const message = isNetwork
-        ? "Nie możemy się teraz połączyć. Spróbuj ponownie za minutę - jeśli dalej nie działa, napisz do nas."
-        : isBadCredentials
-          ? "Zły e-mail albo hasło. Spróbuj jeszcze raz."
-          : "Nie udało się zalogować. Spróbuj jeszcze raz.";
-      setError(message);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      const destination =
+        profile?.role === "ADMIN"
+          ? next.startsWith("/admin")
+            ? next
+            : "/admin"
+          : next.startsWith("/admin")
+            ? "/panel"
+            : next;
+
+      router.replace(destination);
+      router.refresh();
+    } catch {
+      setError("Niepoprawne dane. Spróbuj ponownie.");
       setLoading(false);
-      return;
     }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-    const destination =
-      profile?.role === "ADMIN"
-        ? next.startsWith("/admin")
-          ? next
-          : "/admin"
-        : next.startsWith("/admin")
-          ? "/panel"
-          : next;
-
-    router.replace(destination);
-    router.refresh();
   }
 
   return (

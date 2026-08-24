@@ -5,12 +5,14 @@ export type DriveConfig = {
   clientEmail: string;
   privateKey: string;
   teachersFolderId: string;
+  invoicesFolderId: string | null;
 };
 
 export function getDriveConfig(): DriveConfig | null {
   const clientEmail = process.env.GOOGLE_DRIVE_CLIENT_EMAIL?.trim();
   const privateKeyRaw = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
   const teachersFolderId = process.env.GOOGLE_DRIVE_TEACHERS_FOLDER_ID?.trim();
+  const invoicesFolderId = process.env.GOOGLE_DRIVE_INVOICES_FOLDER_ID?.trim() ?? null;
 
   if (!clientEmail || !privateKeyRaw || !teachersFolderId) return null;
 
@@ -18,7 +20,15 @@ export function getDriveConfig(): DriveConfig | null {
     ? privateKeyRaw.replace(/\\n/g, "\n")
     : privateKeyRaw;
 
-  return { clientEmail, privateKey, teachersFolderId };
+  return { clientEmail, privateKey, teachersFolderId, invoicesFolderId };
+}
+
+export function getInvoicesFolderId(): string | null {
+  return getDriveConfig()?.invoicesFolderId ?? null;
+}
+
+export function isInvoicesDriveConfigured(): boolean {
+  return isDriveConfigured() && Boolean(getInvoicesFolderId());
 }
 
 export function isDriveConfigured(): boolean {

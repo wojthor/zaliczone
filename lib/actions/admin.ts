@@ -8,7 +8,13 @@ import {
   sendTutorWelcomeEmail,
 } from "@/lib/emails/send";
 import { ensureTutorRootFolder } from "@/lib/actions/documents";
-import { isDriveConfigured } from "@/lib/google-drive/client";
+import { isDriveConfigured, isInvoicesDriveConfigured } from "@/lib/google-drive/client";
+import { isDriveInvoiceAttachmentPath } from "@/lib/google-drive/attachment-path";
+import {
+  deleteInvoiceFromDrive,
+  isDriveStorageQuotaError,
+  uploadInvoiceToDrive,
+} from "@/lib/google-drive/invoice-folders";
 import {
   ensureTutorDriveFolder,
   moveTutorDriveFolderToFormer,
@@ -1007,6 +1013,7 @@ export async function createOperatingExpense(formData: FormData) {
   let attachmentPath: string | null = null;
   let attachmentMime: string | null = null;
   let attachmentSize: number | null = null;
+  let attachmentWarning: string | undefined;
 
   const supabase = createServiceClient();
 
@@ -1015,19 +1022,43 @@ export async function createOperatingExpense(formData: FormData) {
       throw new Error("Załącznik jest za duży (max 12 MB).");
     }
     const safeName = sanitizeExpenseFileName(file.name || "zalacznik");
-    const unique = crypto.randomUUID();
-    attachmentPath = `expenses/${month}/${unique}-${safeName}`;
     attachmentName = safeName;
     attachmentMime = file.type || "application/octet-stream";
     attachmentSize = file.size;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadError } = await supabase.storage.from("documents").upload(attachmentPath, buffer, {
-      contentType: attachmentMime,
-      upsert: false,
-    });
-    if (uploadError) {
-      throw new Error(uploadError.message || "Nie udało się wgrać załącznika.");
+
+    if (isInvoicesDriveConfigured()) {
+      try {
+        const uploaded = await uploadInvoiceToDrive(month, safeName, buffer, attachmentMime);
+        attachmentPath = uploaded.fileId;
+      } catch (driveError) {
+        if (!isDriveStorageQuotaError(driveError)) throw driveError;
+        const unique = crypto.randomUUID();
+        attachmentPath = `expenses/${month}/${unique}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(attachmentPath, buffer, { contentType: attachmentMime, upsert: false });
+        if (uploadError) {
+          throw new Error(
+            uploadError.message ||
+              "Nie udało się wgrać załącznika (Drive wymaga Dysku współdzielonego, Supabase też zawiódł).",
+          );
+        }
+        attachmentWarning =
+          "Dodano wydatek. Plik zapisany w Supabase — Google nie pozwala service accountowi wgrywać plików na zwykły Dysk. Aby pliki trafiały do folderów Faktury, przenieś je na Dysk współdzielony (Shared drive).";
+      }
+    } else {
+      const unique = crypto.randomUUID();
+      attachmentPath = `expenses/${month}/${unique}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage.from("documents").upload(attachmentPath, buffer, {
+        contentType: attachmentMime,
+        upsert: false,
+      });
+      if (uploadError) {
+        throw new Error(uploadError.message || "Nie udało się wgrać załącznika.");
+      }
     }
   }
 
@@ -1065,7 +1096,15 @@ export async function createOperatingExpense(formData: FormData) {
 
   if (error) {
     if (attachmentPath) {
-      await supabase.storage.from("documents").remove([attachmentPath]);
+      if (isDriveInvoiceAttachmentPath(attachmentPath)) {
+        try {
+          await deleteInvoiceFromDrive(attachmentPath);
+        } catch {
+          /* best effort */
+        }
+      } else {
+        await supabase.storage.from("documents").remove([attachmentPath]);
+      }
     }
     const msg = error.message ?? "";
     if (msg.includes("attachment_") || error.code === "PGRST204") {
@@ -1083,7 +1122,7 @@ export async function createOperatingExpense(formData: FormData) {
 
   revalidatePath("/admin/ksiegowosc");
   bustTag(TAG.accounting);
-  return data;
+  return attachmentWarning ? { expense: data, attachmentWarning } : data;
 }
 
 export async function deleteOperatingExpense(id: string) {
@@ -1113,7 +1152,15 @@ export async function deleteOperatingExpense(id: string) {
 
   const path = (row as { attachment_path?: string | null } | null)?.attachment_path;
   if (path) {
-    await supabase.storage.from("documents").remove([path]);
+    if (isDriveInvoiceAttachmentPath(path)) {
+      try {
+        await deleteInvoiceFromDrive(path);
+      } catch {
+        /* plik mógł zostać usunięty ręcznie z Drive */
+      }
+    } else {
+      await supabase.storage.from("documents").remove([path]);
+    }
   }
 
   revalidatePath("/admin/ksiegowosc");

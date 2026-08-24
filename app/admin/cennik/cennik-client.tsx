@@ -16,9 +16,11 @@ type Row = { id?: string; label: string; client: number; worker: number };
 function tiersToRows(tiers: PriceTier[]): Row[] {
   if (tiers.length === 0) {
     return [
-      { label: "Szkoła podstawowa", client: 60, worker: 42 },
-      { label: "Szkoła średnia", client: 70, worker: 49 },
-      { label: "Matura", client: 80, worker: 56 },
+      { label: "Szkoła podstawowa", client: 50, worker: 40 },
+      { label: "Szkoła średnia - poziom podstawowy", client: 60, worker: 45 },
+      { label: "Szkoła średnia - poziom rozszerzony", client: 70, worker: 50 },
+      { label: "Matura - poziom podstawowy", client: 70, worker: 50 },
+      { label: "Matura - poziom rozszerzony", client: 80, worker: 60 },
     ];
   }
   return tiers.map((t) => ({
@@ -115,7 +117,7 @@ export function CennikClient({
   };
 
   const addDraftRow = () => {
-    setDraftRows((prev) => [...prev, { label: "", client: 60, worker: 42 }]);
+    setDraftRows((prev) => [...prev, { label: "", client: 50, worker: 40 }]);
   };
 
   const removeDraftRow = (index: number) => {

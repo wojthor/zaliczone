@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { closeMonth, createOperatingExpense, deleteOperatingExpense, switchToJDG } from "@/lib/actions/admin";
-import { getSignedDownloadUrl } from "@/lib/actions/documents";
+import { isDriveInvoiceAttachmentPath } from "@/lib/google-drive/attachment-path";
 import { IconLock } from "@/components/icons";
 import { canCloseMonth } from "@/lib/dates";
 import { sumTutorPayoutWithBonusFromCennik } from "@/lib/data/mappers";
@@ -769,7 +769,15 @@ export function KsiegowoscClient({
 
     startExpense(async () => {
       try {
-        const created = (await createOperatingExpense(formData)) as OperatingExpense | null;
+        const result = await createOperatingExpense(formData);
+        const attachmentWarning =
+          result && typeof result === "object" && "attachmentWarning" in result
+            ? String((result as { attachmentWarning?: string }).attachmentWarning ?? "")
+            : "";
+        const created =
+          result && typeof result === "object" && "expense" in result
+            ? ((result as { expense: OperatingExpense }).expense)
+            : (result as OperatingExpense | null);
         const draft: OperatingExpense = created ?? {
           id: `temp-${Date.now()}`,
           month: selectedMonthKey,
@@ -792,7 +800,7 @@ export function KsiegowoscClient({
         });
         setExpenseFile(null);
         setExpenseFileKey((k) => k + 1);
-        setExpenseFeedback("Dodano wydatek.");
+        setExpenseFeedback(attachmentWarning || "Dodano wydatek.");
         router.refresh();
       } catch (err) {
         setExpenseFeedback(err instanceof Error ? err.message : "Nie udało się dodać wydatku.");
@@ -817,6 +825,12 @@ export function KsiegowoscClient({
   function handleOpenAttachment(path: string) {
     startExpense(async () => {
       try {
+        if (isDriveInvoiceAttachmentPath(path)) {
+          const url = `/api/drive/invoices/${encodeURIComponent(path)}?disposition=inline`;
+          window.open(url, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const { getSignedDownloadUrl } = await import("@/lib/actions/documents");
         const url = await getSignedDownloadUrl(path);
         window.open(url, "_blank", "noopener,noreferrer");
       } catch (err) {
@@ -954,15 +968,6 @@ export function KsiegowoscClient({
                 );
               })}
             </div>
-            {legalMode === "NDG" ? (
-              <button
-                type="button"
-                onClick={() => setConfirmJdgOpen(true)}
-                className="text-muted hover:text-depths self-end px-1 text-[0.65rem] font-medium underline-offset-2 hover:underline"
-              >
-                Przejdź na JDG…
-              </button>
-            ) : null}
           </div>
         </div>
       ) : (
@@ -976,7 +981,7 @@ export function KsiegowoscClient({
 
       {legalMode === "NDG" ? (
         <QuarterlyLimitBar
-          label={`Limit NDG · Q${currentQuarter} ${currentYearNum}`}
+          label={`Limit NDG · kwartał ${currentQuarter} ${currentYearNum}`}
           aktualnaWartosc={ndgLimit.suma}
           limit={NDG_QUARTERLY_LIMIT}
           statusText={
@@ -1030,22 +1035,13 @@ export function KsiegowoscClient({
         <FinanceTile label="Przychód" tone="navy">
           <span className="mark-highlight-on-dark">{formatPln(totals.gross)}</span>
         </FinanceTile>
-        <FinanceTile label="Koszty wypłaty / wszystkie" tone="orange">
-          <span>
-            {formatPln(totals.tutorShare)}
-            <span className="opacity-40"> / </span>
-            {formatPln(totals.allCosts)}
-          </span>
-          {legalMode === "NDG" ? (
-            <span className="mt-2 block text-[0.55rem] font-semibold leading-snug tracking-normal opacity-80">
-              ZUS studentów: 0 zł · PIT studentów: 0 zł (ulga dla młodych)
-            </span>
-          ) : null}
+        <FinanceTile label="Wypłaty" tone="orange">
+          {formatPln(totals.tutorShare)}
         </FinanceTile>
-        <FinanceTile label="Marża agencji" tone="green">
+        <FinanceTile label="Dochód" tone="green">
           {formatPln(totals.agencyShare)}
         </FinanceTile>
-        <FinanceTile label="Lekcje VERIFIED" tone="navy">
+        <FinanceTile label="Liczba lekcji zatwierdzonych" tone="navy">
           {totals.lessonCount}
         </FinanceTile>
       </FinanceTilesRow>
@@ -1573,7 +1569,7 @@ export function KsiegowoscClient({
             <article className="card-quiet p-4">
               <ProfitSummary
                 gross={totals.gross}
-                payouts={paidPayoutsSum}
+                payouts={totals.tutorShare}
                 pit={summaryPit}
                 zusOwn={summaryZusWlasciciel}
                 zusEmployees={summaryZusPracownicy}
@@ -1670,7 +1666,7 @@ export function KsiegowoscClient({
         <article className="card-quiet mt-5 p-4">
           <ProfitSummary
             gross={totals.gross}
-            payouts={paidPayoutsSum}
+            payouts={totals.tutorShare}
             pit={summaryPit}
             zusOwn={summaryZusWlasciciel}
             zusEmployees={summaryZusPracownicy}
@@ -1710,7 +1706,7 @@ export function KsiegowoscClient({
 
             <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
               <ClosedFigure label="Przychód" value={formatPln(totals.gross)} />
-              <ClosedFigure label="Wypłaty" value={formatPln(paidPayoutsSum)} />
+              <ClosedFigure label="Wypłaty" value={formatPln(totals.tutorShare)} />
               <ClosedFigure label="Podatek dochodowy" value={formatPln(summaryPit)} />
               <ClosedFigure label="Twój ZUS" value={formatPln(closedZusTotal)} />
               <ClosedFigure label="ZUS pracowników" value={formatPln(summaryZusPracownicy)} />

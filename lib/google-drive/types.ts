@@ -18,3 +18,7 @@ export type TutorDriveFilesResult = {
 export function driveFolderWebUrl(folderId: string): string {
   return `https://drive.google.com/drive/folders/${folderId}`;
 }
+
+export function driveFileWebUrl(fileId: string): string {
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
