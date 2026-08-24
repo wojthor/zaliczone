@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { closeMonth, createOperatingExpense, deleteOperatingExpense, switchToJDG } from "@/lib/actions/admin";
 import { isDriveInvoiceAttachmentPath } from "@/lib/google-drive/attachment-path";
-import { IconLock } from "@/components/icons";
+import { IconChecklist, IconLock, IconUpload } from "@/components/icons";
 import { canCloseMonth } from "@/lib/dates";
 import { sumTutorPayoutWithBonusFromCennik } from "@/lib/data/mappers";
 import {
@@ -203,6 +203,35 @@ function buildLedgerRows(lines: FinanceLineUi[]): LedgerRow[] {
       cumulativePln: running,
     };
   });
+}
+
+/** Napis NDG/JDG obok tytułu - klika się raz, przejście na JDG jest nieodwracalne. */
+function LegalModeInlineSwitch({
+  legalMode,
+  onRequestJdg,
+}: {
+  legalMode: LegalMode;
+  onRequestJdg: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide sm:text-sm">
+      <span className={legalMode === "NDG" ? "text-depths" : "text-muted/35"}>NDG</span>
+      <span className="text-muted/25" aria-hidden>
+        /
+      </span>
+      <button
+        type="button"
+        onClick={onRequestJdg}
+        disabled={legalMode === "JDG"}
+        title={legalMode === "JDG" ? "Przejście na JDG jest nieodwracalne" : "Przejdź na JDG"}
+        className={`transition disabled:cursor-default ${
+          legalMode === "JDG" ? "text-depths" : "text-muted/50 hover:text-depths"
+        }`}
+      >
+        JDG
+      </button>
+    </div>
+  );
 }
 
 export function KsiegowoscClient({
@@ -850,13 +879,18 @@ export function KsiegowoscClient({
   const td =
     "border-b-2 border-paper px-1 py-1 align-top text-[0.62rem] leading-tight break-words sm:px-1.5 sm:py-1.5 sm:text-[0.7rem]";
   const rowZebra = "bg-snow even:bg-paper/80 hover:bg-paper";
+  const thNavy =
+    "border-b-2 border-[#000C4A]/15 bg-[#000C4A]/5 px-2 py-2 text-left text-[0.62rem] font-bold uppercase tracking-wide text-depths/70 sm:px-2.5 sm:py-2.5 sm:text-[0.68rem]";
+  const tdNavy =
+    "border-b border-[#000C4A]/10 px-2 py-2 align-middle text-[0.72rem] leading-tight text-depths sm:px-2.5 sm:py-2.5 sm:text-[0.8rem]";
 
   return (
     <div className="min-w-0 space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="dash-sans text-depths text-lg font-semibold tracking-tight sm:text-xl">Księgowość</h1>
+            <LegalModeInlineSwitch legalMode={legalMode} onRequestJdg={() => setConfirmJdgOpen(true)} />
             {isMonthClosed ? (
               <span className="badge-done">
                 Miesiąc zamknięty
@@ -912,72 +946,30 @@ export function KsiegowoscClient({
         </div>
       </div>
 
-      {!isMonthClosed ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-          <div className="flex flex-1 flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row">
-            {(
-              [
-                ["month", "Księgowość miesięczna"],
-                ["year", "Księgowość roczna"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setViewMode(id)}
-                className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-                  viewMode === id ? "nav-active" : "text-muted hover:text-depths"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex shrink-0 flex-col gap-1">
-            <div className="flex flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row sm:min-w-[11rem]">
-              {(
-                [
-                  ["NDG", "NDG"],
-                  ["JDG", "JDG"],
-                ] as const
-              ).map(([id, label]) => {
-                const active = legalMode === id;
-                const lockedToJdg = legalMode === "JDG" && id === "NDG";
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    disabled={lockedToJdg}
-                    onClick={() => {
-                      if (id === legalMode) return;
-                      if (id === "JDG") setConfirmJdgOpen(true);
-                    }}
-                    className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
-                      active ? "nav-active" : "text-muted hover:text-depths"
-                    } disabled:cursor-not-allowed disabled:opacity-40`}
-                    title={
-                      lockedToJdg
-                        ? "Przejście na JDG jest nieodwracalne"
-                        : id === "JDG" && legalMode === "NDG"
-                          ? "Przejdź na JDG"
-                          : undefined
-                    }
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <p className="text-muted text-xs font-semibold">
-          Tryb prawny: <span className="text-depths">{legalMode}</span>
-          {legalMode === "JDG" && jdgRegistrationDate
-            ? ` · KPiR od ${formatExpenseDate(jdgRegistrationDate)}`
-            : null}
+      <div className="flex flex-col gap-1 rounded-app bg-paper p-1 sm:flex-row">
+        {(
+          [
+            ["month", "Księgowość miesięczna"],
+            ["year", "Księgowość roczna"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setViewMode(id)}
+            className={`flex-1 rounded-app px-3 py-2 text-xs font-bold transition sm:text-sm ${
+              viewMode === id ? "nav-active" : "text-muted hover:text-depths"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {legalMode === "JDG" && jdgRegistrationDate ? (
+        <p className="text-muted -mt-1 text-[0.7rem] font-medium">
+          KPiR od {formatExpenseDate(jdgRegistrationDate)}
         </p>
-      )}
+      ) : null}
 
       {legalMode === "NDG" ? (
         <QuarterlyLimitBar
@@ -1041,12 +1033,12 @@ export function KsiegowoscClient({
         <FinanceTile label="Dochód" tone="green">
           {formatPln(totals.agencyShare)}
         </FinanceTile>
-        <FinanceTile label="Liczba lekcji zatwierdzonych" tone="navy">
+        <FinanceTile label="Liczba lekcji zatwierdzonych" tone="gray">
           {totals.lessonCount}
         </FinanceTile>
       </FinanceTilesRow>
 
-      <div>
+      <div className="card-quiet p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="section-label">
             {viewMode === "year" ? `Ewidencja roczna · ${selectedYear}` : "Ewidencja sprzedaży"}
@@ -1146,18 +1138,18 @@ export function KsiegowoscClient({
         )}
       </div>
 
-      <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="section-label">Zestawienie kosztów</h2>
+      <section className="card-quiet p-4 sm:p-5">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="dash-sans text-depths text-base font-bold tracking-tight sm:text-lg">Koszty</h2>
           <a href={kosztyHref} target="_blank" rel="noreferrer" className={pdfBtnClass}>
             Wygeneruj zestawienie PDF
           </a>
         </div>
-        <div className="mb-3">
+        <div className="mb-4">
           <p className="text-muted text-xs capitalize">
             {viewMode === "year"
               ? `${periodLabel} - wypłaty, premie i koszty dodatkowe z ewidencji miesięcznej`
-              : `${periodLabel} - rachunki i faktury (koszty realne poza wypłatami tutorów)`}
+              : `${periodLabel} - rachunki i faktury`}
           </p>
         </div>
 
@@ -1168,58 +1160,58 @@ export function KsiegowoscClient({
                 Miesiąc zamknięty - dodawanie i usuwanie kosztów jest zablokowane.
               </p>
             ) : (
-            <div className="flex flex-nowrap items-end gap-1.5 overflow-x-auto rounded-app bg-snow p-2">
-              <label className="grid min-w-30 shrink gap-0.5">
+            <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-1">
+              <label className="grid min-w-32 shrink gap-0.5">
                 <span className="section-label !text-muted leading-none">
-                  Data rachunku/faktury
+                  Data wystawienia rachunku/faktury
                 </span>
                 <input
                   type="date"
                   value={expenseForm.invoiceDate}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, invoiceDate: ev.target.value }))}
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
+                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-[0.7rem]"
                 />
               </label>
-              <label className="grid min-w-22 flex-1 gap-0.5">
-                <span className="section-label !text-muted leading-none">Nr dok.</span>
+              <label className="grid min-w-24 flex-1 gap-0.5">
+                <span className="section-label !text-muted leading-none">Nr rachunku/faktury</span>
                 <input
                   value={expenseForm.documentNumber}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, documentNumber: ev.target.value }))}
-                  placeholder="FV/12"
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
+                  placeholder="FV/12/2026"
+                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-[0.7rem]"
                 />
               </label>
-              <label className="grid min-w-24 flex-[1.2] gap-0.5">
-                <span className="section-label !text-muted leading-none">Nazwa</span>
+              <label className="grid min-w-28 flex-[1.3] gap-0.5">
+                <span className="section-label !text-muted leading-none">Opis wydatku</span>
                 <input
                   value={expenseForm.expenseName}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, expenseName: ev.target.value }))}
-                  placeholder="wydatek"
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
+                  placeholder="np. licencja, abonament"
+                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-[0.7rem]"
                 />
               </label>
-              <label className="grid min-w-24 flex-[1.2] gap-0.5">
+              <label className="grid min-w-24 flex-[1.1] gap-0.5">
                 <span className="section-label !text-muted leading-none">Wystawca</span>
                 <input
                   value={expenseForm.issuerName}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, issuerName: ev.target.value }))}
-                  placeholder="wystawca"
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem]"
+                  placeholder="nazwa firmy"
+                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-[0.7rem]"
                 />
               </label>
-              <label className="grid min-w-17 shrink gap-0.5">
+              <label className="grid min-w-20 shrink gap-0.5">
                 <span className="section-label !text-muted leading-none">Kwota</span>
                 <input
                   value={expenseForm.amountPln}
                   onChange={(ev) => setExpenseForm((f) => ({ ...f, amountPln: ev.target.value }))}
-                  placeholder="0,00"
+                  placeholder="0,00 zł"
                   inputMode="decimal"
-                  className="text-depths min-w-0 rounded-app border border-panel-frame/40 px-1.5 py-1 text-[0.65rem] dash-mono"
+                  className="text-depths dash-mono min-w-0 rounded-app border border-panel-frame/40 bg-white px-2 py-1 text-[0.7rem]"
                 />
               </label>
-              <label className="grid min-w-17 shrink gap-0.5" title={expenseFile?.name ?? "Dodaj plik"}>
+              <label className="grid min-w-26 shrink gap-0.5" title={expenseFile?.name ?? "Dodaj plik"}>
                 <span className="section-label !text-muted leading-none">Plik</span>
-                <span className="relative flex cursor-pointer items-center justify-center rounded-app border border-mist bg-snow px-1.5 py-1 text-depths hover:bg-paper">
+                <span className="relative flex items-center gap-1.5 rounded-app border border-dashed border-panel-frame/60 bg-paper px-2 py-1 text-[0.7rem] text-depths transition hover:border-depths/30">
                   <input
                     key={expenseFileKey}
                     type="file"
@@ -1228,22 +1220,10 @@ export function KsiegowoscClient({
                     className="absolute inset-0 cursor-pointer opacity-0"
                     aria-label="Załącz plik"
                   />
-                  {expenseFile ? (
-                    <span className="max-w-18 truncate text-[0.65rem] font-medium leading-none">
-                      {expenseFile.name}
-                    </span>
-                  ) : (
-                    <svg
-                      viewBox="0 0 16 16"
-                      className="h-3.5 w-3.5 text-depths/70"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden
-                    >
-                      <path d="M8 3v10M3 8h10" strokeLinecap="round" />
-                    </svg>
-                  )}
+                  <IconUpload className="h-3.5 w-3.5 shrink-0 text-depths/60" />
+                  <span className="max-w-20 truncate">
+                    {expenseFile ? expenseFile.name : "Wybierz plik"}
+                  </span>
                 </span>
               </label>
               <div className="shrink-0">
@@ -1251,7 +1231,7 @@ export function KsiegowoscClient({
                   type="button"
                   onClick={handleAddExpense}
                   disabled={pendingExpense}
-                  className="whitespace-nowrap rounded-full bg-[#000C4A] px-2.5 py-1 text-[0.65rem] font-bold text-lime disabled:opacity-50"
+                  className="whitespace-nowrap rounded-full bg-[#000C4A] px-4 py-1.5 text-[0.7rem] font-bold text-lime transition hover:bg-[#000C4A]/90 disabled:opacity-50"
                 >
                   {pendingExpense ? "…" : "Dodaj"}
                 </button>
@@ -1270,8 +1250,8 @@ export function KsiegowoscClient({
               </p>
             ) : null}
 
-            <h3 className="section-label mt-4">
-              Lista kosztów · według daty
+            <h3 className="section-label mt-5">
+              Lista faktur i rachunków
             </h3>
             {expensesForPeriod.length === 0 ? (
               <p className="text-muted py-3 text-xs">Brak kosztów w tym miesiącu - dodaj powyżej.</p>
@@ -1281,12 +1261,12 @@ export function KsiegowoscClient({
                   <thead className="sticky top-0 z-1 bg-paper">
                     <tr>
                       <th className={`${th} w-[5%]`}>Lp.</th>
-                      <th className={`${th} w-[11%]`}>Data rachunku/faktury</th>
-                      <th className={`${th} w-[12%]`}>Numer dokumentu</th>
-                      <th className={`${th} w-[20%]`}>Nazwa wydatku</th>
-                      <th className={`${th} w-[18%]`}>Dane wystawcy</th>
+                      <th className={`${th} w-[11%]`}>Data wystawienia</th>
+                      <th className={`${th} w-[12%]`}>Nr rachunku/faktury</th>
+                      <th className={`${th} w-[20%]`}>Opis wydatku</th>
+                      <th className={`${th} w-[18%]`}>Wystawca</th>
                       <th className={`${th} w-[10%] text-right`}>Kwota</th>
-                      <th className={`${th} w-[14%]`}>Załącznik</th>
+                      <th className={`${th} w-[14%]`}>Plik</th>
                       <th className={`${th} w-[10%]`} />
                     </tr>
                   </thead>
@@ -1298,7 +1278,7 @@ export function KsiegowoscClient({
                         <td className={`${td} font-medium`}>{e.document_number || "-"}</td>
                         <td className={`${td} font-medium`}>{e.expense_name}</td>
                         <td className={td}>{e.issuer_name}</td>
-                        <td className={`${td} text-right font-bold dash-mono text-toffee`}>
+                        <td className={`${td} text-right font-bold dash-mono text-[#000C4A]`}>
                           {formatPln(Number(e.amount_pln))}
                         </td>
                         <td className={td}>
@@ -1389,64 +1369,60 @@ export function KsiegowoscClient({
       </section>
 
       {!isMonthClosed ? (
-      <section className="card-quiet p-3 sm:p-4">
+      <section>
         <h2 className="dash-sans text-depths text-sm font-semibold">
           {viewMode === "year"
             ? `Zestawienie roczne z podziałem miesięcznym · ${selectedYear}`
             : `Podsumowanie miesiąca · ${formatMonthLongPl(selectedMonthKey)}`}
         </h2>
-        <p className="text-muted mt-0.5 text-xs capitalize">
-          {viewMode === "year"
-            ? "Te same wskaźniki co wyżej, rozbite na miesiące roku."
-            : "Te same wskaźniki co wyżej, w podsumowaniu wybranego miesiąca."}
-        </p>
+        {viewMode === "year" ? (
+          <p className="text-muted mt-0.5 text-xs capitalize">Te same wskaźniki co wyżej, rozbite na miesiące roku.</p>
+        ) : null}
         {periodSummaryRows.length === 0 ? (
           <p className="text-muted py-4 text-xs">
             {viewMode === "year" ? "Brak danych w tym roku." : "Brak danych w tym miesiącu."}
           </p>
         ) : (
-          <div className="mt-3 max-h-[min(18rem,40vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
+          <div className="mt-3 max-h-[min(18rem,40vh)] overflow-auto rounded-app border-2 border-[#000C4A] bg-[rgb(245,248,255)] scrollbar-panel">
             <table className="w-full min-w-3xl border-collapse">
               <thead>
                 <tr>
-                  <th className={th}>Miesiąc</th>
-                  <th className={`${th} text-right`}>Przychód</th>
-                  <th className={`${th} text-right`}>Koszty</th>
-                  <th className={`${th} text-right`}>Marża</th>
-                  <th className={`${th} text-right`}>Nauczyciele</th>
-                  <th className={`${th} text-right`}>Uczniowie</th>
-                  <th className={`${th} text-right`}>Lekcje</th>
-                  <th className={`${th} text-right`}>Godziny</th>
-                  <th className={`${th} text-right`}>Wypłaty PAID</th>
-                  <th className={th}>Status</th>
+                  <th className={thNavy}>Miesiąc</th>
+                  <th className={`${thNavy} text-right`}>Przychód</th>
+                  <th className={`${thNavy} text-right`}>Koszty</th>
+                  <th className={`${thNavy} text-right`}>Dochód</th>
+                  <th className={`${thNavy} text-right`}>Nauczyciele</th>
+                  <th className={`${thNavy} text-right`}>Uczniowie</th>
+                  <th className={`${thNavy} text-right`}>Lekcje</th>
+                  <th className={`${thNavy} text-right`}>Godziny</th>
+                  <th className={`${thNavy} text-right`}>Wypłaty PAID</th>
+                  <th className={thNavy}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {periodSummaryRows.map((row) => (
-                  <tr key={row.monthKey} className={rowZebra}>
-                    <td className={`${td} capitalize font-medium`}>{row.label}</td>
-                    <td className={`${td} text-right dash-mono`}>{formatPln(row.gross)}</td>
-                    <td className={`${td} text-right dash-mono text-toffee`}>
-                      {formatPln(row.tutorShare)}
-                    </td>
-                    <td className={`${td} text-right dash-mono text-moss`}>
+                {periodSummaryRows.map((row, i) => (
+                  <tr key={row.monthKey} className={i % 2 === 1 ? "bg-[#000C4A]/5" : undefined}>
+                    <td className={`${tdNavy} capitalize font-semibold`}>{row.label}</td>
+                    <td className={`${tdNavy} dash-mono text-right`}>{formatPln(row.gross)}</td>
+                    <td className={`${tdNavy} dash-mono text-right`}>{formatPln(row.tutorShare)}</td>
+                    <td className={`${tdNavy} dash-mono text-right font-bold text-moss`}>
                       {formatPln(row.agencyShare)}
                     </td>
-                    <td className={`${td} text-right dash-mono`}>{row.tutorCount}</td>
-                    <td className={`${td} text-right dash-mono`}>{row.studentCount}</td>
-                    <td className={`${td} text-right dash-mono`}>{row.lessonCount}</td>
-                    <td className={`${td} text-right dash-mono`}>
+                    <td className={`${tdNavy} dash-mono text-right`}>{row.tutorCount}</td>
+                    <td className={`${tdNavy} dash-mono text-right`}>{row.studentCount}</td>
+                    <td className={`${tdNavy} dash-mono text-right`}>{row.lessonCount}</td>
+                    <td className={`${tdNavy} dash-mono text-right`}>
                       {row.hoursCount.toLocaleString("pl-PL", {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className={`${td} text-right dash-mono`}>{formatPln(row.paidPayouts)}</td>
-                    <td className={td}>
+                    <td className={`${tdNavy} dash-mono text-right`}>{formatPln(row.paidPayouts)}</td>
+                    <td className={tdNavy}>
                       {row.closed ? (
                         <span className="text-[0.6rem] font-bold uppercase text-moss">Zamknięty</span>
                       ) : (
-                        <span className="text-[0.6rem] font-bold uppercase text-muted">Otwarty</span>
+                        <span className="text-muted text-[0.6rem] font-bold uppercase">Otwarty</span>
                       )}
                     </td>
                   </tr>
@@ -1454,32 +1430,32 @@ export function KsiegowoscClient({
               </tbody>
               {yearSummaryTotals ? (
                 <tfoot>
-                  <tr className="bg-paper">
-                    <td className={`${td} font-bold`}>Suma roku</td>
-                    <td className={`${td} text-right font-bold dash-mono`}>
+                  <tr className="bg-[#000C4A]/10">
+                    <td className={`${tdNavy} font-bold`}>Suma roku</td>
+                    <td className={`${tdNavy} dash-mono text-right font-bold`}>
                       {formatPln(yearSummaryTotals.gross)}
                     </td>
-                    <td className={`${td} text-right font-bold dash-mono text-toffee`}>
+                    <td className={`${tdNavy} dash-mono text-right font-bold`}>
                       {formatPln(yearSummaryTotals.costs)}
                     </td>
-                    <td className={`${td} text-right font-bold dash-mono text-moss`}>
+                    <td className={`${tdNavy} dash-mono text-right font-bold text-moss`}>
                       {formatPln(yearSummaryTotals.margin)}
                     </td>
-                    <td className={`${td} text-right dash-mono text-muted`}>-</td>
-                    <td className={`${td} text-right dash-mono text-muted`}>-</td>
-                    <td className={`${td} text-right font-bold dash-mono`}>
+                    <td className={`${tdNavy} text-muted dash-mono text-right`}>-</td>
+                    <td className={`${tdNavy} text-muted dash-mono text-right`}>-</td>
+                    <td className={`${tdNavy} dash-mono text-right font-bold`}>
                       {yearSummaryTotals.lessonCount}
                     </td>
-                    <td className={`${td} text-right font-bold dash-mono`}>
+                    <td className={`${tdNavy} dash-mono text-right font-bold`}>
                       {yearSummaryTotals.hoursCount.toLocaleString("pl-PL", {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className={`${td} text-right font-bold dash-mono`}>
+                    <td className={`${tdNavy} dash-mono text-right font-bold`}>
                       {formatPln(yearSummaryTotals.paidPayouts)}
                     </td>
-                    <td className={td} />
+                    <td className={tdNavy} />
                   </tr>
                 </tfoot>
               ) : null}
@@ -1490,199 +1466,176 @@ export function KsiegowoscClient({
       ) : null}
 
       {!isMonthClosed ? (
-      <section className="card-quiet p-4 sm:p-5">
+      <section>
         <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">Rozliczenia - Zrób to sam</h2>
-        <p className="text-muted mt-1 text-xs">
-          Tylko to, co dotyczy Twojej firmy ·{" "}
-          <span className="capitalize">{periodLabel}</span> · dane VERIFIED + wypłaty PAID
-          {legalMode === "JDG" && viewMode === "year" ? " · ZUS × 12 miesięcy" : null}
-          {" · "}
-          <span className="font-semibold text-depths">{legalMode}</span>
-        </p>
 
-        {legalMode === "NDG" ? (
-          <div className="mt-5 space-y-4">
-            <article className="card-quiet p-4">
-              <h3 className="dash-sans text-depths text-sm font-bold">Za co płacisz</h3>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <article className="card-quiet flex h-full flex-col p-4">
+            <h3 className="dash-sans text-depths text-sm font-bold">Podatki</h3>
+            {legalMode === "NDG" ? (
+              <>
+                <ul className="mt-3 space-y-3 text-sm">
+                  <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <div>
+                      <p className="font-semibold text-depths">Podatek dochodowy</p>
+                      <p className="text-muted text-xs">PIT-36 · dopiero w zeznaniu do 30 kwietnia</p>
+                    </div>
+                    <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  </li>
+                  <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <div>
+                      <p className="font-semibold text-depths">Twój ZUS</p>
+                      <p className="text-muted text-xs">NDG - brak składek społecznych</p>
+                    </div>
+                    <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  </li>
+                  <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <div>
+                      <p className="font-semibold text-depths">Składka zdrowotna</p>
+                      <p className="text-muted text-xs">NDG - brak obowiązku</p>
+                    </div>
+                    <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  </li>
+                  <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <div>
+                      <p className="font-semibold text-depths">ZUS pracowników</p>
+                      <p className="text-muted text-xs">Studenci &lt;26 lat - zwolnienie</p>
+                    </div>
+                    <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  </li>
+                  <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <div>
+                      <p className="font-semibold text-depths">VAT</p>
+                      <p className="text-muted text-xs">NDG nie jest podatnikiem VAT</p>
+                    </div>
+                    <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  </li>
+                </ul>
+                <div className="mt-4 border-t border-panel-frame/20 pt-4">
+                  <p className="text-muted mb-2 text-xs">
+                    Dochód narastająco vs kwota wolna {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}
+                  </p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="dash-mono text-sm font-bold text-depths">
+                      {formatPln(dochodNarastajacoOdStycznia)}
+                    </span>
+                    <span className="text-muted text-xs">/ {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}</span>
+                  </div>
+                  <div
+                    className="mt-2 h-3 overflow-hidden rounded-full bg-panel-frame/50"
+                    role="progressbar"
+                    aria-valuenow={Math.round(pitFreePct)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="h-full rounded-full bg-lime transition-[width]"
+                      style={{ width: `${Math.min(100, pitFreePct)}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
               <ul className="mt-3 space-y-3 text-sm">
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">Podatek dochodowy</p>
-                    <p className="text-muted text-xs">PIT-36 · dopiero w zeznaniu do 30 kwietnia</p>
+                    <p className="text-muted text-xs">
+                      Zaliczka PIT 12%
+                      {viewMode === "month" ? " · przelew do 20. dnia kolejnego miesiąca" : " · suma zaliczek w okresie"}
+                    </p>
                   </div>
-                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  <span className="dash-mono text-base font-black text-depths">{formatPln(summaryPit)}</span>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">Twój ZUS</p>
-                    <p className="text-muted text-xs">NDG - brak składek społecznych</p>
+                    <p className="text-muted text-xs">
+                      Tylko składki społeczne
+                      {ulgaNumer != null
+                        ? ` · Ulga na start, miesiąc ${ulgaNumer}/6`
+                        : jdgRegistrationDate
+                          ? " · Preferencyjny (po Ulgi na start)"
+                          : ""}
+                      {viewMode === "year" ? " · × 12" : ""}
+                    </p>
                   </div>
-                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  <span className="dash-mono text-base font-black text-depths">
+                    {formatPln(summaryZusWlasciciel)}
+                  </span>
+                </li>
+                <li>
+                  <label className="grid max-w-md gap-1">
+                    <span className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">
+                      Etap ZUS
+                    </span>
+                    <select
+                      value={zusStage}
+                      onChange={(e) => setZusStage(e.target.value as JdgZusStage)}
+                      className="text-depths rounded-app border border-panel-frame/40 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="start">
+                        Ulga na start - {formatCurrencyPln(ZUS_ULGA_NA_START_SPOLECZNE)} społeczne
+                      </option>
+                      <option value="maly">
+                        Preferencyjny - {formatCurrencyPln(ZUS_PREFERENCYJNY_SPOLECZNE)} społeczne
+                      </option>
+                    </select>
+                  </label>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">Składka zdrowotna</p>
-                    <p className="text-muted text-xs">NDG - brak obowiązku</p>
+                    <p className="text-muted text-xs">
+                      9% dochodu, nie mniej niż {formatCurrencyPln(SKLADKA_ZDROWOTNA_MINIMUM)}
+                      {viewMode === "year" ? " · × 12" : ""}
+                    </p>
                   </div>
-                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  <span className="dash-mono text-base font-black text-depths">
+                    {formatPln(summaryZdrowotna)}
+                  </span>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
                     <p className="font-semibold text-depths">ZUS pracowników</p>
                     <p className="text-muted text-xs">Studenci &lt;26 lat - zwolnienie</p>
                   </div>
-                  <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
+                  <span className="dash-mono text-base font-black text-depths">
+                    {formatPln(summaryZusPracownicy)}
+                  </span>
                 </li>
                 <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <div>
-                    <p className="font-semibold text-depths">VAT</p>
-                    <p className="text-muted text-xs">NDG nie jest podatnikiem VAT</p>
+                    <p className="font-semibold text-depths">PIT pracowników</p>
+                    <p className="text-muted text-xs">Ulga dla młodych</p>
                   </div>
                   <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
                 </li>
               </ul>
-              <div className="mt-4 border-t border-panel-frame/20 pt-4">
-                <p className="text-muted mb-2 text-xs">
-                  Dochód narastająco vs kwota wolna {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}
-                </p>
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="dash-mono text-sm font-bold text-depths">
-                    {formatPln(dochodNarastajacoOdStycznia)}
-                  </span>
-                  <span className="text-muted text-xs">/ {formatCurrencyPln(PIT_TAX_FREE_AMOUNT)}</span>
-                </div>
-                <div
-                  className="mt-2 h-3 overflow-hidden rounded-full bg-panel-frame/50"
-                  role="progressbar"
-                  aria-valuenow={Math.round(pitFreePct)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div
-                    className="h-full rounded-full bg-lime transition-[width]"
-                    style={{ width: `${Math.min(100, pitFreePct)}%` }}
-                  />
-                </div>
-              </div>
-            </article>
+            )}
+          </article>
 
-            <article className="card-quiet p-4">
-              <ProfitSummary
-                gross={totals.gross}
-                payouts={totals.tutorShare}
-                pit={summaryPit}
-                zusOwn={summaryZusWlasciciel}
-                zusEmployees={summaryZusPracownicy}
-                health={summaryZdrowotna}
-                costs={summaryKoszty}
-                netProfit={netProfit}
-              />
-            </article>
-          </div>
-        ) : (
-          <>
-        <div className="mt-5 space-y-4">
-          <article className="card-quiet p-4">
-            <h3 className="dash-sans text-depths text-sm font-bold">Za co płacisz</h3>
-            <ul className="mt-3 space-y-3 text-sm">
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <div>
-                  <p className="font-semibold text-depths">Podatek dochodowy</p>
-                  <p className="text-muted text-xs">
-                    Zaliczka PIT 12%
-                    {viewMode === "month" ? " · przelew do 20. dnia kolejnego miesiąca" : " · suma zaliczek w okresie"}
-                  </p>
-                </div>
-                <span className="dash-mono text-base font-black text-depths">{formatPln(summaryPit)}</span>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <div>
-                  <p className="font-semibold text-depths">Twój ZUS</p>
-                  <p className="text-muted text-xs">
-                    Tylko składki społeczne
-                    {ulgaNumer != null
-                      ? ` · Ulga na start, miesiąc ${ulgaNumer}/6`
-                      : jdgRegistrationDate
-                        ? " · Preferencyjny (po Ulgi na start)"
-                        : ""}
-                    {viewMode === "year" ? " · × 12" : ""}
-                  </p>
-                </div>
-                <span className="dash-mono text-base font-black text-depths">
-                  {formatPln(summaryZusWlasciciel)}
-                </span>
-              </li>
-              <li>
-                <label className="grid max-w-md gap-1">
-                  <span className="text-muted text-[0.65rem] font-semibold uppercase tracking-wide">
-                    Etap ZUS
-                  </span>
-                  <select
-                    value={zusStage}
-                    onChange={(e) => setZusStage(e.target.value as JdgZusStage)}
-                    className="text-depths rounded-app border border-panel-frame/40 bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="start">
-                      Ulga na start - {formatCurrencyPln(ZUS_ULGA_NA_START_SPOLECZNE)} społeczne
-                    </option>
-                    <option value="maly">
-                      Preferencyjny - {formatCurrencyPln(ZUS_PREFERENCYJNY_SPOLECZNE)} społeczne
-                    </option>
-                  </select>
-                </label>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <div>
-                  <p className="font-semibold text-depths">Składka zdrowotna</p>
-                  <p className="text-muted text-xs">
-                    9% dochodu, nie mniej niż {formatCurrencyPln(SKLADKA_ZDROWOTNA_MINIMUM)}
-                    {viewMode === "year" ? " · × 12" : ""}
-                  </p>
-                </div>
-                <span className="dash-mono text-base font-black text-depths">
-                  {formatPln(summaryZdrowotna)}
-                </span>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <div>
-                  <p className="font-semibold text-depths">ZUS pracowników</p>
-                  <p className="text-muted text-xs">Studenci &lt;26 lat - zwolnienie</p>
-                </div>
-                <span className="dash-mono text-base font-black text-depths">
-                  {formatPln(summaryZusPracownicy)}
-                </span>
-              </li>
-              <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <div>
-                  <p className="font-semibold text-depths">PIT pracowników</p>
-                  <p className="text-muted text-xs">Ulga dla młodych</p>
-                </div>
-                <span className="dash-mono text-base font-black text-depths">{formatPln(0)}</span>
-              </li>
-            </ul>
+          <article className="card-feature flex h-full flex-col p-5">
+            <ProfitSummary
+              gross={totals.gross}
+              payouts={totals.tutorShare}
+              pit={summaryPit}
+              zusOwn={summaryZusWlasciciel}
+              zusEmployees={summaryZusPracownicy}
+              health={summaryZdrowotna}
+              costs={summaryKoszty}
+              netProfit={netProfit}
+            />
           </article>
         </div>
 
-        <article className="card-quiet mt-5 p-4">
-          <ProfitSummary
-            gross={totals.gross}
-            payouts={totals.tutorShare}
-            pit={summaryPit}
-            zusOwn={summaryZusWlasciciel}
-            zusEmployees={summaryZusPracownicy}
-            health={summaryZdrowotna}
-            costs={summaryKoszty}
-            netProfit={netProfit}
-          />
-        </article>
-
-        <p className="mt-4 text-xs font-medium text-claret">
-          {viewMode === "month"
-            ? "Pamiętaj, aby do 25. dnia miesiąca wysłać plik JPK_V7 (KPiR) z Twojego programu księgowego!"
-            : "W ciągu roku JPK_V7 wysyłasz miesięcznie - ten widok pomaga kontrolować sumy roczne."}
-        </p>
-          </>
-        )}
+        {legalMode === "JDG" ? (
+          <p className="mt-4 text-xs font-medium text-claret">
+            {viewMode === "month"
+              ? "Pamiętaj, aby do 25. dnia miesiąca wysłać plik JPK_V7 (KPiR) z Twojego programu księgowego!"
+              : "W ciągu roku JPK_V7 wysyłasz miesięcznie - ten widok pomaga kontrolować sumy roczne."}
+          </p>
+        ) : null}
       </section>
       ) : null}
 
@@ -1704,7 +1657,7 @@ export function KsiegowoscClient({
               </div>
             </div>
 
-            <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
+            <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
               <ClosedFigure label="Przychód" value={formatPln(totals.gross)} />
               <ClosedFigure label="Wypłaty" value={formatPln(totals.tutorShare)} />
               <ClosedFigure label="Podatek dochodowy" value={formatPln(summaryPit)} />
@@ -1726,53 +1679,63 @@ export function KsiegowoscClient({
           </section>
         ) : (
           <section className="card-quiet p-4 sm:p-5">
-            <div>
-              <h2 className="section-label text-base">Kreator zamknięcia miesiąca</h2>
-              <p className="text-muted mt-1 text-xs capitalize">
-                {periodLabel}
-                {!canClose ? " - zamknięcie dostępne od 6. dnia następnego miesiąca." : " - spełnij warunki, aby zamknąć miesiąc."}
-              </p>
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-depths/8 text-depths">
+                <IconChecklist className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="dash-sans text-depths text-base font-semibold tracking-tight">
+                  Kreator zamknięcia miesiąca
+                </h2>
+                <p className="text-muted mt-0.5 text-xs capitalize">
+                  {periodLabel}
+                  {!canClose
+                    ? " - zamknięcie dostępne od 6. dnia następnego miesiąca."
+                    : " - spełnij warunki, aby zamknąć miesiąc."}
+                </p>
+              </div>
             </div>
 
-            <ul className="mt-4 space-y-2">
-              <li
-                className={`flex items-center gap-2 rounded-ledger border px-3 py-2 text-sm ${
-                  lessonsReady ? "border-moss/30 bg-moss/5 text-moss" : "border-claret/25 bg-claret/5 text-claret"
-                }`}
-              >
-                <span className="dash-mono text-xs font-bold">{lessonsReady ? "✓" : "✗"}</span>
-                <span className="font-medium">
-                  Warunek 1 - wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji)
-                </span>
-              </li>
-              <li
-                className={`flex items-center gap-2 rounded-ledger border px-3 py-2 text-sm ${
-                  payoutsReady ? "border-moss/30 bg-moss/5 text-moss" : "border-claret/25 bg-claret/5 text-claret"
-                }`}
-              >
-                <span className="dash-mono text-xs font-bold">{payoutsReady ? "✓" : "✗"}</span>
-                <span className="font-medium">Warunek 2 - wszystkie wypłaty tutorów mają status PAID</span>
-              </li>
+            <ul className="mt-5 space-y-2.5">
+              <ChecklistRow ok={lessonsReady} title="Warunek 1">
+                Wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji).
+              </ChecklistRow>
+              <ChecklistRow ok={payoutsReady} title="Warunek 2">
+                Wszystkie wypłaty tutorów mają status PAID.
+              </ChecklistRow>
               <li>
-                <label className="flex cursor-pointer items-center gap-2 rounded-ledger border border-panel-frame/25 bg-snow px-3 py-2 text-sm text-depths hover:bg-paper">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-app border px-3 py-3 text-sm transition ${
+                    bankReconciled
+                      ? "border-moss/25 bg-moss/5"
+                      : "border-panel-frame/40 bg-snow hover:bg-paper"
+                  } ${!canClose ? "cursor-not-allowed opacity-60" : ""}`}
+                >
                   <input
                     type="checkbox"
                     checked={bankReconciled}
                     onChange={() => setBankReconciled((v) => !v)}
                     disabled={!canClose}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#000C4A]"
                   />
-                  <span className="font-medium">Warunek 3 - potwierdzam zgodność salda z kontem bankowym</span>
+                  <div>
+                    <p className={`font-semibold ${bankReconciled ? "text-moss" : "text-depths"}`}>Warunek 3</p>
+                    <p className="text-muted mt-0.5 text-xs">
+                      Potwierdzam zgodność salda z kontem bankowym.
+                    </p>
+                  </div>
                 </label>
               </li>
             </ul>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmCloseOpen(true)}
                 disabled={!canClose || !checklistComplete}
-                className="btn-block bg-[#000C4A] px-5 py-2.5 text-xs text-lime disabled:opacity-50"
+                className="btn-block flex items-center gap-2 bg-[#000C4A] px-5 py-2.5 text-xs text-lime transition hover:bg-[#000C4A]/90 disabled:opacity-50"
               >
+                <IconLock className="h-3.5 w-3.5" />
                 Zamknij miesiąc
               </button>
             </div>
@@ -1789,11 +1752,11 @@ export function KsiegowoscClient({
             {monthBreakdown.map((row) => (
               <li
                 key={row.monthKey}
-                className="flex items-center justify-between gap-2 border-b-2 border-paper px-1 py-2 last:border-0"
+                className="flex items-center justify-between gap-2 rounded-app border border-panel-frame/30 bg-paper px-3 py-2.5"
               >
                 <span className="text-depths text-xs font-medium capitalize">{row.label}</span>
                 {row.closed ? (
-                  <span className="text-[0.65rem] font-bold uppercase text-moss">Zamknięty</span>
+                  <span className="badge-done">Zamknięty</span>
                 ) : (
                   <span className="text-[0.65rem] font-bold uppercase text-muted">Otwarty</span>
                 )}
@@ -1842,7 +1805,7 @@ function ClosedFigure({
 }) {
   const toneClass = tone === "moss" ? "text-moss" : tone === "claret" ? "text-claret" : "text-depths";
   return (
-    <div>
+    <div className="rounded-app bg-paper p-3">
       <p className="section-label !text-muted">{label}</p>
       <p className={`dash-mono mt-1 ${emphasis ? "text-lg font-black" : "text-sm font-bold"} ${toneClass}`}>
         {value}
@@ -1851,7 +1814,39 @@ function ClosedFigure({
   );
 }
 
-/** Uproszczone podsumowanie P&L - te same pozycje w NDG i JDG (zera tam, gdzie nie dotyczy). */
+/** Wiersz warunku w kreatorze zamknięcia miesiąca - okrągły znacznik + tytuł/opis. */
+function ChecklistRow({
+  ok,
+  title,
+  children,
+}: {
+  ok: boolean;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <li
+      className={`flex items-start gap-3 rounded-app border px-3 py-3 text-sm ${
+        ok ? "border-moss/25 bg-moss/5" : "border-claret/25 bg-claret/5"
+      }`}
+    >
+      <span
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-snow ${
+          ok ? "bg-moss" : "bg-claret"
+        }`}
+        aria-hidden
+      >
+        {ok ? "✓" : "✗"}
+      </span>
+      <div>
+        <p className={`font-semibold ${ok ? "text-moss" : "text-claret"}`}>{title}</p>
+        <p className="text-muted mt-0.5 text-xs">{children}</p>
+      </div>
+    </li>
+  );
+}
+
+/** Uproszczone podsumowanie P&L - te same pozycje w NDG i JDG (zera tam, gdzie nie dotyczy). Neonowa karta na granacie. */
 function ProfitSummary({
   gross,
   payouts,
@@ -1872,55 +1867,56 @@ function ProfitSummary({
   netProfit: number;
 }) {
   const row = "flex justify-between gap-4";
+  const loss = netProfit < 0;
   return (
-    <>
-      <h3 className="section-label">Podsumowanie</h3>
-      <ul className="mt-3 space-y-2 text-sm">
+    <div className="flex h-full flex-col">
+      <h3 className="dash-sans text-[10px] font-extrabold uppercase tracking-[0.14em] text-soft-lime">
+        Podsumowanie
+      </h3>
+      <ul className="mt-4 space-y-2.5 text-sm">
         <li className={row}>
-          <span className="font-semibold uppercase tracking-wide text-depths">Przychód</span>
-          <span className="font-bold dash-mono text-depths">{formatPln(gross)}</span>
+          <span className="font-semibold uppercase tracking-wide text-snow/90">Przychód</span>
+          <span className="font-bold dash-mono text-snow">{formatPln(gross)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− Wypłaty</span>
           <span className="font-bold dash-mono">{formatPln(payouts)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− Podatek dochodowy</span>
           <span className="font-bold dash-mono">{formatPln(pit)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− Twój ZUS</span>
           <span className="font-bold dash-mono">{formatPln(zusOwn)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− ZUS pracowników</span>
           <span className="font-bold dash-mono">{formatPln(zusEmployees)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− Zdrowotna</span>
           <span className="font-bold dash-mono">{formatPln(health)}</span>
         </li>
-        <li className={`${row} text-toffee`}>
+        <li className={`${row} text-soft-lime/85`}>
           <span className="font-semibold uppercase tracking-wide">− Koszty</span>
           <span className="font-bold dash-mono">{formatPln(costs)}</span>
         </li>
-        <li
-          className={`${row} items-end border-t-2 border-depths/15 pt-3 ${
-            netProfit < 0 ? "border-claret/40" : "border-moss/30"
+      </ul>
+      <div
+        className={`${row} mt-auto items-end border-t-2 pt-3 ${loss ? "border-[#E23B3B]/40" : "border-lime/40"}`}
+      >
+        <span
+          className={`dash-sans text-lg font-black uppercase tracking-tight sm:text-xl ${
+            loss ? "text-[#FF8B7A]" : "text-lime"
           }`}
         >
-          <span
-            className={`dash-sans text-lg font-black uppercase tracking-tight sm:text-xl ${
-              netProfit < 0 ? "text-claret" : "text-moss"
-            }`}
-          >
-            {netProfit < 0 ? "Strata na rękę" : "Zysk na rękę"}
-          </span>
-          <span className="dash-mono text-2xl font-black tabular-nums text-depths sm:text-3xl">
-            {formatPln(netProfit)}
-          </span>
-        </li>
-      </ul>
-    </>
+          {loss ? "Strata na rękę" : "Zysk na rękę"}
+        </span>
+        <span className="dash-mono text-2xl font-black tabular-nums text-snow sm:text-3xl">
+          {formatPln(netProfit)}
+        </span>
+      </div>
+    </div>
   );
 }

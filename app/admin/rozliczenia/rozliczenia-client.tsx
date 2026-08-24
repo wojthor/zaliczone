@@ -517,10 +517,11 @@ function LessonRow({
   onReject?: () => void;
 }) {
   const amountClass = variant === "verified" ? "text-moss" : variant === "unpaid" ? "text-claret" : "text-depths";
+  const borderClass = variant === "verified" ? "border-2 border-moss/70" : "border border-panel-frame/30";
 
   return (
     <li
-      className={`rounded-ledger border border-panel-frame/30 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
+      className={`rounded-app ${borderClass} bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 ${
         variant === "unpaid" ? "bg-claret/5" : ""
       } ${busy ? "opacity-80" : ""} ${pulsing ? "row-confirm-pulse" : ""} ${leaving ? "hop-to-paid" : ""}`}
     >

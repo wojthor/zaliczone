@@ -75,9 +75,9 @@ const DEADLINES = [
   },
   {
     id: "premia",
-    when: `${DATES.bonus.hoursThreshold} h · +${DATES.bonus.bonusPln} zł`,
+    when: `40 / 50 / 60 h · łącznie do ${DATES.bonus.tiers.reduce((s, t) => s + t.bonusPln, 0)} zł`,
     what: "Premia miesięczna",
-    how: "Liczą się tylko lekcje ze statusem „zatwierdzona”. Postęp widać na Dashboardzie.",
+    how: "40 h zatwierdzonych → +100 zł, 50 h → kolejne +100 zł, 60 h → kolejne +100 zł (łącznie do 300 zł). Liczą się tylko lekcje ze statusem „zatwierdzona”.",
     tag: "Próg",
   },
 ] as const;
@@ -90,7 +90,7 @@ export default async function PrzewodnikPage() {
   return (
     <PageShell title="Przewodnik">
       <p className="text-muted text-sm font-medium">
-        Film instruktażowy, ważne terminy i dane firmy.
+        Film instruktażowy, sposoby płatności, ważne terminy i dane firmy.
       </p>
 
       <section className="mt-6">
@@ -99,6 +99,45 @@ export default async function PrzewodnikPage() {
         <div className="mt-4">
           <VideoBlock />
         </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="section-label">Sposoby płatności</h2>
+        <p className="text-muted mt-1 text-sm">
+          Tak rodzice i uczniowie płacą za lekcje - podaj im jeden z poniższych sposobów.
+        </p>
+        <ul className="mt-4 divide-y divide-mist overflow-hidden soft-panel">
+          <li className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
+            <div className="sm:w-48 sm:shrink-0">
+              <span className="inline-flex rounded-full bg-lime px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-depths">
+                Przelew
+              </span>
+              <p className="text-depths mt-1.5 text-base font-extrabold tracking-tight">Rachunek bankowy</p>
+            </div>
+            <div className="min-w-0 flex-1 border-t border-panel-frame/25 pt-2 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+              <p className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Numer konta</p>
+              <p className="text-depths mt-0.5 font-mono text-sm font-bold tracking-wide">{COMPANY.bankAccount}</p>
+              <p className="text-muted mt-1 text-xs leading-relaxed">
+                Odbiorca: {COMPANY.name}. W tytule przelewu: data + imię i nazwisko ucznia.
+              </p>
+            </div>
+          </li>
+          <li className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
+            <div className="sm:w-48 sm:shrink-0">
+              <span className="inline-flex rounded-full bg-lime px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-depths">
+                BLIK
+              </span>
+              <p className="text-depths mt-1.5 text-base font-extrabold tracking-tight">Na numer telefonu</p>
+            </div>
+            <div className="min-w-0 flex-1 border-t border-panel-frame/25 pt-2 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+              <p className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Telefon</p>
+              <p className="text-depths mt-0.5 font-mono text-sm font-bold tracking-wide">{COMPANY.phone}</p>
+              <p className="text-muted mt-1 text-xs leading-relaxed">
+                BLIK na numer telefonu. W tytule: data + imię i nazwisko ucznia.
+              </p>
+            </div>
+          </li>
+        </ul>
       </section>
 
       <section className="mt-8">
@@ -135,6 +174,10 @@ export default async function PrzewodnikPage() {
             <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Nazwa</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.name}</dd>
           </div>
+          <div>
+            <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">E-mail</dt>
+            <dd className="text-depths mt-0.5 font-semibold">{COMPANY.email}</dd>
+          </div>
           <div className="sm:col-span-2">
             <dt className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">Adres</dt>
             <dd className="text-depths mt-0.5 font-semibold">{COMPANY.address}</dd>
@@ -144,7 +187,7 @@ export default async function PrzewodnikPage() {
         <div className="mt-4 rounded-2xl bg-[#000C4A] px-3.5 py-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-lime">Po co to jest</p>
           <p className="mt-1.5 text-sm leading-relaxed text-luster/90">
-            Kupujesz coś do pracy, materiały albo sprzęt? Poproś sprzedawcę o{" "}
+            Kupujesz coś do pracy, np. papier, zeszyty, długopisy? Poproś sprzedawcę o{" "}
             <strong className="text-lime">fakturę</strong> na dane firmy powyżej, nie paragon. Sam
             paragon nie wystarczy do rozliczenia. Zrób zdjęcie lub skan faktury i wyślij
             koordynatorowi mailem, dopisz krótko, co to było.

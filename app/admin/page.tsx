@@ -29,12 +29,6 @@ function formatMonthLongPl(monthKey: string): string {
   return new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric" }).format(d);
 }
 
-function daysUntilIso(iso: string, today = new Date()): number {
-  const target = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((target.getTime() - start.getTime()) / 86_400_000);
-}
-
 /** Suma wynagrodzeń tutorów (lekcje wg cennika + premia) dla linii VERIFIED. */
 function computeTutorCostForLines(
   lines: FinanceLineUi[],
@@ -80,22 +74,11 @@ export default async function AdminHomePage() {
   const totalCostPln = Math.round((tutorCostPln + otherOperatingCostPln) * 100) / 100;
   const agencyProfitPln = Math.round((verifiedMonthSumPln - totalCostPln) * 100) / 100;
 
-  const expiringContracts = tutors
-    .filter((t): t is typeof t & { contract_end: string } => Boolean(t.contract_end))
-    .map((t) => ({
-      id: t.id,
-      name: t.full_name ?? "Nauczyciel",
-      daysLeft: daysUntilIso(t.contract_end, today),
-    }))
-    .filter((t) => t.daysLeft >= 0 && t.daysLeft <= 30)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-
   return (
     <AdminDashboardClient
       todayLabel={formatTodayPl(today)}
       monthLabel={formatMonthLongPl(monthKey)}
       verifiedMonthSumPln={verifiedMonthSumPln}
-      payoutCostPln={tutorCostPln}
       totalCostPln={totalCostPln}
       agencyProfitPln={agencyProfitPln}
       unpaidMonthSumPln={unpaidMonthSumPln}
@@ -104,7 +87,6 @@ export default async function AdminHomePage() {
       pendingMonthCount={pendingThisMonth.length}
       verifiedMonthCount={verifiedThisMonth.length}
       unpaidMonthCount={unpaidThisMonth.length}
-      expiringContracts={expiringContracts}
       alerts={alerts}
     />
   );

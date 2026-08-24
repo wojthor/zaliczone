@@ -6,12 +6,6 @@ import { FinanceTile } from "@/components/admin/finance-tile";
 import { AlertsBanner } from "@/components/alerts/alerts-banner";
 import type { AppAlert } from "@/lib/types/database";
 
-type ExpiringContract = {
-  id: string;
-  name: string;
-  daysLeft: number;
-};
-
 type MonthDeadline = {
   id: string;
   label: string;
@@ -465,37 +459,37 @@ function RevenueSplitDonut({
   const marginPct = total > 0 ? Math.round((margin / total) * 100) : 0;
 
   return (
-    <div className="flex h-full items-center gap-3">
-      <div className="relative size-14 shrink-0 rounded-full" style={{ background }}>
-        <div className="absolute inset-[5px] flex flex-col items-center justify-center rounded-full bg-snow">
-          <span className="dash-mono text-depths text-xs font-bold tabular-nums">{marginPct}%</span>
+    <div className="flex h-full items-center gap-6">
+      <div className="relative size-28 shrink-0 rounded-full sm:size-32" style={{ background }}>
+        <div className="absolute inset-[10px] flex items-center justify-center rounded-full bg-snow">
+          <span className="dash-mono text-depths text-lg font-bold tabular-nums sm:text-xl">{marginPct}%</span>
         </div>
       </div>
-      <ul className="min-w-0 flex-1 space-y-1">
-        <li className="flex items-center gap-1.5">
-          <span className="size-1.5 shrink-0 rounded-full" style={{ background: costsColor }} />
-          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#000C4A" }}>
+      <ul className="min-w-0 flex-1 space-y-2.5">
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: costsColor }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#000C4A" }}>
             Koszty
           </span>
-          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#000C4A" }}>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#000C4A" }}>
             {formatPln(costs)}
           </span>
         </li>
-        <li className="flex items-center gap-1.5">
-          <span className="size-1.5 shrink-0 rounded-full" style={{ background: marginColor }} />
-          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#000C4A" }}>
-            Marża
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: marginColor }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#000C4A" }}>
+            Dochód
           </span>
-          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#000C4A" }}>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#000C4A" }}>
             {formatPln(margin)}
           </span>
         </li>
-        <li className="flex items-center gap-1.5">
-          <span className="size-1.5 shrink-0 rounded-full" style={{ background: unpaidColor }} />
-          <span className="dash-sans flex-1 truncate text-[10px] font-semibold" style={{ color: "#AAAAAA" }}>
-            Nieopł.
+        <li className="flex items-center gap-2">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: unpaidColor }} />
+          <span className="dash-sans flex-1 text-xs font-semibold sm:text-sm" style={{ color: "#AAAAAA" }}>
+            Nieopłacone
           </span>
-          <span className="dash-mono text-[10px] font-bold tabular-nums" style={{ color: "#AAAAAA" }}>
+          <span className="dash-mono text-sm font-bold tabular-nums" style={{ color: "#AAAAAA" }}>
             {formatPln(unpaid)}
           </span>
         </li>
@@ -508,7 +502,6 @@ export function AdminDashboardClient({
   todayLabel,
   monthLabel,
   verifiedMonthSumPln,
-  payoutCostPln,
   totalCostPln,
   agencyProfitPln,
   unpaidMonthSumPln,
@@ -517,13 +510,11 @@ export function AdminDashboardClient({
   pendingMonthCount,
   verifiedMonthCount,
   unpaidMonthCount,
-  expiringContracts,
   alerts,
 }: {
   todayLabel: string;
   monthLabel: string;
   verifiedMonthSumPln: number;
-  payoutCostPln: number;
   totalCostPln: number;
   agencyProfitPln: number;
   unpaidMonthSumPln: number;
@@ -532,7 +523,6 @@ export function AdminDashboardClient({
   pendingMonthCount: number;
   verifiedMonthCount: number;
   unpaidMonthCount: number;
-  expiringContracts: ExpiringContract[];
   alerts: AppAlert[];
 }) {
   return (
@@ -559,31 +549,19 @@ export function AdminDashboardClient({
 
       <section>
         <h2 className="dash-sans text-muted mb-3 text-xs font-semibold uppercase tracking-wide">Finanse miesiąca</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <FinanceTile label="Przychód" tone="navy">
             {formatPln(verifiedMonthSumPln)}
           </FinanceTile>
-          <FinanceTile label="Koszty · wypłaty / wszystkie" tone="orange">
-            {formatPln(payoutCostPln)}
-            <span className="opacity-40"> / </span>
+          <FinanceTile label="Koszty" tone="orange">
             {formatPln(totalCostPln)}
           </FinanceTile>
-          <FinanceTile label="Marża agencji" tone="green">
+          <FinanceTile label="Dochód" tone="green">
             {formatPln(agencyProfitPln)}
           </FinanceTile>
           <FinanceTile label="Nieopłacone" tone="red">
             −{formatPln(unpaidMonthSumPln)}
           </FinanceTile>
-          <article className="admin-card !rounded-3xl p-4 sm:p-5">
-            <p className="dash-sans text-muted text-[10px] font-bold uppercase tracking-[0.16em]">Podział</p>
-            <div className="mt-2.5">
-              <RevenueSplitDonut
-                costs={totalCostPln}
-                margin={agencyProfitPln}
-                unpaid={unpaidMonthSumPln}
-              />
-            </div>
-          </article>
         </div>
       </section>
 
@@ -605,32 +583,14 @@ export function AdminDashboardClient({
           <article className="admin-card p-4 lg:col-span-2">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:border-r sm:border-panel-frame/25 sm:pr-4">
-                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">
-                  Umowy - 30 dni
-                </p>
-                <ul className="mt-2.5 max-h-40 space-y-1.5 overflow-y-auto pr-1 scrollbar-panel">
-                  {expiringContracts.length === 0 ? (
-                    <li className="dash-sans text-muted text-xs">Brak umów kończących się wkrótce.</li>
-                  ) : (
-                    expiringContracts.map((t) => (
-                      <li key={t.id} className="flex items-center justify-between gap-2">
-                        <Link
-                          href={`/admin/nauczyciele/${t.id}`}
-                          className="dash-sans text-depths min-w-0 truncate text-xs font-semibold hover:underline"
-                        >
-                          {t.name}
-                        </Link>
-                        <span
-                          className={`dash-mono shrink-0 text-[11px] font-bold tabular-nums ${
-                            t.daysLeft <= 7 ? "text-claret" : "text-toffee"
-                          }`}
-                        >
-                          {daysLeftLabel(t.daysLeft)}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
+                <p className="dash-sans text-muted text-[10px] font-semibold uppercase tracking-wide">Podział</p>
+                <div className="mt-2.5 flex items-center">
+                  <RevenueSplitDonut
+                    costs={totalCostPln}
+                    margin={agencyProfitPln}
+                    unpaid={unpaidMonthSumPln}
+                  />
+                </div>
               </div>
 
               <div>

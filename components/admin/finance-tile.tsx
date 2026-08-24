@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type FinanceTone = "navy" | "orange" | "green" | "red";
+export type FinanceTone = "navy" | "orange" | "green" | "red" | "gray";
 
 /**
  * Tone names kept for call-site compatibility; mapped to Zaliczone palette only
@@ -29,6 +29,12 @@ const FINANCE_TONE_STYLES: Record<
     background: "#AAAAAA",
     label: "#FFFFFF",
     value: "#FFFFFF",
+  },
+  /** Wyciszony kafelek - informacyjny wskaźnik, nie kwota finansowa. */
+  gray: {
+    background: "#E8E8E6",
+    label: "#5F5E5A",
+    value: "#000C4A",
   },
 };
 
