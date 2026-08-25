@@ -20,6 +20,7 @@ import {
 } from "@/lib/data/mappers";
 import type {
   AdminTutorSummary,
+  Candidate,
   DbLesson,
   DbLessonWithRelations,
   DbStudent,
@@ -907,4 +908,24 @@ export async function getTutorNotifications(tutorId: string): Promise<AppNotific
     ["tutor-notifications", tutorId],
     { tags: [notificationsTag(tutorId), TAG.notifications], revalidate: false },
   )();
+}
+
+function isMissingCandidates(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  const msg = error.message ?? "";
+  return error.code === "42P01" || error.code === "PGRST205" || msg.includes("candidates");
+}
+
+/** Lista kandydatów rekrutacji (najnowsi na górze). Graceful, gdy brak migracji 0018. */
+export async function getCandidates(): Promise<Candidate[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("candidates")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) {
+    if (isMissingCandidates(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as Candidate[];
 }

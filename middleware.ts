@@ -21,6 +21,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Webhooki (Google Forms) — bez sesji, auth przez x-webhook-secret w route.
+  if (pathname.startsWith("/api/webhooks/")) {
+    return NextResponse.next();
+  }
+
   const { supabase, user, supabaseResponse } = await updateSession(request);
 
   const isPublic = PUBLIC_PATHS.some(

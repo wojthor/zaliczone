@@ -201,6 +201,98 @@ export async function sendTutorWaitlistEmail(input: {
   return { skipped: false as const };
 }
 
+export async function sendRecruitmentTestEmail(input: {
+  email: string;
+  firstName: string;
+  tests: { subject: string; level?: string; url: string; label?: string }[];
+}) {
+  const resend = client();
+  if (!resend) return { skipped: true as const };
+
+  const { to, subjectSuffix } = resolveRecipients(input.email);
+  const linksHtml = input.tests
+    .map((t) => {
+      const title = t.label ?? (t.level ? `${t.subject} · ${t.level}` : t.subject);
+      return `
+      <tr>
+        <td style="padding:10px 0; border-bottom:1px solid ${BRAND.mist};">
+          <p style="margin:0 0 4px 0; font-weight:800; color:${BRAND.navy};">${title}</p>
+          ${t.level ? `<p style="margin:0 0 8px 0; font-size:12px; color:${BRAND.muted};">Poziom: ${t.level}</p>` : ""}
+          ${pillButton(t.url, `Otwórz test · ${t.subject}`)}
+        </td>
+      </tr>`;
+    })
+    .join("");
+
+  const body = `
+    <p style="margin:0 0 8px 0; font-size:11px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:${BRAND.muted};">
+      Rekrutacja
+    </p>
+    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; letter-spacing:-0.02em; line-height:1.25; color:${BRAND.navy};">
+      Cześć, ${input.firstName}!
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Dzięki za zgłoszenie do <strong>ZALICZONE</strong>. Dla każdego przedmiotu rozwiązujesz
+      <strong>jeden test</strong> na najwyższym poziomie, który zaznaczyłeś/aś.
+      Wynik dostaniemy automatycznie.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+      ${linksHtml}
+    </table>
+    <p style="margin:20px 0 0 0; font-size:12px; color:${BRAND.muted};">
+      W każdym teście podaj ten sam e-mail: <strong style="color:${BRAND.navy};">${input.email}</strong>.
+    </p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Test rekrutacyjny ZALICZONE${subjectSuffix}`,
+    html: emailShell(body, "Twój test rekrutacyjny ZALICZONE jest gotowy."),
+  });
+
+  return { skipped: false as const };
+}
+
+export async function sendRecruitmentRejectionEmail(input: {
+  email: string;
+  firstName: string;
+}) {
+  const resend = client();
+  if (!resend) return { skipped: true as const };
+
+  const { to, subjectSuffix } = resolveRecipients(input.email);
+  const body = `
+    <p style="margin:0 0 8px 0; font-size:11px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:${BRAND.muted};">
+      Rekrutacja
+    </p>
+    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; letter-spacing:-0.02em; line-height:1.25; color:${BRAND.navy};">
+      Cześć, ${input.firstName}!
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Dziękujemy za udział w rekrutacji do <strong>ZALICZONE</strong> oraz czas poświęcony
+      na wypełnienie formularza i testu.
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Tym razem zdecydowaliśmy się zaprosić inne osoby, których profil lepiej pasuje
+      do naszych aktualnych potrzeb. To nie zamyka drzwi na przyszłość — jeśli sytuacja
+      się zmieni, chętnie damy znać.
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Trzymamy kciuki za Twoje dalsze plany.
+    </p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Rekrutacja ZALICZONE — informacja${subjectSuffix}`,
+    html: emailShell(body, "Informacja zwrotna z rekrutacji ZALICZONE."),
+  });
+
+  return { skipped: false as const };
+}
+
 function monthKeyFix(month: string): string {
   return month.includes("-") ? month : month;
 }

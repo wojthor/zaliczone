@@ -12,6 +12,7 @@ import {
   IconGuide,
   IconLogout,
   IconMenu,
+  IconUserPlus,
   IconUsers,
   IconWallet,
 } from "@/components/icons";
@@ -115,6 +116,22 @@ const ADMIN_NAV = [
       "dokumenty",
       "przedmioty nauczyciela",
       "zatrudnienie",
+    ],
+  },
+  {
+    href: "/admin/rekrutacja",
+    label: "Rekrutacja",
+    Icon: IconUserPlus,
+    keywords: [
+      "kandydaci",
+      "rekrutacja",
+      "test",
+      "zatrudnij",
+      "odrzuć",
+      "cv",
+      "aplikacja",
+      "google forms",
+      "nowy nauczyciel",
     ],
   },
   {

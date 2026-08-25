@@ -262,3 +262,40 @@ export type DocumentTreeResult = {
   available: boolean;
   errorMessage?: string;
 };
+
+export type CandidateStatus = "NEW" | "IN_PROGRESS" | "REJECTED" | "HIRED";
+
+export type RequiredTest = {
+  subject: string;
+  level: string;
+};
+
+/** Wyniki: { "Biologia": { score: "18/20", level: "Matura" } } */
+export type CandidateTestResultEntry = {
+  score: string;
+  level: string;
+};
+
+export type CandidateTestResults = Record<string, CandidateTestResultEntry | string>;
+
+export type Candidate = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  dob: string | null;
+  student_status: boolean;
+  university: string | null;
+  experience: boolean;
+  required_tests: RequiredTest[];
+  levels: string | null;
+  hours_per_week: string | null;
+  cv_url: string | null;
+  tests_expected: number;
+  tests_completed: number;
+  test_results: CandidateTestResults;
+  test_sent_manually: boolean;
+  status: CandidateStatus;
+  created_at: string;
+};
+
