@@ -148,7 +148,7 @@ var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 var TEST_SUBJECT = "Biologia";
 var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony"; // dopasuj do tego quizu
-var MAX_POINTS = 20;
+var MAX_POINTS = 15; // max punktów w tym quizie (u Julii 15/15)
 
 function onFormSubmit(e) {
   postTestResult(e.response);
@@ -181,9 +181,38 @@ function postTestResult(r) {
   try { email = r.getRespondentEmail() || ""; } catch (_) {}
   if (!email) email = ans("Adres e-mail") || ans("Email") || ans("E-mail");
 
+  // getScore() bywa null, gdy quiz nie „zwalnia” ocen od razu — sumujemy punkty z pytań.
+  var points = null;
+  try {
+    var raw = r.getScore();
+    Logger.log("raw getScore=" + raw + " (type " + typeof raw + ")");
+    if (raw !== null && raw !== undefined && raw !== "") points = Number(raw);
+  } catch (err) {
+    Logger.log("getScore error: " + err);
+  }
+  if (points === null || isNaN(points)) {
+    points = 0;
+    var gotAny = false;
+    try {
+      var graded = r.getGradableItemResponses();
+      for (var g = 0; g < graded.length; g++) {
+        var ps = graded[g].getScore();
+        Logger.log("item score[" + g + "]=" + ps);
+        if (ps !== null && ps !== undefined && ps !== "") {
+          points += Number(ps);
+          gotAny = true;
+        }
+      }
+    } catch (err2) {
+      Logger.log("gradable error: " + err2);
+    }
+    if (!gotAny) points = null;
+  }
+
   var score = "";
-  try { score = String(r.getScore()); } catch (_) {}
-  if (score && score.indexOf("/") === -1) score = score + "/" + MAX_POINTS;
+  if (points !== null && !isNaN(points)) {
+    score = String(points) + "/" + MAX_POINTS;
+  }
 
   var fullName = ans("Imię i nazwisko") || ans("Imię") || "";
 
@@ -192,7 +221,10 @@ function postTestResult(r) {
     return;
   }
   if (!score) {
-    Logger.log("SKIP brak score email=" + email);
+    Logger.log(
+      "SKIP brak score email=" + email +
+        " — w Forms: Ustawienia → Quizy → Zwolnij oceny: Natychmiast po przesłaniu, potem Run ponownie."
+    );
     return;
   }
 
