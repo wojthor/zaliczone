@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/admin";
-import { parseRequiredTests, parseTestResults } from "@/lib/recruitment/test-links";
+import {
+  asStringList,
+  buildRequiredTestsFromSubjectsAndLevels,
+  parseRequiredTests,
+  parseTestResults,
+} from "@/lib/recruitment/test-links";
 import type { CandidateStatus } from "@/lib/types/database";
 
 export const runtime = "nodejs";
@@ -55,6 +60,28 @@ function parseDob(v: unknown): string | null {
   return null;
 }
 
+/** required_tests z payloadu albo z pól przedmiotów + poziomów. */
+function resolveApplicationTests(body: Record<string, unknown>) {
+  let requiredTests = parseRequiredTests(body.required_tests ?? body.requiredTests);
+  if (requiredTests.length === 0) {
+    requiredTests = buildRequiredTestsFromSubjectsAndLevels(
+      asStringList(
+        body.subjects ??
+          body.teaching_subjects ??
+          body.teachingSubjects ??
+          body.przedmioty,
+      ),
+      asStringList(
+        body.teaching_levels ??
+          body.teachingLevels ??
+          body.poziomy ??
+          (Array.isArray(body.levels) ? body.levels : undefined),
+      ),
+    );
+  }
+  return requiredTests;
+}
+
 export async function POST(req: Request) {
   if (!assertWebhookSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -99,13 +126,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "full_name is required" }, { status: 400 });
       }
 
-      const requiredTests = parseRequiredTests(body.required_tests ?? body.requiredTests);
+      const requiredTests = resolveApplicationTests(body);
       if (requiredTests.length === 0) {
         return NextResponse.json(
-          { error: "required_tests must be a non-empty array of { subject, level }" },
+          {
+            error:
+              "Podaj required_tests albo subjects + teaching_levels (przedmioty i poziomy z formularza).",
+          },
           { status: 400 },
         );
       }
+
+      const levelsNote =
+        asText(body.levels_note) ??
+        (typeof body.levels === "string" ? asText(body.levels) : null) ??
+        requiredTests.map((t) => `${t.subject}: ${t.level}`).join("; ");
 
       const row = {
         full_name: fullName,
@@ -116,7 +151,7 @@ export async function POST(req: Request) {
         university: asText(body.university),
         experience: asBool(body.experience),
         required_tests: requiredTests,
-        levels: asText(body.levels),
+        levels: levelsNote,
         hours_per_week: asText(body.hours_per_week ?? body.hoursPerWeek),
         cv_url: asText(body.cv_url ?? body.cvUrl),
         tests_expected: requiredTests.length,
@@ -129,7 +164,7 @@ export async function POST(req: Request) {
 
       const { data: existing } = await supabase
         .from("candidates")
-        .select("id, status")
+        .select("id, status, test_results, tests_completed, test_sent_manually, tests_reviewed_manually")
         .ilike("email", email)
         .in("status", OPEN_STATUSES)
         .order("created_at", { ascending: false })
@@ -137,6 +172,8 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (existing) {
+        const prevResults = parseTestResults(existing.test_results);
+        const completed = Object.keys(prevResults).length;
         const { data, error } = await supabase
           .from("candidates")
           .update({
@@ -151,6 +188,8 @@ export async function POST(req: Request) {
             hours_per_week: row.hours_per_week,
             cv_url: row.cv_url,
             tests_expected: row.tests_expected,
+            tests_completed: completed,
+            status: completed > 0 || existing.test_sent_manually ? "IN_PROGRESS" : "NEW",
           })
           .eq("id", existing.id)
           .select("*")
@@ -164,7 +203,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, action: "created", candidate: data }, { status: 201 });
     }
 
-    // TEST_RESULT
+    // TEST_RESULT — tylko dopina wynik do istniejącego zgłoszenia (APPLICATION first).
     const email = normalizeEmail(String(body.email ?? ""));
     const subject = asText(body.subject) ?? asText(body.test_subject);
     const level = asText(body.level) ?? asText(body.test_level) ?? "";
@@ -182,41 +221,20 @@ export async function POST(req: Request) {
 
     const { data: candidate } = await supabase
       .from("candidates")
-      .select("id, status, test_results, tests_completed, required_tests, tests_expected, full_name")
+      .select("id, status, test_results, tests_completed, required_tests, tests_expected")
       .ilike("email", email)
       .in("status", ["NEW", "IN_PROGRESS"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    // Quiz mógł przyjść przed APPLICATION albo bez skryptu na formularzu zgłoszeniowym —
-    // wtedy tworzymy stub, żeby wynik się nie zgubił.
     if (!candidate) {
-      const fullName =
-        asText(body.full_name) ??
-        asText(body.fullName) ??
-        email.split("@")[0] ??
-        "Kandydat";
-      const requiredTests = [{ subject, level: level || "" }];
-      const { data, error } = await supabase
-        .from("candidates")
-        .insert({
-          full_name: fullName,
-          email,
-          required_tests: requiredTests,
-          tests_expected: 1,
-          tests_completed: 1,
-          test_results: { [subject]: { score, level } },
-          test_sent_manually: false,
-          tests_reviewed_manually: false,
-          status: "IN_PROGRESS" as const,
-        })
-        .select("*")
-        .single();
-      if (error) throw error;
       return NextResponse.json(
-        { ok: true, action: "test_result_created", candidate: data },
-        { status: 201 },
+        {
+          error:
+            "Brak zgłoszenia rekrutacyjnego dla tego e-maila. Najpierw Formularz rekrutacyjny (APPLICATION), potem test.",
+        },
+        { status: 404 },
       );
     }
 
@@ -230,11 +248,19 @@ export async function POST(req: Request) {
       ? Number(candidate.tests_completed) || Object.keys(nextResults).length
       : (Number(candidate.tests_completed) || 0) + 1;
 
+    const required = parseRequiredTests(candidate.required_tests);
+    const hasSubject = required.some((t) => t.subject.toLowerCase() === subject.toLowerCase());
+    const nextRequired = hasSubject
+      ? required
+      : [...required, { subject, level: level || "" }];
+
     const { data, error } = await supabase
       .from("candidates")
       .update({
         test_results: nextResults,
         tests_completed: testsCompleted,
+        required_tests: nextRequired,
+        tests_expected: Math.max(Number(candidate.tests_expected) || 0, nextRequired.length),
         status: "IN_PROGRESS",
       })
       .eq("id", candidate.id)

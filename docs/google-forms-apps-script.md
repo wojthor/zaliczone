@@ -10,8 +10,7 @@
 4. Trigger: **From form** → `onFormSubmit` (formularz główny + każdy quiz Biologii itd.).
 5. Smoke: wyślij testowe zgłoszenie → kandydat w `/admin/rekrutacja`; wynik quizu → `test_results`.
 
-**Dlaczego wynik quizu „nie widać”?**  
-Wcześniej `TEST_RESULT` wymagał wcześniejszego `APPLICATION`. Jeśli Julia zrobiła tylko test Biologii (albo Apps Script nie miał e-maila / triggera), nic nie trafiło do bazy. Teraz wynik bez zgłoszenia tworzy stub kandydata. Formularz quizu **musi zbierać e-mail** (Ustawienia Forms) i mieć zainstalowany skrypt B) z triggerem.
+**Kolejność:** Formularz rekrutacyjny (APPLICATION) → karta w panelu + podpowiedź testów → checkbox „wysłane” → wyniki quizów (TEST_RESULT) dopinają się do **tej samej** karty (ten sam e-mail). Sam test bez zgłoszenia **nie** tworzy karty.
 
 ## Logika najwyższego poziomu
 
@@ -25,16 +24,25 @@ Kolejność (rosnąco):
 
 ## A) Formularz główny (APPLICATION)
 
+Flow: **najpierw to zgłoszenie** tworzy kartę w `/admin/rekrutacja`. Testy dopinasz później.
+
+Pytania (dopasuj tytuły 1:1 do Forms):
+- `Jakiego przedmiotu chcesz uczyć?` — wielokrotny wybór (przedmioty)
+- `Na jakim poziomie chcesz udzielać korepetycji?` — wielokrotny wybór (poziomy)
+
+Logika: **jeden test na każdy przedmiot**, na **najwyższym** zaznaczonym poziomie.
+
 ```javascript
 /** @OnlyCurrentDoc */
 var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 
-/** Im wyższy index, tym wyższy poziom. Dopasuj tytuły kolumn CheckboxGrid. */
 var LEVEL_RANK = {
   "Szkoła podstawowa": 1,
   "Szkoła średnia - poziom podstawowy": 2,
   "Szkoła średnia - poziom rozszerzony": 3,
+  "Szkoła średnia (poziom podstawowy)": 2,
+  "Szkoła średnia (poziom rozszerzony)": 3,
   "Matura": 4,
   "Matura - poziom podstawowy": 4,
   "Matura - poziom rozszerzony": 5,
@@ -42,7 +50,9 @@ var LEVEL_RANK = {
 
 function onFormSubmit(e) {
   try {
-    postJson({ type: "APPLICATION", data: buildApplicationData(e) });
+    var payload = { type: "APPLICATION", data: buildApplicationData(e) };
+    var res = postJson(payload);
+    Logger.log("APPLICATION " + res.getResponseCode() + " " + res.getContentText());
   } catch (err) {
     console.error(err);
   }
@@ -62,10 +72,14 @@ function buildApplicationData(e) {
     return "";
   }
 
-  // CheckboxGrid zwykle wraca jako obiekt { "Biologia": ["Matura", "Szkoła podstawowa"], ... }
-  // albo jako tablica stringów "Biologia [Matura]". Dopasuj do swojego formularza.
-  var grid = ans("Przedmioty i poziomy"); // <- tytuł pytania CheckboxGrid
-  var requiredTests = highestLevelPerSubject(grid);
+  var subjects = toList(ans("Jakiego przedmiotu chcesz uczyć?"));
+  var levels = toList(ans("Na jakim poziomie chcesz udzielać korepetycji?"));
+  var requiredTests = buildRequiredTests(subjects, levels);
+
+  // Fallback: CheckboxGrid „Przedmioty i poziomy”, jeśli nadal używasz siatki
+  if (requiredTests.length === 0) {
+    requiredTests = highestLevelPerSubject(ans("Przedmioty i poziomy"));
+  }
 
   var first = String(ans("Imię") || "");
   var last = String(ans("Nazwisko") || "");
@@ -73,12 +87,14 @@ function buildApplicationData(e) {
 
   return {
     full_name: fullName,
-    email: String(ans("E-mail") || "").toLowerCase(),
+    email: String(ans("E-mail") || ans("Adres e-mail") || "").toLowerCase(),
     phone: String(ans("Telefon") || ""),
     dob: String(ans("Data urodzenia") || ""),
     student_status: /tak|yes/i.test(String(ans("Czy jesteś studentem?"))),
     university: String(ans("Uczelnia") || ""),
-    experience: /tak|yes/i.test(String(ans("Doświadczenie"))),
+    experience: /tak|yes/i.test(String(ans("Doświadczenie") || ans("Czy masz doświadczenie?"))),
+    subjects: subjects,
+    teaching_levels: levels,
     required_tests: requiredTests,
     levels: requiredTests.map(function (t) { return t.subject + ": " + t.level; }).join("; "),
     hours_per_week: String(ans("Ile godzin tygodniowo?") || ""),
@@ -86,13 +102,42 @@ function buildApplicationData(e) {
   };
 }
 
-/**
- * Wejście: obiekt { subject: [levels...] } albo tablica "Subject [Level]".
- * Wyjście: [{ subject, level }] — jeden wpis na przedmiot (najwyższy level).
- */
-function highestLevelPerSubject(grid) {
-  var map = {}; // subject -> { level, rank }
+function toList(v) {
+  if (Array.isArray(v)) return v.map(function (x) { return String(x || "").trim(); }).filter(Boolean);
+  var s = String(v || "").trim();
+  if (!s) return [];
+  return s.split(/[,;\n|]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+}
 
+function pickHighestLevel(levels) {
+  var best = "";
+  var bestRank = -1;
+  levels.forEach(function (level) {
+    var rank = LEVEL_RANK[level] || 0;
+    if (rank > bestRank) {
+      best = level;
+      bestRank = rank;
+    }
+  });
+  return best;
+}
+
+/** Każdy przedmiot → jeden test na najwyższym zaznaczonym poziomie. */
+function buildRequiredTests(subjects, levels) {
+  var highest = pickHighestLevel(levels);
+  var out = [];
+  var seen = {};
+  subjects.forEach(function (subject) {
+    subject = String(subject || "").trim();
+    if (!subject || seen[subject.toLowerCase()]) return;
+    seen[subject.toLowerCase()] = true;
+    out.push({ subject: subject, level: highest });
+  });
+  return out;
+}
+
+function highestLevelPerSubject(grid) {
+  var map = {};
   function consider(subject, level) {
     subject = String(subject || "").trim();
     level = String(level || "").trim();
@@ -102,31 +147,25 @@ function highestLevelPerSubject(grid) {
       map[subject] = { level: level, rank: rank };
     }
   }
-
   if (grid && typeof grid === "object" && !Array.isArray(grid)) {
     Object.keys(grid).forEach(function (subject) {
       var levels = grid[subject];
-      if (Array.isArray(levels)) {
-        levels.forEach(function (lvl) { consider(subject, lvl); });
-      } else {
-        consider(subject, levels);
-      }
+      if (Array.isArray(levels)) levels.forEach(function (lvl) { consider(subject, lvl); });
+      else consider(subject, levels);
     });
   } else if (Array.isArray(grid)) {
     grid.forEach(function (row) {
-      // np. "Biologia [Matura]" z eksportu
       var m = String(row).match(/^(.+?)\s*\[(.+)\]\s*$/);
       if (m) consider(m[1], m[2]);
     });
   }
-
   return Object.keys(map).map(function (subject) {
     return { subject: subject, level: map[subject].level };
   });
 }
 
 function postJson(payload) {
-  UrlFetchApp.fetch(WEBHOOK_URL, {
+  return UrlFetchApp.fetch(WEBHOOK_URL, {
     method: "post",
     contentType: "application/json",
     headers: { "x-webhook-secret": WEBHOOK_SECRET },

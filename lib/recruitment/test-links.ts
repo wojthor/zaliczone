@@ -1,4 +1,4 @@
-/** Poziomy jak w cenniku (CheckboxGrid / required_tests). */
+/** Poziomy jak w cenniku / formularzu rekrutacyjnym. */
 export const RECRUITMENT_LEVELS = [
   "Szkoła podstawowa",
   "Szkoła średnia - poziom podstawowy",
@@ -6,6 +6,16 @@ export const RECRUITMENT_LEVELS = [
   "Matura - poziom podstawowy",
   "Matura - poziom rozszerzony",
 ] as const;
+
+/** Im wyższy rank, tym wyższy poziom → jeden test na przedmiot. */
+export const LEVEL_RANK: Record<string, number> = {
+  "szkola podstawowa": 1,
+  "szkola srednia poziom podstawowy": 2,
+  "szkola srednia poziom rozszerzony": 3,
+  matura: 4,
+  "matura poziom podstawowy": 4,
+  "matura poziom rozszerzony": 5,
+};
 
 export type RequiredTest = {
   subject: string;
@@ -72,6 +82,15 @@ export type ResolvedTestLink = {
   label: string;
 };
 
+export type SuggestedTest = {
+  subject: string;
+  level: string;
+  label: string;
+  url: string | null;
+  /** Brak formularza w TEST_URLS dla tej pary. */
+  missing: boolean;
+};
+
 function normKey(s: string): string {
   return s
     .trim()
@@ -85,6 +104,70 @@ function normKey(s: string): string {
     .trim();
 }
 
+function levelRank(level: string): number {
+  return LEVEL_RANK[normKey(level)] ?? 0;
+}
+
+/** Najwyższy poziom spośród zaznaczonych (np. z pytania o poziomy). */
+export function pickHighestLevel(levels: string[]): string {
+  let best = "";
+  let bestRank = -1;
+  for (const level of levels) {
+    const l = level.trim();
+    if (!l) continue;
+    const rank = levelRank(l);
+    if (rank > bestRank || (rank === bestRank && l.length > best.length)) {
+      best = l;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+/** Lista stringów z Forms (tablica, CSV, wielolinijkowy tekst). */
+export function asStringList(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((x) => String(x ?? "").trim()).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return [];
+    if (s.includes("\n")) {
+      return s
+        .split(/\n+/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+    return s
+      .split(/[,;|]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Przedmioty × najwyższy poziom → jeden test na przedmiot.
+ * Np. [Biologia, Chemia] + [podstawowy, rozszerzony] → oba na rozszerzonym.
+ */
+export function buildRequiredTestsFromSubjectsAndLevels(
+  subjects: string[],
+  levels: string[],
+): RequiredTest[] {
+  const cleanSubjects = subjects.map((s) => s.trim()).filter(Boolean);
+  if (cleanSubjects.length === 0) return [];
+  const highest = pickHighestLevel(levels);
+  const out: RequiredTest[] = [];
+  const seen = new Set<string>();
+  for (const subject of cleanSubjects) {
+    const key = subject.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ subject, level: highest });
+  }
+  return out;
+}
+
 function resolveSubjectKey(subject: string): string | null {
   const n = normKey(subject);
   for (const key of Object.keys(TEST_URLS)) {
@@ -94,6 +177,7 @@ function resolveSubjectKey(subject: string): string | null {
 }
 
 function resolveLevelUrl(byLevel: Record<string, string>, level: string): string | null {
+  if (!level) return null;
   if (byLevel[level]) return byLevel[level]!;
   const n = normKey(level);
   for (const [key, url] of Object.entries(byLevel)) {
@@ -138,22 +222,34 @@ export function parseTestResults(raw: unknown): Record<string, TestResultEntry> 
 
 /** Dobiera URL z TEST_URLS dla listy required_tests. */
 export function resolveTestLinks(requiredTests: RequiredTest[]): ResolvedTestLink[] {
-  const out: ResolvedTestLink[] = [];
-  for (const t of requiredTests) {
-    const subjectKey = resolveSubjectKey(t.subject);
-    if (!subjectKey) continue;
-    const byLevel = TEST_URLS[subjectKey];
-    if (!byLevel) continue;
-    const url = resolveLevelUrl(byLevel, t.level);
-    if (!url) continue;
-    out.push({
-      subject: subjectKey,
+  return suggestTestsToSend(requiredTests)
+    .filter((t) => t.url)
+    .map((t) => ({
+      subject: t.subject,
       level: t.level,
+      url: t.url!,
+      label: t.label,
+    }));
+}
+
+/**
+ * Podpowiedź: jakie testy wysłać na podstawie required_tests ze zgłoszenia.
+ * Pokazuje też brakujące URL-e (przedmiot/poziom bez Forms).
+ */
+export function suggestTestsToSend(requiredTests: RequiredTest[]): SuggestedTest[] {
+  return requiredTests.map((t) => {
+    const subjectKey = resolveSubjectKey(t.subject);
+    const byLevel = subjectKey ? TEST_URLS[subjectKey] : null;
+    const url = byLevel ? resolveLevelUrl(byLevel, t.level) : null;
+    const subject = subjectKey ?? t.subject;
+    return {
+      subject,
+      level: t.level,
+      label: t.level ? `${subject} · ${t.level}` : subject,
       url,
-      label: t.level ? `${subjectKey} · ${t.level}` : subjectKey,
-    });
-  }
-  return out;
+      missing: !url,
+    };
+  });
 }
 
 /** Buduje active_subjects z required_tests („Przedmiot · Poziom”). */

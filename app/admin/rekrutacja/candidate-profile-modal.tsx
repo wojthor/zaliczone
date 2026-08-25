@@ -9,7 +9,11 @@ import {
   setCandidateTestsReviewed,
   setCandidateTestsSent,
 } from "@/lib/actions/recruitment";
-import { parseRequiredTests, parseTestResults } from "@/lib/recruitment/test-links";
+import {
+  parseRequiredTests,
+  parseTestResults,
+  suggestTestsToSend,
+} from "@/lib/recruitment/test-links";
 import type { Candidate, CandidateStatus, RequiredTest } from "@/lib/types/database";
 
 const STATUS_LABEL: Record<CandidateStatus, string> = {
@@ -132,10 +136,10 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
   const progressPct = expected > 0 ? Math.min(100, Math.round((completed / expected) * 100)) : 0;
   const closed = candidate.status === "HIRED" || candidate.status === "REJECTED";
   const age = ageFromDob(candidate.dob);
-  const fromApplication = Boolean(
-    candidate.phone || candidate.dob || candidate.university || candidate.hours_per_week || candidate.cv_url,
-  );
+  const suggestions = suggestTestsToSend(required);
   const reviewed = Boolean(candidate.tests_reviewed_manually);
+  const awaitingResults =
+    candidate.test_sent_manually && completed < (expected || suggestions.length);
 
   function runFlag(action: () => Promise<{ ok: true }>) {
     setError(null);
@@ -194,77 +198,6 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
               </p>
             ) : null}
 
-            {!fromApplication ? (
-              <p className="rounded-app border border-toffee/35 bg-toffee/10 px-3 py-2.5 text-xs leading-relaxed text-depths">
-                Na razie widać głównie wynik testu. Pełne dane (telefon, uczelnia, CV…) uzupełnią się, gdy ta
-                sama osoba wyśle <strong>Formularz rekrutacyjny</strong> (APPLICATION) na webhook.
-              </p>
-            ) : null}
-
-            <section>
-              <h3 className="section-label">Status i checklista</h3>
-              <div className="mt-3 space-y-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">
-                    Status
-                  </span>
-                  <select
-                    className="dash-sans text-depths rounded-app border border-panel-frame/40 bg-snow px-3 py-2 text-sm font-semibold disabled:opacity-50"
-                    value={candidate.status}
-                    disabled={isPending}
-                    onChange={(e) => {
-                      const next = e.target.value as CandidateStatus;
-                      runFlag(() => setCandidateStatus(candidate.id, next));
-                    }}
-                  >
-                    {(Object.keys(STATUS_LABEL) as CandidateStatus[]).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[#000C4A]"
-                    checked={candidate.test_sent_manually}
-                    disabled={isPending || closed}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      runFlag(() => setCandidateTestsSent(candidate.id, checked));
-                    }}
-                  />
-                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
-                    Wysłałem / wysłałam linki do testów
-                    <span className="text-muted mt-0.5 block text-xs font-normal">
-                      Zaznacz przed oczekiwanymi odpowiedziami — bez maila z aplikacji.
-                    </span>
-                  </span>
-                </label>
-
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[#000C4A]"
-                    checked={reviewed}
-                    disabled={isPending || closed}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      runFlag(() => setCandidateTestsReviewed(candidate.id, checked));
-                    }}
-                  />
-                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
-                    Testy sprawdzone samodzielnie
-                    <span className="text-muted mt-0.5 block text-xs font-normal">
-                      Oznacz, gdy przejrzałeś wyniki w Forms / panelu.
-                    </span>
-                  </span>
-                </label>
-              </div>
-            </section>
-
             <section>
               <h3 className="section-label">Dane ze zgłoszenia</h3>
               <dl className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -306,13 +239,123 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
               </dl>
               {candidate.levels ? (
                 <dl className="mt-3">
-                  <Field label="Poziomy (opis)">{candidate.levels}</Field>
+                  <Field label="Przedmioty / poziomy (ze zgłoszenia)">{candidate.levels}</Field>
                 </dl>
               ) : null}
             </section>
 
             <section>
-              <h3 className="section-label">Testy wiedzy</h3>
+              <h3 className="section-label">Status i checklista</h3>
+              <div className="mt-3 space-y-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">
+                    Status
+                  </span>
+                  <select
+                    className="dash-sans text-depths rounded-app border border-panel-frame/40 bg-snow px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                    value={candidate.status}
+                    disabled={isPending}
+                    onChange={(e) => {
+                      const next = e.target.value as CandidateStatus;
+                      runFlag(() => setCandidateStatus(candidate.id, next));
+                    }}
+                  >
+                    {(Object.keys(STATUS_LABEL) as CandidateStatus[]).map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 accent-[#000C4A]"
+                    checked={candidate.test_sent_manually}
+                    disabled={isPending || closed}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      runFlag(() => setCandidateTestsSent(candidate.id, checked));
+                    }}
+                  />
+                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
+                    Wysłałem / wysłałam linki do testów
+                    <span className="text-muted mt-0.5 block text-xs font-normal">
+                      Po zaznaczeniu aplikacja oczekuje wyników z Forms — bez maila z apki.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 accent-[#000C4A]"
+                    checked={reviewed}
+                    disabled={isPending || closed}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      runFlag(() => setCandidateTestsReviewed(candidate.id, checked));
+                    }}
+                  />
+                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
+                    Testy sprawdzone samodzielnie
+                    <span className="text-muted mt-0.5 block text-xs font-normal">
+                      Oznacz, gdy przejrzałeś wyniki.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="section-label">Testy do wysłania</h3>
+              <p className="text-muted mt-1 text-xs leading-relaxed">
+                Podpowiedź z pól przedmiotów i poziomów ze zgłoszenia — jeden test na przedmiot (najwyższy
+                poziom).
+              </p>
+              <ul className="mt-3 space-y-2">
+                {suggestions.length === 0 ? (
+                  <li className="text-muted text-xs">Brak przedmiotów w zgłoszeniu.</li>
+                ) : (
+                  suggestions.map((t) => (
+                    <li
+                      key={`suggest-${t.subject}-${t.level}`}
+                      className="rounded-app border border-panel-frame/30 bg-paper px-3 py-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="dash-sans text-depths text-sm font-semibold">{t.label}</p>
+                          {t.missing ? (
+                            <p className="text-claret mt-1 text-[0.7rem] font-medium">
+                              Brak formularza w TEST_URLS dla tej pary.
+                            </p>
+                          ) : null}
+                        </div>
+                        {t.url ? (
+                          <a
+                            href={t.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="dash-sans shrink-0 rounded-full bg-[#000C4A] px-2.5 py-1 text-[0.65rem] font-bold text-lime"
+                          >
+                            Otwórz Forms
+                          </a>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </section>
+
+            <section>
+              <h3 className="section-label">Wyniki testów</h3>
+              {awaitingResults ? (
+                <p className="mt-1 text-xs text-toffee">
+                  Testy oznaczone jako wysłane — czekamy na odpowiedzi z Forms.
+                </p>
+              ) : null}
               <div className="mt-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="dash-sans text-depths text-sm font-bold">

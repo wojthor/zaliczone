@@ -53,7 +53,7 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
           </h1>
           <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
           <p className="dash-sans text-muted mt-1.5 text-sm">
-            Profile kandydatów · jeden test na przedmiot (najwyższy poziom)
+            Najpierw Formularz rekrutacyjny → podpowiedź testów → checkbox „wysłane” → wyniki z Forms
           </p>
         </div>
         <p className="dash-mono text-muted text-xs font-semibold tabular-nums">
@@ -94,7 +94,8 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
 
       {rows.length === 0 ? (
         <p className="dash-sans text-muted soft-panel px-4 py-10 text-center text-sm">
-          Brak kandydatów. Gdy formularz wyśle APPLICATION na webhook, pojawią się tutaj jako karty.
+          Brak kandydatów. Gdy ktoś wyśle Formularz rekrutacyjny (APPLICATION), pojawi się tu karta ze
+          zgłoszenia — potem dopinasz wyniki testów.
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
