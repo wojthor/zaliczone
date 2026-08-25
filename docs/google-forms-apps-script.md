@@ -1,5 +1,15 @@
 # Google Apps Script — rekrutacja Zaliczone (CheckboxGrid → required_tests)
 
+## Checklist produkcji
+
+1. **Vercel → Settings → Environment Variables** — dodaj `GOOGLE_FORMS_WEBHOOK_SECRET` (Production) z tą samą wartością co w `.env.local`. Bez tego endpoint przyjmuje każde żądanie.
+2. Redeploy po dodaniu zmiennej (albo „Redeploy” ostatniego deploymentu).
+3. W Apps Script ustaw:
+   - `WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms"`
+   - `WEBHOOK_SECRET` = ta sama wartość co env
+4. Trigger: **From form** → `onFormSubmit` (formularz główny + każdy quiz Biologii itd.).
+5. Smoke: wyślij testowe zgłoszenie → kandydat w `/admin/rekrutacja`; wynik quizu → `test_results`.
+
 ## Logika najwyższego poziomu
 
 Kandydat zaznacza w siatce wiele poziomów per przedmiot. **Na każdy przedmiot idzie tylko jeden test** — z najwyższego zaznaczonego poziomu.
@@ -14,8 +24,8 @@ Kolejność (rosnąco):
 
 ```javascript
 /** @OnlyCurrentDoc */
-var WEBHOOK_URL = "https://zaliczone.edu.pl/api/webhooks/google-forms";
-var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET";
+var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
+var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 
 /** Im wyższy index, tym wyższy poziom. Dopasuj tytuły kolumn CheckboxGrid. */
 var LEVEL_RANK = {
@@ -129,10 +139,10 @@ Ustaw `TEST_SUBJECT` i `TEST_LEVEL` w każdym quizie (zgodnie z najwyższym pozi
 
 ```javascript
 /** @OnlyCurrentDoc */
-var WEBHOOK_URL = "https://zaliczone.edu.pl/api/webhooks/google-forms";
-var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET";
+var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
+var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 var TEST_SUBJECT = "Biologia";
-var TEST_LEVEL = "Matura";
+var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony"; // dopasuj do tego quizu
 var MAX_POINTS = 20;
 
 function onFormSubmit(e) {
