@@ -147,14 +147,37 @@ var MAX_POINTS = 20;
 
 function onFormSubmit(e) {
   var r = e.response;
+
+  function ans(title) {
+    var items = r.getItemResponses();
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].getItem().getTitle() === title) {
+        return String(items[i].getResponse() || "").trim();
+      }
+    }
+    return "";
+  }
+
+  // Formularz musi zbierać e-mail (Ustawienia → Zbieraj adresy e-mail)
+  // albo mieć pytanie „Adres e-mail” / „Email”.
   var email = "";
   try { email = r.getRespondentEmail() || ""; } catch (_) {}
+  if (!email) email = ans("Adres e-mail") || ans("Email") || ans("E-mail");
 
   var score = "";
   try { score = String(r.getScore()); } catch (_) {}
   if (score && score.indexOf("/") === -1) score = score + "/" + MAX_POINTS;
 
-  UrlFetchApp.fetch(WEBHOOK_URL, {
+  if (!email || email.indexOf("@") === -1) {
+    console.error("TEST_RESULT: brak e-maila — włącz zbieranie adresów w Forms.");
+    return;
+  }
+  if (!score) {
+    console.error("TEST_RESULT: brak wyniku (quiz musi mieć punktację).");
+    return;
+  }
+
+  var res = UrlFetchApp.fetch(WEBHOOK_URL, {
     method: "post",
     contentType: "application/json",
     headers: { "x-webhook-secret": WEBHOOK_SECRET },
@@ -167,5 +190,6 @@ function onFormSubmit(e) {
     }),
     muteHttpExceptions: true,
   });
+  console.log("TEST_RESULT response", res.getResponseCode(), res.getContentText());
 }
 ```

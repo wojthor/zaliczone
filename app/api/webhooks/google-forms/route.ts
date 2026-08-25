@@ -181,15 +181,41 @@ export async function POST(req: Request) {
 
     const { data: candidate } = await supabase
       .from("candidates")
-      .select("id, status, test_results, tests_completed")
+      .select("id, status, test_results, tests_completed, required_tests, tests_expected, full_name")
       .ilike("email", email)
       .in("status", ["NEW", "IN_PROGRESS"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    // Quiz mógł przyjść przed APPLICATION albo bez skryptu na formularzu zgłoszeniowym —
+    // wtedy tworzymy stub, żeby wynik się nie zgubił.
     if (!candidate) {
-      return NextResponse.json({ error: "Candidate not found for email" }, { status: 404 });
+      const fullName =
+        asText(body.full_name) ??
+        asText(body.fullName) ??
+        email.split("@")[0] ??
+        "Kandydat";
+      const requiredTests = [{ subject, level: level || "" }];
+      const { data, error } = await supabase
+        .from("candidates")
+        .insert({
+          full_name: fullName,
+          email,
+          required_tests: requiredTests,
+          tests_expected: 1,
+          tests_completed: 1,
+          test_results: { [subject]: { score, level } },
+          test_sent_manually: false,
+          status: "IN_PROGRESS" as const,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return NextResponse.json(
+        { ok: true, action: "test_result_created", candidate: data },
+        { status: 201 },
+      );
     }
 
     const prev = parseTestResults(candidate.test_results);
