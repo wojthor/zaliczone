@@ -295,6 +295,8 @@ export type Candidate = {
   tests_completed: number;
   test_results: CandidateTestResults;
   test_sent_manually: boolean;
+  /** Admin sprawdził wyniki testów ręcznie (checkbox w panelu). */
+  tests_reviewed_manually: boolean;
   status: CandidateStatus;
   created_at: string;
 };

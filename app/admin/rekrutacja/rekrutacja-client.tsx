@@ -130,20 +130,26 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
                   </div>
 
                   <div className="flex flex-wrap gap-1">
-                    {required.slice(0, 4).map((t) => (
-                      <span
-                        key={`${t.subject}-${t.level}`}
-                        className="rounded-full bg-paper px-2 py-0.5 text-[0.65rem] font-semibold text-depths"
-                      >
-                        {t.subject}
-                        {t.level ? ` · ${t.level}` : ""}
-                      </span>
-                    ))}
-                    {required.length > 4 ? (
-                      <span className="text-muted text-[0.65rem] font-semibold">
-                        +{required.length - 4}
-                      </span>
-                    ) : null}
+                    {required.length === 0 ? (
+                      <span className="text-muted text-[0.65rem]">Brak listy testów</span>
+                    ) : (
+                      required.map((t) => {
+                        const score = results[t.subject]?.score;
+                        return (
+                          <span
+                            key={`${t.subject}-${t.level}`}
+                            className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
+                              score
+                                ? "bg-moss/15 text-moss"
+                                : "bg-paper text-depths"
+                            }`}
+                          >
+                            {t.subject}
+                            {score ? ` ${score}` : t.level ? ` · ${t.level}` : ""}
+                          </span>
+                        );
+                      })
+                    )}
                   </div>
 
                   <div className="mt-auto">
@@ -162,8 +168,10 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
                       />
                     </div>
                     <p className="text-muted mt-2 text-[0.65rem]">
-                      {c.test_sent_manually ? "Testy wysłane" : "Testy niewysłane"} · kliknij, by
-                      otworzyć profil
+                      {c.test_sent_manually ? "Testy wysłane" : "Testy niewysłane"}
+                      {c.tests_reviewed_manually ? " · sprawdzone" : ""}
+                      {" · "}
+                      kliknij profil
                     </p>
                   </div>
                 </button>

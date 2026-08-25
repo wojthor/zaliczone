@@ -927,5 +927,8 @@ export async function getCandidates(): Promise<Candidate[]> {
     if (isMissingCandidates(error)) return [];
     throw error;
   }
-  return (data ?? []) as Candidate[];
+  return (data ?? []).map((row) => ({
+    ...(row as Candidate),
+    tests_reviewed_manually: Boolean((row as Candidate).tests_reviewed_manually),
+  }));
 }

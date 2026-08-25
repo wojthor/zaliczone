@@ -2,18 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createTutorAccount } from "@/lib/actions/admin";
-import {
-  sendRecruitmentRejectionEmail,
-  sendRecruitmentTestEmail,
-} from "@/lib/emails/send";
-import {
-  offeringsFromCandidate,
-  parseRequiredTests,
-  resolveTestLinks,
-} from "@/lib/recruitment/test-links";
+import { sendRecruitmentRejectionEmail } from "@/lib/emails/send";
+import { offeringsFromCandidate } from "@/lib/recruitment/test-links";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
-import type { Candidate } from "@/lib/types/database";
+import type { Candidate, CandidateStatus } from "@/lib/types/database";
+
+const STATUSES: CandidateStatus[] = ["NEW", "IN_PROGRESS", "REJECTED", "HIRED"];
 
 async function requireAdmin(): Promise<void> {
   const supabase = await createClient();
@@ -46,62 +41,69 @@ async function getCandidateOrThrow(candidateId: string): Promise<Candidate> {
   return data as Candidate;
 }
 
-/**
- * Oznacza testy jako wysłane, ustawia status IN_PROGRESS
- * i wysyła maila Resend z linkami dobranymi z TEST_URLS (przedmiot + poziom).
- */
-export async function markTestsAsSent(candidateId: string): Promise<{ ok: true }> {
+/** Checkbox: oznacz, że linki do testów zostały wysłane (bez maila z aplikacji). */
+export async function setCandidateTestsSent(
+  candidateId: string,
+  sent: boolean,
+): Promise<{ ok: true }> {
   await requireAdmin();
   const candidate = await getCandidateOrThrow(candidateId);
-
   if (candidate.status === "HIRED" || candidate.status === "REJECTED") {
-    throw new Error("Ten kandydat jest już zamknięty (zatrudniony lub odrzucony).");
+    throw new Error("Ten kandydat jest już zamknięty.");
   }
 
-  const required = parseRequiredTests(candidate.required_tests);
-  const links = resolveTestLinks(required);
-  if (links.length === 0) {
-    throw new Error(
-      "Brak linków do testów dla required_tests kandydata. Uzupełnij TEST_URLS (przedmiot + poziom).",
-    );
-  }
-  if (links.length < required.length) {
-    const missing = required
-      .filter((t) => !links.some((l) => l.subject === t.subject && normLoose(l.level) === normLoose(t.level)))
-      .map((t) => `${t.subject} · ${t.level}`)
-      .join(", ");
-    throw new Error(`Brak URL-i dla: ${missing}. Uzupełnij TEST_URLS.`);
-  }
-
-  await sendRecruitmentTestEmail({
-    email: candidate.email,
-    firstName: firstNameOf(candidate.full_name),
-    tests: links.map((l) => ({
-      subject: l.subject,
-      level: l.level,
-      url: l.url,
-      label: l.label,
-    })),
-  });
+  const patch: Record<string, unknown> = { test_sent_manually: sent };
+  if (sent && candidate.status === "NEW") patch.status = "IN_PROGRESS";
 
   const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("candidates")
-    .update({ test_sent_manually: true, status: "IN_PROGRESS" })
-    .eq("id", candidateId);
+  const { error } = await supabase.from("candidates").update(patch).eq("id", candidateId);
   if (error) throw error;
 
   revalidateRecruitment();
   return { ok: true };
 }
 
-function normLoose(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/[()]/g, " ")
-    .replace(/\s*-\s*/g, " ")
-    .replace(/\s+/g, " ");
+/** Checkbox: admin sprawdził wyniki testów samodzielnie. */
+export async function setCandidateTestsReviewed(
+  candidateId: string,
+  reviewed: boolean,
+): Promise<{ ok: true }> {
+  await requireAdmin();
+  await getCandidateOrThrow(candidateId);
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("candidates")
+    .update({ tests_reviewed_manually: reviewed })
+    .eq("id", candidateId);
+  if (error) {
+    if (String(error.message).includes("tests_reviewed_manually")) {
+      throw new Error(
+        "Brak kolumny tests_reviewed_manually — uruchom migrację 0019_candidates_review.sql w Supabase.",
+      );
+    }
+    throw error;
+  }
+
+  revalidateRecruitment();
+  return { ok: true };
+}
+
+/** Ręczna zmiana statusu kandydata (bez maila). */
+export async function setCandidateStatus(
+  candidateId: string,
+  status: CandidateStatus,
+): Promise<{ ok: true }> {
+  await requireAdmin();
+  if (!STATUSES.includes(status)) throw new Error("Nieprawidłowy status.");
+  await getCandidateOrThrow(candidateId);
+
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("candidates").update({ status }).eq("id", candidateId);
+  if (error) throw error;
+
+  revalidateRecruitment();
+  return { ok: true };
 }
 
 export async function hireCandidate(candidateId: string): Promise<{ ok: true; tutorId: string }> {

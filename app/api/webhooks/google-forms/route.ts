@@ -123,6 +123,7 @@ export async function POST(req: Request) {
         tests_completed: 0,
         test_results: {},
         test_sent_manually: false,
+        tests_reviewed_manually: false,
         status: "NEW" as const,
       };
 
@@ -207,6 +208,7 @@ export async function POST(req: Request) {
           tests_completed: 1,
           test_results: { [subject]: { score, level } },
           test_sent_manually: false,
+          tests_reviewed_manually: false,
           status: "IN_PROGRESS" as const,
         })
         .select("*")
