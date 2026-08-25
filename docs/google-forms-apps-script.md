@@ -10,6 +10,9 @@
 4. Trigger: **From form** → `onFormSubmit` (formularz główny + każdy quiz Biologii itd.).
 5. Smoke: wyślij testowe zgłoszenie → kandydat w `/admin/rekrutacja`; wynik quizu → `test_results`.
 
+**Dlaczego wynik quizu „nie widać”?**  
+Wcześniej `TEST_RESULT` wymagał wcześniejszego `APPLICATION`. Jeśli Julia zrobiła tylko test Biologii (albo Apps Script nie miał e-maila / triggera), nic nie trafiło do bazy. Teraz wynik bez zgłoszenia tworzy stub kandydata. Formularz quizu **musi zbierać e-mail** (Ustawienia Forms) i mieć zainstalowany skrypt B) z triggerem.
+
 ## Logika najwyższego poziomu
 
 Kandydat zaznacza w siatce wiele poziomów per przedmiot. **Na każdy przedmiot idzie tylko jeden test** — z najwyższego zaznaczonego poziomu.
