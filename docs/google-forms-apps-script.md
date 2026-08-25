@@ -138,7 +138,9 @@ function postJson(payload) {
 
 ## B) Formularz testu (TEST_RESULT)
 
-Ustaw `TEST_SUBJECT` i `TEST_LEVEL` w każdym quizie (zgodnie z najwyższym poziomem z `required_tests`).
+Ustaw `TEST_SUBJECT` i `TEST_LEVEL` w każdym quizie.
+
+**Już wypełnione odpowiedzi:** wklej cały skrypt poniżej → zapisz → zaznacz funkcję `backfillExistingTestResults` → **Run** (jednorazowo). To wyśle do panelu wszystkie dotychczasowe odpowiedzi z tego Forms (np. Julię). Potem `onFormSubmit` łapie tylko nowe.
 
 ```javascript
 /** @OnlyCurrentDoc */
@@ -149,8 +151,22 @@ var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony"; // dopasuj do tego qui
 var MAX_POINTS = 20;
 
 function onFormSubmit(e) {
-  var r = e.response;
+  postTestResult(e.response);
+}
 
+/** Uruchom ręcznie raz: Run → backfillExistingTestResults */
+function backfillExistingTestResults() {
+  var form = FormApp.getActiveForm();
+  var responses = form.getResponses();
+  Logger.log("Backfill: " + responses.length + " odpowiedzi");
+  for (var i = 0; i < responses.length; i++) {
+    postTestResult(responses[i]);
+    Utilities.sleep(200);
+  }
+  Logger.log("Backfill done");
+}
+
+function postTestResult(r) {
   function ans(title) {
     var items = r.getItemResponses();
     for (var i = 0; i < items.length; i++) {
@@ -161,8 +177,6 @@ function onFormSubmit(e) {
     return "";
   }
 
-  // Formularz musi zbierać e-mail (Ustawienia → Zbieraj adresy e-mail)
-  // albo mieć pytanie „Adres e-mail” / „Email”.
   var email = "";
   try { email = r.getRespondentEmail() || ""; } catch (_) {}
   if (!email) email = ans("Adres e-mail") || ans("Email") || ans("E-mail");
@@ -171,28 +185,35 @@ function onFormSubmit(e) {
   try { score = String(r.getScore()); } catch (_) {}
   if (score && score.indexOf("/") === -1) score = score + "/" + MAX_POINTS;
 
+  var fullName = ans("Imię i nazwisko") || ans("Imię") || "";
+
   if (!email || email.indexOf("@") === -1) {
-    console.error("TEST_RESULT: brak e-maila — włącz zbieranie adresów w Forms.");
+    Logger.log("SKIP brak email id=" + r.getId());
     return;
   }
   if (!score) {
-    console.error("TEST_RESULT: brak wyniku (quiz musi mieć punktację).");
+    Logger.log("SKIP brak score email=" + email);
     return;
   }
+
+  var payload = {
+    type: "TEST_RESULT",
+    email: String(email).toLowerCase().trim(),
+    subject: TEST_SUBJECT,
+    level: TEST_LEVEL,
+    score: score,
+  };
+  if (fullName) payload.full_name = fullName;
 
   var res = UrlFetchApp.fetch(WEBHOOK_URL, {
     method: "post",
     contentType: "application/json",
     headers: { "x-webhook-secret": WEBHOOK_SECRET },
-    payload: JSON.stringify({
-      type: "TEST_RESULT",
-      email: String(email).toLowerCase().trim(),
-      subject: TEST_SUBJECT,
-      level: TEST_LEVEL,
-      score: score,
-    }),
+    payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
-  console.log("TEST_RESULT response", res.getResponseCode(), res.getContentText());
+  Logger.log(email + " " + score + " → " + res.getResponseCode() + " " + res.getContentText());
 }
 ```
+
+Po Run: **Executions** → logi typu `jmiedzinska859@gmail.com 15/15 → 201 …`. Odśwież `/admin/rekrutacja`.
