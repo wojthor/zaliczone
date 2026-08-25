@@ -138,30 +138,33 @@ function postJson(payload) {
 
 ## B) Formularz testu (TEST_RESULT)
 
-Ustaw `TEST_SUBJECT` i `TEST_LEVEL` w każdym quizie.
+Biologia **już jest testem** (masz punkty i „Udostępnij oceny”) — nie musisz nic „robić od zera”.  
+Wystarczy, żeby zaznaczone było **„Natychmiast po przesłaniu każdego formularza”** (nie „Później”). Bez tego Apps Script często dostaje pusty wynik.
 
-**Już wypełnione odpowiedzi:** wklej cały skrypt poniżej → zapisz → zaznacz funkcję `backfillExistingTestResults` → **Run** (jednorazowo). To wyśle do panelu wszystkie dotychczasowe odpowiedzi z tego Forms (np. Julię). Potem `onFormSubmit` łapie tylko nowe.
+Dodatkowo: **Odpowiedzi → Link do arkusza kalkulacyjnego** (jeśli jeszcze nie ma). W arkuszu jest kolumna **Score** / **Wynik** — skrypt czyta stamtąd, gdy `getScore()` jest puste.
+
+**Import starych odpowiedzi:** wklej skrypt → `MAX_POINTS` / sekret → Run → **`backfillExistingTestResults`**.
 
 ```javascript
 /** @OnlyCurrentDoc */
 var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 var TEST_SUBJECT = "Biologia";
-var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony"; // dopasuj do tego quizu
-var MAX_POINTS = 15; // max punktów w tym quizie (u Julii 15/15)
+var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony";
+var MAX_POINTS = 15;
 
 function onFormSubmit(e) {
   postTestResult(e.response);
 }
 
-/** Uruchom ręcznie raz: Run → backfillExistingTestResults */
+/** Run → backfillExistingTestResults (jednorazowo) */
 function backfillExistingTestResults() {
   var form = FormApp.getActiveForm();
   var responses = form.getResponses();
   Logger.log("Backfill: " + responses.length + " odpowiedzi");
   for (var i = 0; i < responses.length; i++) {
     postTestResult(responses[i]);
-    Utilities.sleep(200);
+    Utilities.sleep(250);
   }
   Logger.log("Backfill done");
 }
@@ -181,39 +184,7 @@ function postTestResult(r) {
   try { email = r.getRespondentEmail() || ""; } catch (_) {}
   if (!email) email = ans("Adres e-mail") || ans("Email") || ans("E-mail");
 
-  // getScore() bywa null, gdy quiz nie „zwalnia” ocen od razu — sumujemy punkty z pytań.
-  var points = null;
-  try {
-    var raw = r.getScore();
-    Logger.log("raw getScore=" + raw + " (type " + typeof raw + ")");
-    if (raw !== null && raw !== undefined && raw !== "") points = Number(raw);
-  } catch (err) {
-    Logger.log("getScore error: " + err);
-  }
-  if (points === null || isNaN(points)) {
-    points = 0;
-    var gotAny = false;
-    try {
-      var graded = r.getGradableItemResponses();
-      for (var g = 0; g < graded.length; g++) {
-        var ps = graded[g].getScore();
-        Logger.log("item score[" + g + "]=" + ps);
-        if (ps !== null && ps !== undefined && ps !== "") {
-          points += Number(ps);
-          gotAny = true;
-        }
-      }
-    } catch (err2) {
-      Logger.log("gradable error: " + err2);
-    }
-    if (!gotAny) points = null;
-  }
-
-  var score = "";
-  if (points !== null && !isNaN(points)) {
-    score = String(points) + "/" + MAX_POINTS;
-  }
-
+  var score = resolveScore(r, email);
   var fullName = ans("Imię i nazwisko") || ans("Imię") || "";
 
   if (!email || email.indexOf("@") === -1) {
@@ -223,7 +194,7 @@ function postTestResult(r) {
   if (!score) {
     Logger.log(
       "SKIP brak score email=" + email +
-        " — w Forms: Ustawienia → Quizy → Zwolnij oceny: Natychmiast po przesłaniu, potem Run ponownie."
+        " | Ustaw „Udostępnij oceny: Natychmiast” ALBO Odpowiedzi→arkusz z kolumną Score, potem Run znowu."
     );
     return;
   }
@@ -246,6 +217,88 @@ function postTestResult(r) {
   });
   Logger.log(email + " " + score + " → " + res.getResponseCode() + " " + res.getContentText());
 }
+
+/** 1) getScore 2) suma pytań 3) kolumna Score/Wynik w arkuszu odpowiedzi */
+function resolveScore(r, email) {
+  try {
+    var raw = r.getScore();
+    Logger.log("raw getScore=" + raw);
+    if (raw !== null && raw !== undefined && raw !== "" && !isNaN(Number(raw))) {
+      return Number(raw) + "/" + MAX_POINTS;
+    }
+  } catch (e) {
+    Logger.log("getScore err " + e);
+  }
+
+  try {
+    var sum = 0;
+    var any = false;
+    var graded = r.getGradableItemResponses();
+    for (var g = 0; g < graded.length; g++) {
+      var ps = graded[g].getScore();
+      if (ps !== null && ps !== undefined && ps !== "") {
+        sum += Number(ps);
+        any = true;
+      }
+    }
+    if (any) return sum + "/" + MAX_POINTS;
+  } catch (e2) {
+    Logger.log("gradable err " + e2);
+  }
+
+  var fromSheet = scoreFromDestinationSheet(email, r.getTimestamp());
+  if (fromSheet) return fromSheet;
+  return "";
+}
+
+function scoreFromDestinationSheet(email, timestamp) {
+  var form = FormApp.getActiveForm();
+  var sid = form.getDestinationId();
+  if (!sid) {
+    Logger.log("Brak arkusza docelowego (Odpowiedzi → Link do arkusza).");
+    return "";
+  }
+  var ss = SpreadsheetApp.openById(sid);
+  var sheet = ss.getSheets()[0];
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return "";
+
+  var headers = values[0].map(function (h) {
+    return String(h).trim().toLowerCase();
+  });
+  var scoreCol = -1;
+  var emailCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c];
+    if (scoreCol < 0 && (h === "score" || h === "wynik" || h.indexOf("score") === 0 || h.indexOf("wynik") === 0)) {
+      scoreCol = c;
+    }
+    if (emailCol < 0 && (h.indexOf("email") >= 0 || h.indexOf("e-mail") >= 0 || h.indexOf("adres e-mail") >= 0)) {
+      emailCol = c;
+    }
+  }
+  Logger.log("sheet scoreCol=" + scoreCol + " emailCol=" + emailCol);
+
+  if (scoreCol < 0) return "";
+
+  var wantEmail = String(email || "").toLowerCase().trim();
+  for (var r = values.length - 1; r >= 1; r--) {
+    var rowEmail = emailCol >= 0 ? String(values[r][emailCol] || "").toLowerCase().trim() : "";
+    if (wantEmail && rowEmail && rowEmail !== wantEmail) continue;
+
+    var cell = values[r][scoreCol];
+    if (cell === null || cell === undefined || cell === "") continue;
+
+    var s = String(cell).trim();
+    // "15 / 15" | "15/15" | 15
+    var m = s.match(/(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)/);
+    if (m) return m[1].replace(",", ".") + "/" + m[2].replace(",", ".");
+    if (!isNaN(Number(s))) return Number(s) + "/" + MAX_POINTS;
+
+    if (wantEmail && rowEmail === wantEmail) break;
+  }
+  return "";
+}
 ```
 
-Po Run: **Executions** → logi typu `jmiedzinska859@gmail.com 15/15 → 201 …`. Odśwież `/admin/rekrutacja`.
+Po udanym Run w logu: `jmiedzinska859@gmail.com 15/15 → 201 …` → odśwież `/admin/rekrutacja`.
