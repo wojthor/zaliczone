@@ -32,6 +32,8 @@ Pytania (dopasuj tytuły 1:1 do Forms):
 
 Logika: **jeden test na każdy przedmiot**, na **najwyższym** zaznaczonym poziomie.
 
+**Już wypełnione zgłoszenia:** wklej skrypt → Run → **`backfillExistingApplications`** (raz). Potem `onFormSubmit` łapie tylko nowe.
+
 ```javascript
 /** @OnlyCurrentDoc */
 var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
@@ -50,17 +52,43 @@ var LEVEL_RANK = {
 
 function onFormSubmit(e) {
   try {
-    var payload = { type: "APPLICATION", data: buildApplicationData(e) };
-    var res = postJson(payload);
-    Logger.log("APPLICATION " + res.getResponseCode() + " " + res.getContentText());
+    postApplication(e.response);
   } catch (err) {
     console.error(err);
   }
 }
 
-function buildApplicationData(e) {
-  var r = e.response;
+/** Run → backfillExistingApplications — jednorazowo importuje już wypełnione zgłoszenia. */
+function backfillExistingApplications() {
+  var form = FormApp.getActiveForm();
+  var responses = form.getResponses();
+  Logger.log("Backfill APPLICATION: " + responses.length + " odpowiedzi");
+  for (var i = 0; i < responses.length; i++) {
+    postApplication(responses[i]);
+    Utilities.sleep(250);
+  }
+  Logger.log("Backfill APPLICATION done");
+}
 
+function postApplication(r) {
+  var data = buildApplicationDataFromResponse(r);
+  if (!data.email || data.email.indexOf("@") === -1) {
+    Logger.log("SKIP brak email id=" + r.getId());
+    return;
+  }
+  if (!data.full_name) {
+    Logger.log("SKIP brak imienia email=" + data.email);
+    return;
+  }
+  if (!data.required_tests || data.required_tests.length === 0) {
+    Logger.log("SKIP brak przedmiotów/poziomów email=" + data.email);
+    return;
+  }
+  var res = postJson({ type: "APPLICATION", data: data });
+  Logger.log(data.email + " → " + res.getResponseCode() + " " + res.getContentText());
+}
+
+function buildApplicationDataFromResponse(r) {
   function ans(title) {
     var items = r.getItemResponses();
     for (var i = 0; i < items.length; i++) {
@@ -85,9 +113,13 @@ function buildApplicationData(e) {
   var last = String(ans("Nazwisko") || "");
   var fullName = String(ans("Imię i nazwisko") || "").trim() || (first + " " + last).trim();
 
+  var email = "";
+  try { email = r.getRespondentEmail() || ""; } catch (_) {}
+  if (!email) email = String(ans("E-mail") || ans("Adres e-mail") || "");
+
   return {
     full_name: fullName,
-    email: String(ans("E-mail") || ans("Adres e-mail") || "").toLowerCase(),
+    email: String(email).toLowerCase().trim(),
     phone: String(ans("Telefon") || ""),
     dob: String(ans("Data urodzenia") || ""),
     student_status: /tak|yes/i.test(String(ans("Czy jesteś studentem?"))),
