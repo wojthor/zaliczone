@@ -97,7 +97,7 @@ function normKey(s: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
-    .replace(/język\s+/g, "")
+    .replace(/^jezyk\s+/, "")
     .replace(/[()]/g, " ")
     .replace(/\s*-\s*/g, " ")
     .replace(/\s+/g, " ")
@@ -124,24 +124,31 @@ export function pickHighestLevel(levels: string[]): string {
   return best;
 }
 
-/** Lista stringów z Forms (tablica, CSV, wielolinijkowy tekst). */
+/** Lista stringów z Forms — rozbija też „poziom1,poziom2” w jednym elemencie tablicy. */
 export function asStringList(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw.map((x) => String(x ?? "").trim()).filter(Boolean);
-  }
-  if (typeof raw === "string") {
-    const s = raw.trim();
-    if (!s) return [];
-    if (s.includes("\n")) {
-      return s
+  const splitOne = (s: string): string[] => {
+    const t = s.trim();
+    if (!t) return [];
+    if (t.includes("\n")) {
+      return t
         .split(/\n+/)
+        .flatMap(splitOne)
+        .filter(Boolean);
+    }
+    if (t.includes(",")) {
+      return t
+        .split(",")
         .map((x) => x.trim())
         .filter(Boolean);
     }
-    return s
-      .split(/[,;|]/)
-      .map((x) => x.trim())
-      .filter(Boolean);
+    return [t];
+  };
+
+  if (Array.isArray(raw)) {
+    return raw.flatMap((x) => splitOne(String(x ?? ""))).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    return splitOne(raw);
   }
   return [];
 }
@@ -193,8 +200,10 @@ export function parseRequiredTests(raw: unknown): RequiredTest[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const subject = String((item as { subject?: unknown }).subject ?? "").trim();
-    const level = String((item as { level?: unknown }).level ?? "").trim();
+    const levelRaw = String((item as { level?: unknown }).level ?? "").trim();
     if (!subject) continue;
+    const levelParts = asStringList(levelRaw);
+    const level = levelParts.length > 1 ? pickHighestLevel(levelParts) : levelRaw;
     const key = `${subject}::${level}`;
     if (seen.has(key)) continue;
     seen.add(key);
