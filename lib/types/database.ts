@@ -270,13 +270,21 @@ export type RequiredTest = {
   level: string;
 };
 
-/** Wyniki: { "Biologia": { score: "18/20", level: "Matura" } } */
+/** Wyniki: lista { subject, level, score } albo legacy mapa przedmiot → wynik. */
 export type CandidateTestResultEntry = {
   score: string;
   level: string;
 };
 
-export type CandidateTestResults = Record<string, CandidateTestResultEntry | string>;
+export type CandidateTestResultRow = {
+  subject: string;
+  level: string;
+  score: string;
+};
+
+export type CandidateTestResults =
+  | CandidateTestResultRow[]
+  | Record<string, CandidateTestResultEntry | string>;
 
 export type Candidate = {
   id: string;
@@ -295,6 +303,8 @@ export type Candidate = {
   tests_completed: number;
   test_results: CandidateTestResults;
   test_sent_manually: boolean;
+  /** Data wysłania linków do testów (podawana ręcznie) — do liczenia 3 dni roboczych. */
+  test_sent_at: string | null;
   /** Admin sprawdził wyniki testów ręcznie (checkbox w panelu). */
   tests_reviewed_manually: boolean;
   status: CandidateStatus;

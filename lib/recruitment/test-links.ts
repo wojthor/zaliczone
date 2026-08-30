@@ -23,8 +23,9 @@ export type RequiredTest = {
 };
 
 export type TestResultEntry = {
-  score: string;
+  subject: string;
   level: string;
+  score: string;
 };
 
 /**
@@ -75,6 +76,14 @@ export const TEST_URLS: Record<string, Record<string, string>> = {
   },
 };
 
+/**
+ * Formularze z wklejonym Apps Script (onFormSubmit / backfill).
+ * Synchronizowane z TEST_URLS — każdy Forms z URL-em ma skrypt.
+ */
+export const TESTS_WITH_APPS_SCRIPT: Record<string, readonly string[]> = Object.fromEntries(
+  Object.entries(TEST_URLS).map(([subject, byLevel]) => [subject, Object.keys(byLevel)]),
+);
+
 export type ResolvedTestLink = {
   subject: string;
   level: string;
@@ -89,6 +98,8 @@ export type SuggestedTest = {
   url: string | null;
   /** Brak formularza w TEST_URLS dla tej pary. */
   missing: boolean;
+  /** Forms jest, ale brak skryptu Apps Script. */
+  scriptMissing: boolean;
 };
 
 function normKey(s: string): string {
@@ -97,11 +108,33 @@ function normKey(s: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
+    .replace(/ł/g, "l")
     .replace(/^jezyk\s+/, "")
     .replace(/[()]/g, " ")
     .replace(/\s*-\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Ujednolica etykiety poziomu z różnych Forms do kanonicznej formy z cennika. */
+export function canonicalizeLevel(level: string): string {
+  const n = normKey(level);
+  if (!n) return "";
+  const aliases: Record<string, string> = {
+    "szkola podstawowa": "Szkoła podstawowa",
+    "szkola srednia poziom podstawowy": "Szkoła średnia - poziom podstawowy",
+    "szkola srednia poziom rozszerzony": "Szkoła średnia - poziom rozszerzony",
+    matura: "Matura",
+    "matura poziom podstawowy": "Matura - poziom podstawowy",
+    "matura poziom rozszerzony": "Matura - poziom rozszerzony",
+  };
+  return aliases[n] || level.trim().replace(/\s+/g, " ");
+}
+
+/** Ujednolica nazwę przedmiotu (Język polski → Polski w linkach; zachowuje czytelny label). */
+export function canonicalizeSubject(subject: string): string {
+  const key = resolveSubjectKey(subject);
+  return key ?? subject.trim();
 }
 
 function levelRank(level: string): number {
@@ -212,21 +245,111 @@ export function parseRequiredTests(raw: unknown): RequiredTest[] {
   return out;
 }
 
-export function parseTestResults(raw: unknown): Record<string, TestResultEntry> {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const out: Record<string, TestResultEntry> = {};
-  for (const [subject, val] of Object.entries(raw as Record<string, unknown>)) {
+export function parseTestResults(raw: unknown): Record<string, { score: string; level: string }> {
+  const list = parseTestResultsList(raw);
+  const out: Record<string, { score: string; level: string }> = {};
+  for (const row of list) {
+    const prev = out[row.subject];
+    if (!prev || levelRank(row.level) >= levelRank(prev.level)) {
+      out[row.subject] = { score: row.score, level: row.level };
+    }
+  }
+  return out;
+}
+
+function resultKey(subject: string, level: string): string {
+  return `${normKey(subject)}::${normKey(level)}`;
+}
+
+function sameSubject(a: string, b: string): boolean {
+  return normKey(a) === normKey(b);
+}
+
+/**
+ * Wyniki jako lista (wiele poziomów na ten sam przedmiot).
+ * Czyta też stary format: { "Biologia": { score, level } }.
+ */
+export function parseTestResultsList(raw: unknown): TestResultEntry[] {
+  const out: TestResultEntry[] = [];
+  const seen = new Set<string>();
+
+  const push = (subject: string, level: string, score: string) => {
+    const s = subject.trim();
+    const sc = score.trim();
+    if (!s || !sc) return;
+    const key = resultKey(s, level);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ subject: s, level: level.trim(), score: sc });
+  };
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const subject = String((item as { subject?: unknown }).subject ?? "").trim();
+      const level = String((item as { level?: unknown }).level ?? "").trim();
+      const score = String((item as { score?: unknown }).score ?? "").trim();
+      push(subject, level, score);
+    }
+    return out;
+  }
+
+  if (!raw || typeof raw !== "object") return out;
+
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof val === "string" && val.trim()) {
-      out[subject] = { score: val.trim(), level: "" };
+      const parts = key.split("::");
+      push(parts[0] || key, parts.slice(1).join("::"), val);
       continue;
     }
     if (val && typeof val === "object" && !Array.isArray(val)) {
       const score = String((val as { score?: unknown }).score ?? "").trim();
       const level = String((val as { level?: unknown }).level ?? "").trim();
-      if (score) out[subject] = { score, level };
+      const subjectFromVal = String((val as { subject?: unknown }).subject ?? "").trim();
+      const subject = subjectFromVal || key.split("::")[0] || key;
+      push(subject, level, score);
     }
   }
   return out;
+}
+
+/** Upsert: ten sam przedmiot+poziom → nadpisz; inny poziom → dopisz (np. matma rozsz. + podst.). */
+export function upsertTestResult(
+  prev: TestResultEntry[],
+  next: { subject: string; level: string; score: string },
+): TestResultEntry[] {
+  const subject = next.subject.trim();
+  const level = (next.level || "").trim();
+  const score = next.score.trim();
+  if (!subject || !score) return prev;
+
+  const key = resultKey(subject, level);
+  let found = false;
+  const out = prev.map((row) => {
+    if (resultKey(row.subject, row.level) !== key) return row;
+    found = true;
+    return { subject, level, score };
+  });
+  if (!found) out.push({ subject, level, score });
+  return out;
+}
+
+export function countSubjectsWithResults(results: TestResultEntry[]): number {
+  const seen = new Set<string>();
+  for (const r of results) seen.add(normKey(r.subject));
+  return seen.size;
+}
+
+/** Dokładny poziom, inaczej dowolny wynik z przedmiotu. */
+export function findResultForRequired(
+  results: TestResultEntry[],
+  required: RequiredTest,
+): TestResultEntry | null {
+  const exact = results.find(
+    (r) => sameSubject(r.subject, required.subject) && normKey(r.level) === normKey(required.level),
+  );
+  if (exact) return exact;
+  return results.find((r) => sameSubject(r.subject, required.subject)) ?? null;
 }
 
 /** Dobiera URL z TEST_URLS dla listy required_tests. */
@@ -245,18 +368,28 @@ export function resolveTestLinks(requiredTests: RequiredTest[]): ResolvedTestLin
  * Podpowiedź: jakie testy wysłać na podstawie required_tests ze zgłoszenia.
  * Pokazuje też brakujące URL-e (przedmiot/poziom bez Forms).
  */
+function hasAppsScript(subjectKey: string | null, level: string): boolean {
+  if (!subjectKey) return false;
+  const levels = TESTS_WITH_APPS_SCRIPT[subjectKey];
+  if (!levels?.length) return false;
+  const n = normKey(level);
+  return levels.some((l) => normKey(l) === n);
+}
+
 export function suggestTestsToSend(requiredTests: RequiredTest[]): SuggestedTest[] {
   return requiredTests.map((t) => {
     const subjectKey = resolveSubjectKey(t.subject);
     const byLevel = subjectKey ? TEST_URLS[subjectKey] : null;
     const url = byLevel ? resolveLevelUrl(byLevel, t.level) : null;
     const subject = subjectKey ?? t.subject;
+    const missing = !url;
     return {
       subject,
       level: t.level,
       label: t.level ? `${subject} · ${t.level}` : subject,
       url,
-      missing: !url,
+      missing,
+      scriptMissing: !missing && !hasAppsScript(subjectKey, t.level),
     };
   });
 }

@@ -3,8 +3,11 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import {
   asStringList,
   buildRequiredTestsFromSubjectsAndLevels,
+  canonicalizeLevel,
+  countSubjectsWithResults,
   parseRequiredTests,
-  parseTestResults,
+  parseTestResultsList,
+  upsertTestResult,
 } from "@/lib/recruitment/test-links";
 import type { CandidateStatus } from "@/lib/types/database";
 
@@ -172,8 +175,8 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (existing) {
-        const prevResults = parseTestResults(existing.test_results);
-        const completed = Object.keys(prevResults).length;
+        const prevResults = parseTestResultsList(existing.test_results);
+        const completed = countSubjectsWithResults(prevResults);
         const { data, error } = await supabase
           .from("candidates")
           .update({
@@ -238,18 +241,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const prev = parseTestResults(candidate.test_results);
-    const hadScore = Boolean(prev[subject]?.score);
-    const nextResults = {
-      ...prev,
-      [subject]: { score, level },
-    };
-    const testsCompleted = hadScore
-      ? Number(candidate.tests_completed) || Object.keys(nextResults).length
-      : (Number(candidate.tests_completed) || 0) + 1;
+    const prev = parseTestResultsList(candidate.test_results);
+    const nextResults = upsertTestResult(prev, {
+      subject,
+      level: canonicalizeLevel(level || ""),
+      score,
+    });
+    const testsCompleted = countSubjectsWithResults(nextResults);
 
     const required = parseRequiredTests(candidate.required_tests);
-    const hasSubject = required.some((t) => t.subject.toLowerCase() === subject.toLowerCase());
+    const hasSubject = required.some(
+      (t) => t.subject.toLowerCase() === subject.toLowerCase(),
+    );
+    // Nie nadpisujemy wymaganego poziomu wynikiem z innego Forms — tylko dopinamy wynik.
     const nextRequired = hasSubject
       ? required
       : [...required, { subject, level: level || "" }];

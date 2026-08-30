@@ -220,11 +220,16 @@ Dodatkowo: **Odpowiedzi → Link do arkusza kalkulacyjnego** (jeśli jeszcze nie
 /** @OnlyCurrentDoc */
 var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
-var TEST_SUBJECT = "Biologia";
-var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony";
-var MAX_POINTS = 15;
+var TEST_SUBJECT = "Biologia"; // zmień per Forms
+var TEST_LEVEL = "Szkoła średnia - poziom rozszerzony"; // zmień per Forms
+var MAX_POINTS = 15; // max punktów w tym quizie
 
 function onFormSubmit(e) {
+  // Nie uruchamiaj z menu Run — tylko trigger Forms. Do importu starych: backfillExistingTestResults.
+  if (!e || !e.response) {
+    Logger.log("SKIP: uruchom backfillExistingTestResults (nie onFormSubmit z edytora).");
+    return;
+  }
   postTestResult(e.response);
 }
 
@@ -372,4 +377,5 @@ function scoreFromDestinationSheet(email, timestamp) {
 }
 ```
 
+Webhook zapisuje **każdy** wynik jako osobną pozycję `(przedmiot + poziom)`. Jeśli ktoś zrobił matmę rozszerzoną, a potem dostał podstawową — w profilu widać **oba** wyniki.
 Po udanym Run w logu: `jmiedzinska859@gmail.com 15/15 → 201 …` → odśwież `/admin/rekrutacja`.

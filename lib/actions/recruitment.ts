@@ -41,10 +41,14 @@ async function getCandidateOrThrow(candidateId: string): Promise<Candidate> {
   return data as Candidate;
 }
 
-/** Checkbox: oznacz, że linki do testów zostały wysłane (bez maila z aplikacji). */
+/**
+ * Checkbox: oznacz, że linki do testów zostały wysłane (bez maila z aplikacji).
+ * `sentAt` to data wysyłki (YYYY-MM-DD) — służy do liczenia 3 dni roboczych na odpowiedź.
+ */
 export async function setCandidateTestsSent(
   candidateId: string,
   sent: boolean,
+  sentAt?: string | null,
 ): Promise<{ ok: true }> {
   await requireAdmin();
   const candidate = await getCandidateOrThrow(candidateId);
@@ -52,12 +56,31 @@ export async function setCandidateTestsSent(
     throw new Error("Ten kandydat jest już zamknięty.");
   }
 
+  if (sent) {
+    const date = (sentAt || "").trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error("Podaj datę wysłania testów przed oznaczeniem.");
+    }
+  }
+
   const patch: Record<string, unknown> = { test_sent_manually: sent };
-  if (sent && candidate.status === "NEW") patch.status = "IN_PROGRESS";
+  if (sent) {
+    patch.test_sent_at = (sentAt || "").trim().slice(0, 10);
+    if (candidate.status === "NEW") patch.status = "IN_PROGRESS";
+  } else {
+    patch.test_sent_at = null;
+  }
 
   const supabase = createServiceClient();
   const { error } = await supabase.from("candidates").update(patch).eq("id", candidateId);
-  if (error) throw error;
+  if (error) {
+    if (String(error.message).includes("test_sent_at")) {
+      throw new Error(
+        "Brak kolumny test_sent_at — uruchom migrację 0020_candidates_test_sent_at.sql w Supabase.",
+      );
+    }
+    throw error;
+  }
 
   revalidateRecruitment();
   return { ok: true };

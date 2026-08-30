@@ -5,13 +5,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   hireCandidate,
   rejectCandidate,
-  setCandidateStatus,
   setCandidateTestsReviewed,
   setCandidateTestsSent,
 } from "@/lib/actions/recruitment";
 import {
   parseRequiredTests,
-  parseTestResults,
+  parseTestResultsList,
   suggestTestsToSend,
 } from "@/lib/recruitment/test-links";
 import type { Candidate, CandidateStatus, RequiredTest } from "@/lib/types/database";
@@ -66,33 +65,142 @@ function formatCreated(iso: string): string {
   }
 }
 
-/** Lista testów do wyświetlenia: required + ewentualne wyniki spoza listy. */
+function formatDatePl(d: Date): string {
+  try {
+    return new Intl.DateTimeFormat("pl-PL", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+function dateOnly(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isWeekend(d: Date): boolean {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function addBusinessDays(from: Date, days: number): Date {
+  const result = dateOnly(from);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    if (!isWeekend(result)) added += 1;
+  }
+  return result;
+}
+
+/** Liczba dni roboczych między dwiema datami (dodatnia, jeśli `to` jest po `from`). */
+function businessDaysBetween(from: Date, to: Date): number {
+  const a = dateOnly(from);
+  const b = dateOnly(to);
+  const sign = b.getTime() >= a.getTime() ? 1 : -1;
+  const start = sign === 1 ? a : b;
+  const end = sign === 1 ? b : a;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur.getTime() < end.getTime()) {
+    cur.setDate(cur.getDate() + 1);
+    if (!isWeekend(cur)) count += 1;
+  }
+  return count * sign;
+}
+
+/** Lista testów: wymagane + dodatkowe wyniki (np. inny poziom niż wysłany). */
 function buildTestRows(
   required: RequiredTest[],
-  results: ReturnType<typeof parseTestResults>,
-): { subject: string; level: string; score: string | null }[] {
-  const seen = new Set<string>();
-  const rows: { subject: string; level: string; score: string | null }[] = [];
+  results: ReturnType<typeof parseTestResultsList>,
+): { subject: string; level: string; score: string | null; extra: boolean }[] {
+  const rows: { subject: string; level: string; score: string | null; extra: boolean }[] = [];
+  const claimed = new Set<string>();
+
+  const keyOf = (subject: string, level: string) =>
+    `${subject.trim().toLowerCase()}::${level.trim().toLowerCase()}`;
 
   for (const t of required) {
-    seen.add(t.subject);
+    const exact = results.find(
+      (r) =>
+        r.subject.toLowerCase() === t.subject.toLowerCase() &&
+        r.level.trim().toLowerCase() === t.level.trim().toLowerCase(),
+    );
+    if (exact) {
+      claimed.add(keyOf(exact.subject, exact.level));
+      rows.push({
+        subject: t.subject,
+        level: t.level,
+        score: exact.score,
+        extra: false,
+      });
+      continue;
+    }
     rows.push({
       subject: t.subject,
       level: t.level,
-      score: results[t.subject]?.score ?? null,
+      score: null,
+      extra: false,
     });
   }
 
-  for (const [subject, entry] of Object.entries(results)) {
-    if (seen.has(subject)) continue;
+  for (const r of results) {
+    const k = keyOf(r.subject, r.level);
+    if (claimed.has(k)) continue;
+    claimed.add(k);
     rows.push({
-      subject,
-      level: entry.level || "",
-      score: entry.score || null,
+      subject: r.subject,
+      level: r.level,
+      score: r.score,
+      extra: true,
     });
   }
 
   return rows;
+}
+
+function TestDeadlineBadge({ sentAt }: { sentAt: string | null }) {
+  if (!sentAt) return null;
+  const sent = new Date(`${sentAt.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(sent.getTime())) return null;
+
+  const deadline = addBusinessDays(sent, 3);
+  const today = dateOnly(new Date());
+  const diff = businessDaysBetween(today, deadline);
+  const deadlineLabel = formatDatePl(deadline);
+
+  let text: string;
+  let tone: "ok" | "soon" | "overdue";
+  if (diff > 1) {
+    text = `Termin odpowiedzi: ${deadlineLabel} · jeszcze ${diff} dni robocze`;
+    tone = "ok";
+  } else if (diff === 1) {
+    text = `Termin odpowiedzi: ${deadlineLabel} · jutro`;
+    tone = "soon";
+  } else if (diff === 0) {
+    text = `Termin odpowiedzi: dziś (${deadlineLabel})`;
+    tone = "soon";
+  } else {
+    const overdue = Math.abs(diff);
+    text = `Termin minął ${overdue} ${overdue === 1 ? "dzień roboczy" : "dni robocze"} temu (${deadlineLabel})`;
+    tone = "overdue";
+  }
+
+  const toneClass =
+    tone === "overdue"
+      ? "border-claret/40 bg-claret/10 text-claret"
+      : tone === "soon"
+        ? "border-toffee/40 bg-toffee/10 text-toffee"
+        : "border-moss/30 bg-moss/10 text-moss";
+
+  return (
+    <p className={`dash-sans inline-flex items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-bold ${toneClass}`}>
+      {text}
+    </p>
+  );
 }
 
 type Props = {
@@ -107,6 +215,11 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
   const [pending, setPending] = useState<"hire" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [sentDate, setSentDate] = useState<string>(candidate.test_sent_at?.slice(0, 10) || "");
+
+  useEffect(() => {
+    setSentDate(candidate.test_sent_at?.slice(0, 10) || "");
+  }, [candidate.id, candidate.test_sent_at]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,17 +242,17 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
   if (!open) return null;
 
   const required = parseRequiredTests(candidate.required_tests);
-  const results = parseTestResults(candidate.test_results);
+  const results = parseTestResultsList(candidate.test_results);
   const testRows = buildTestRows(required, results);
-  const expected = Math.max(candidate.tests_expected || required.length, testRows.length, 0);
-  const completed = testRows.filter((t) => Boolean(t.score)).length;
+  const expected = Math.max(candidate.tests_expected || required.length, 0);
+  const completed = required.filter((t) =>
+    results.some((r) => r.subject.trim().toLowerCase() === t.subject.trim().toLowerCase()),
+  ).length;
   const progressPct = expected > 0 ? Math.min(100, Math.round((completed / expected) * 100)) : 0;
   const closed = candidate.status === "HIRED" || candidate.status === "REJECTED";
   const age = ageFromDob(candidate.dob);
   const suggestions = suggestTestsToSend(required);
   const reviewed = Boolean(candidate.tests_reviewed_manually);
-  const awaitingResults =
-    candidate.test_sent_manually && completed < (expected || suggestions.length);
 
   function runFlag(action: () => Promise<{ ok: true }>) {
     setError(null);
@@ -151,6 +264,20 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
         setError(e instanceof Error ? e.message : "Nie udało się zapisać.");
       }
     });
+  }
+
+  function handleSentToggle(checked: boolean) {
+    if (checked && !sentDate) {
+      setError("Najpierw podaj datę wysłania.");
+      return;
+    }
+    runFlag(() => setCandidateTestsSent(candidate.id, checked, checked ? sentDate : null));
+  }
+
+  function handleDateChange(value: string) {
+    setSentDate(value);
+    if (!candidate.test_sent_manually || !value) return;
+    runFlag(() => setCandidateTestsSent(candidate.id, true, value));
   }
 
   return (
@@ -217,95 +344,31 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                 </Field>
                 <Field label="Data urodzenia">{formatDob(candidate.dob)}</Field>
                 <Field label="Wiek">{age ?? "—"}</Field>
-                <Field label="Student">{candidate.student_status ? "Tak" : "Nie"}</Field>
+                <Field label="Status studenta">{candidate.student_status ? "Tak" : "Nie"}</Field>
                 <Field label="Uczelnia">{candidate.university || "—"}</Field>
                 <Field label="Doświadczenie">{candidate.experience ? "Tak" : "Nie"}</Field>
                 <Field label="Zgłoszenie / wpis">{formatCreated(candidate.created_at)}</Field>
                 <Field label="Godziny / tydzień">{candidate.hours_per_week || "—"}</Field>
-                <Field label="CV">
-                  {candidate.cv_url ? (
-                    <a
-                      href={candidate.cv_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-bold text-[#000C4A] hover:underline"
-                    >
-                      Otwórz CV
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </Field>
               </dl>
-              {candidate.levels ? (
-                <dl className="mt-3">
-                  <Field label="Przedmioty / poziomy (ze zgłoszenia)">{candidate.levels}</Field>
-                </dl>
-              ) : null}
             </section>
 
             <section>
-              <h3 className="section-label">Status i checklista</h3>
-              <div className="mt-3 space-y-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">
-                    Status
-                  </span>
-                  <select
-                    className="dash-sans text-depths rounded-app border border-panel-frame/40 bg-snow px-3 py-2 text-sm font-semibold disabled:opacity-50"
-                    value={candidate.status}
-                    disabled={isPending}
-                    onChange={(e) => {
-                      const next = e.target.value as CandidateStatus;
-                      runFlag(() => setCandidateStatus(candidate.id, next));
-                    }}
-                  >
-                    {(Object.keys(STATUS_LABEL) as CandidateStatus[]).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[#000C4A]"
-                    checked={candidate.test_sent_manually}
-                    disabled={isPending || closed}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      runFlag(() => setCandidateTestsSent(candidate.id, checked));
-                    }}
-                  />
-                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
-                    Wysłałem / wysłałam linki do testów
-                    <span className="text-muted mt-0.5 block text-xs font-normal">
-                      Po zaznaczeniu aplikacja oczekuje wyników z Forms — bez maila z apki.
-                    </span>
-                  </span>
-                </label>
-
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 accent-[#000C4A]"
-                    checked={reviewed}
-                    disabled={isPending || closed}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      runFlag(() => setCandidateTestsReviewed(candidate.id, checked));
-                    }}
-                  />
-                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
-                    Testy sprawdzone samodzielnie
-                    <span className="text-muted mt-0.5 block text-xs font-normal">
-                      Oznacz, gdy przejrzałeś wyniki.
-                    </span>
-                  </span>
-                </label>
-              </div>
+              <h3 className="section-label">Przedmioty i poziomy</h3>
+              <ul className="mt-3 space-y-1.5">
+                {required.length === 0 ? (
+                  <li className="text-muted text-xs">Brak przedmiotów w zgłoszeniu.</li>
+                ) : (
+                  required.map((t) => (
+                    <li
+                      key={`level-${t.subject}-${t.level}`}
+                      className="dash-sans text-depths rounded-app border border-panel-frame/25 bg-paper px-3 py-2 text-sm"
+                    >
+                      <span className="font-bold">{t.subject}:</span>{" "}
+                      <span className="font-medium">{t.level || "—"}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
             </section>
 
             <section>
@@ -321,7 +384,11 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                   suggestions.map((t) => (
                     <li
                       key={`suggest-${t.subject}-${t.level}`}
-                      className="rounded-app border border-panel-frame/30 bg-paper px-3 py-2.5"
+                      className={`rounded-app border px-3 py-2.5 ${
+                        t.scriptMissing || t.missing
+                          ? "border-claret/35 bg-claret/4"
+                          : "border-panel-frame/30 bg-paper"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -330,7 +397,13 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                             <p className="text-claret mt-1 text-[0.7rem] font-medium">
                               Brak formularza w TEST_URLS dla tej pary.
                             </p>
-                          ) : null}
+                          ) : t.scriptMissing ? (
+                            <p className="text-claret mt-1 text-[0.7rem] font-bold uppercase tracking-wide">
+                              Brak skryptu Apps Script
+                            </p>
+                          ) : (
+                            <p className="text-moss mt-1 text-[0.7rem] font-medium">Skrypt gotowy</p>
+                          )}
                         </div>
                         {t.url ? (
                           <a
@@ -350,56 +423,122 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
             </section>
 
             <section>
-              <h3 className="section-label">Wyniki testów</h3>
-              {awaitingResults ? (
-                <p className="mt-1 text-xs text-toffee">
-                  Testy oznaczone jako wysłane — czekamy na odpowiedzi z Forms.
-                </p>
-              ) : null}
-              <div className="mt-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="dash-sans text-depths text-sm font-bold">
-                    Wyniki: {completed}/{expected || "—"}
-                  </p>
-                  <p className="dash-mono text-muted text-xs font-bold tabular-nums">{progressPct}%</p>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-mist">
-                  <div
-                    className="h-full rounded-full bg-[#000C4A] transition-all"
-                    style={{ width: `${progressPct}%` }}
+              <h3 className="section-label">Wysyłka testów</h3>
+              <div className="mt-3 space-y-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
+                <label className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">
+                    Data wysłania
+                  </span>
+                  <input
+                    type="date"
+                    className="dash-mono text-depths rounded-app border border-panel-frame/40 bg-snow px-2.5 py-1.5 text-sm font-semibold disabled:opacity-50"
+                    value={sentDate}
+                    disabled={isPending || closed}
+                    onChange={(e) => handleDateChange(e.target.value)}
                   />
-                </div>
+                </label>
 
-                <ul className="mt-3 space-y-2">
-                  {testRows.length === 0 ? (
-                    <li className="text-muted text-xs">Brak testów na liście.</li>
-                  ) : (
-                    testRows.map((t) => (
-                      <li
-                        key={`${t.subject}-${t.level}`}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-snow px-3 py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="dash-sans text-depths text-sm font-semibold">{t.subject}</p>
-                          {t.level ? (
-                            <p className="text-muted mt-0.5 text-[0.7rem] font-medium leading-snug">
-                              {t.level}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span
-                          className={`dash-mono shrink-0 text-sm font-bold tabular-nums ${
-                            t.score ? "text-moss" : "text-muted"
-                          }`}
-                        >
-                          {t.score ?? "Oczekuje"}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
+                <label
+                  className={`flex items-start gap-3 ${
+                    !sentDate || closed ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 accent-[#000C4A]"
+                    checked={candidate.test_sent_manually}
+                    disabled={isPending || closed || !sentDate}
+                    onChange={(e) => handleSentToggle(e.target.checked)}
+                  />
+                  <span className="dash-sans text-depths text-sm font-medium leading-snug">
+                    Wysłałem / wysłałam linki do testów
+                    <span className="text-muted mt-0.5 block text-xs font-normal">
+                      {!sentDate
+                        ? "Najpierw wybierz datę wysłania."
+                        : "Status zmieni się na „W toku” i policzymy 3 dni robocze na odpowiedź."}
+                    </span>
+                  </span>
+                </label>
               </div>
             </section>
+
+            {candidate.test_sent_manually && candidate.test_sent_at ? (
+              <section>
+                <h3 className="section-label">Wyniki testów</h3>
+                <div className="mt-2">
+                  <TestDeadlineBadge sentAt={candidate.test_sent_at} />
+                </div>
+                <div className="mt-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="dash-sans text-depths text-sm font-bold">
+                      Wyniki: {completed}/{expected || "—"}
+                    </p>
+                    <p className="dash-mono text-muted text-xs font-bold tabular-nums">{progressPct}%</p>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-mist">
+                    <div
+                      className="h-full rounded-full bg-[#000C4A] transition-all"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+
+                  <ul className="mt-3 space-y-2">
+                    {testRows.length === 0 ? (
+                      <li className="text-muted text-xs">Brak testów na liście.</li>
+                    ) : (
+                      testRows.map((t) => (
+                        <li
+                          key={`${t.extra ? "extra" : "req"}-${t.subject}-${t.level}`}
+                          className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ${
+                            t.extra ? "bg-toffee/10 ring-1 ring-toffee/25" : "bg-snow"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="dash-sans text-depths text-sm font-semibold">{t.subject}</p>
+                            {t.level ? (
+                              <p className="text-muted mt-0.5 text-[0.7rem] font-medium leading-snug">
+                                {t.level}
+                              </p>
+                            ) : null}
+                            {t.extra ? (
+                              <p className="text-toffee mt-0.5 text-[0.65rem] font-bold">
+                                Dodatkowy wynik (inny poziom niż na liście)
+                              </p>
+                            ) : null}
+                          </div>
+                          <span
+                            className={`dash-mono shrink-0 text-sm font-bold tabular-nums ${
+                              t.score ? "text-moss" : "text-muted"
+                            }`}
+                          >
+                            {t.score ?? "Oczekuje"}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+
+                  <label className="mt-3 flex cursor-pointer items-start gap-3 border-t border-panel-frame/25 pt-3">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-[#000C4A]"
+                      checked={reviewed}
+                      disabled={isPending || closed}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        runFlag(() => setCandidateTestsReviewed(candidate.id, checked));
+                      }}
+                    />
+                    <span className="dash-sans text-depths text-sm font-medium leading-snug">
+                      Testy sprawdzone samodzielnie
+                      <span className="text-muted mt-0.5 block text-xs font-normal">
+                        Oznacz, gdy przejrzałeś wyniki.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </section>
+            ) : null}
           </div>
 
           {!closed ? (
