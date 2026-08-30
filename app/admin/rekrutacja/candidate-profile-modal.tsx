@@ -9,11 +9,12 @@ import {
   setCandidateTestsSent,
 } from "@/lib/actions/recruitment";
 import {
+  buildCandidateTestDisplayRows,
   parseRequiredTests,
   parseTestResultsList,
   suggestTestsToSend,
 } from "@/lib/recruitment/test-links";
-import type { Candidate, CandidateStatus, RequiredTest } from "@/lib/types/database";
+import type { Candidate, CandidateStatus } from "@/lib/types/database";
 
 const STATUS_LABEL: Record<CandidateStatus, string> = {
   NEW: "Nowy",
@@ -112,58 +113,25 @@ function businessDaysBetween(from: Date, to: Date): number {
   return count * sign;
 }
 
-/** Lista testów: wymagane + dodatkowe wyniki (np. inny poziom niż wysłany). */
-function buildTestRows(
-  required: RequiredTest[],
-  results: ReturnType<typeof parseTestResultsList>,
-): { subject: string; level: string; score: string | null; extra: boolean }[] {
-  const rows: { subject: string; level: string; score: string | null; extra: boolean }[] = [];
-  const claimed = new Set<string>();
-
-  const keyOf = (subject: string, level: string) =>
-    `${subject.trim().toLowerCase()}::${level.trim().toLowerCase()}`;
-
-  for (const t of required) {
-    const exact = results.find(
-      (r) =>
-        r.subject.toLowerCase() === t.subject.toLowerCase() &&
-        r.level.trim().toLowerCase() === t.level.trim().toLowerCase(),
+function TestProgressBadge({
+  sentAt,
+  completed,
+  expected,
+}: {
+  sentAt: string | null;
+  completed: number;
+  expected: number;
+}) {
+  if (expected > 0 && completed >= expected) {
+    return (
+      <p className="dash-sans inline-flex items-center rounded-full border border-moss/30 bg-moss/10 px-2.5 py-1 text-[0.7rem] font-bold text-moss">
+        Oddano wszystkie testy ({completed}/{expected})
+      </p>
     );
-    if (exact) {
-      claimed.add(keyOf(exact.subject, exact.level));
-      rows.push({
-        subject: t.subject,
-        level: t.level,
-        score: exact.score,
-        extra: false,
-      });
-      continue;
-    }
-    rows.push({
-      subject: t.subject,
-      level: t.level,
-      score: null,
-      extra: false,
-    });
   }
 
-  for (const r of results) {
-    const k = keyOf(r.subject, r.level);
-    if (claimed.has(k)) continue;
-    claimed.add(k);
-    rows.push({
-      subject: r.subject,
-      level: r.level,
-      score: r.score,
-      extra: true,
-    });
-  }
+  if (!sentAt || expected <= 0) return null;
 
-  return rows;
-}
-
-function TestDeadlineBadge({ sentAt }: { sentAt: string | null }) {
-  if (!sentAt) return null;
   const sent = new Date(`${sentAt.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(sent.getTime())) return null;
 
@@ -171,34 +139,40 @@ function TestDeadlineBadge({ sentAt }: { sentAt: string | null }) {
   const today = dateOnly(new Date());
   const diff = businessDaysBetween(today, deadline);
   const deadlineLabel = formatDatePl(deadline);
+  const pending = Math.max(expected - completed, 0);
+  const progressNote = completed > 0 ? ` · oddano ${completed}/${expected}` : "";
 
-  let text: string;
-  let tone: "ok" | "soon" | "overdue";
-  if (diff > 1) {
-    text = `Termin odpowiedzi: ${deadlineLabel} · jeszcze ${diff} dni robocze`;
-    tone = "ok";
-  } else if (diff === 1) {
-    text = `Termin odpowiedzi: ${deadlineLabel} · jutro`;
-    tone = "soon";
-  } else if (diff === 0) {
-    text = `Termin odpowiedzi: dziś (${deadlineLabel})`;
-    tone = "soon";
-  } else {
+  if (pending <= 0) return null;
+
+  if (diff < 0) {
     const overdue = Math.abs(diff);
-    text = `Termin minął ${overdue} ${overdue === 1 ? "dzień roboczy" : "dni robocze"} temu (${deadlineLabel})`;
-    tone = "overdue";
+    return (
+      <p className="dash-sans inline-flex items-center rounded-full border border-claret/40 bg-claret/10 px-2.5 py-1 text-[0.7rem] font-bold text-claret">
+        Brakuje {pending} {pending === 1 ? "testu" : "testów"} · termin minął {overdue}{" "}
+        {overdue === 1 ? "dzień roboczy" : "dni robocze"} temu ({deadlineLabel}){progressNote}
+      </p>
+    );
   }
 
-  const toneClass =
-    tone === "overdue"
-      ? "border-claret/40 bg-claret/10 text-claret"
-      : tone === "soon"
-        ? "border-toffee/40 bg-toffee/10 text-toffee"
-        : "border-moss/30 bg-moss/10 text-moss";
+  if (diff > 1) {
+    return (
+      <p className="dash-sans inline-flex items-center rounded-full border border-toffee/40 bg-toffee/10 px-2.5 py-1 text-[0.7rem] font-bold text-toffee">
+        Brakuje {pending} · termin {deadlineLabel} · jeszcze {diff} dni robocze{progressNote}
+      </p>
+    );
+  }
+
+  if (diff === 1) {
+    return (
+      <p className="dash-sans inline-flex items-center rounded-full border border-toffee/40 bg-toffee/10 px-2.5 py-1 text-[0.7rem] font-bold text-toffee">
+        Brakuje {pending} · termin jutro ({deadlineLabel}){progressNote}
+      </p>
+    );
+  }
 
   return (
-    <p className={`dash-sans inline-flex items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-bold ${toneClass}`}>
-      {text}
+    <p className="dash-sans inline-flex items-center rounded-full border border-toffee/40 bg-toffee/10 px-2.5 py-1 text-[0.7rem] font-bold text-toffee">
+      Brakuje {pending} · termin dziś ({deadlineLabel}){progressNote}
     </p>
   );
 }
@@ -243,7 +217,7 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
 
   const required = parseRequiredTests(candidate.required_tests);
   const results = parseTestResultsList(candidate.test_results);
-  const testRows = buildTestRows(required, results);
+  const testRows = buildCandidateTestDisplayRows(required, results);
   const expected = Math.max(candidate.tests_expected || required.length, 0);
   const completed = required.filter((t) =>
     results.some((r) => r.subject.trim().toLowerCase() === t.subject.trim().toLowerCase()),
@@ -354,72 +328,55 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
 
             <section>
               <h3 className="section-label">Przedmioty i poziomy</h3>
-              <ul className="mt-3 space-y-1.5">
-                {required.length === 0 ? (
-                  <li className="text-muted text-xs">Brak przedmiotów w zgłoszeniu.</li>
-                ) : (
-                  required.map((t) => (
+              <p className="text-muted mt-1 text-xs">Zaznaczone w formularzu zgłoszeniowym.</p>
+              {required.length === 0 ? (
+                <p className="text-muted mt-3 text-xs">Brak przedmiotów w zgłoszeniu.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-panel-frame/25 overflow-hidden rounded-app border border-panel-frame/25 bg-snow">
+                  {required.map((t) => (
                     <li
                       key={`level-${t.subject}-${t.level}`}
-                      className="dash-sans text-depths rounded-app border border-panel-frame/25 bg-paper px-3 py-2 text-sm"
+                      className="flex items-baseline justify-between gap-4 px-3 py-2.5"
                     >
-                      <span className="font-bold">{t.subject}:</span>{" "}
-                      <span className="font-medium">{t.level || "—"}</span>
+                      <span className="dash-sans text-depths text-sm font-semibold">{t.subject}</span>
+                      <span className="text-muted shrink-0 text-right text-xs font-medium leading-snug">
+                        {t.level || "—"}
+                      </span>
                     </li>
-                  ))
-                )}
-              </ul>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section>
               <h3 className="section-label">Testy do wysłania</h3>
               <p className="text-muted mt-1 text-xs leading-relaxed">
-                Podpowiedź z pól przedmiotów i poziomów ze zgłoszenia — jeden test na przedmiot (najwyższy
-                poziom).
+                Jeden test na przedmiot — najwyższy poziom do wysłania.
               </p>
-              <ul className="mt-3 space-y-2">
-                {suggestions.length === 0 ? (
-                  <li className="text-muted text-xs">Brak przedmiotów w zgłoszeniu.</li>
-                ) : (
-                  suggestions.map((t) => (
-                    <li
-                      key={`suggest-${t.subject}-${t.level}`}
-                      className={`rounded-app border px-3 py-2.5 ${
-                        t.scriptMissing || t.missing
-                          ? "border-claret/35 bg-claret/4"
-                          : "border-panel-frame/30 bg-paper"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
+              {(() => {
+                const toSend = suggestions.filter((t) => t.url);
+                if (toSend.length === 0) {
+                  return <p className="text-muted mt-3 text-xs">Brak testów do wysłania.</p>;
+                }
+                return (
+                  <ol className="mt-3 space-y-2">
+                    {toSend.map((t, index) => (
+                      <li
+                        key={`suggest-${t.subject}-${t.level}`}
+                        className="flex gap-3 rounded-app border border-[#000C4A]/15 border-l-4 border-l-[#000C4A] bg-[#000C4A]/4 px-3 py-2.5"
+                      >
+                        <span className="dash-mono text-muted mt-0.5 text-[0.65rem] font-bold tabular-nums">
+                          {index + 1}
+                        </span>
                         <div className="min-w-0">
-                          <p className="dash-sans text-depths text-sm font-semibold">{t.label}</p>
-                          {t.missing ? (
-                            <p className="text-claret mt-1 text-[0.7rem] font-medium">
-                              Brak formularza w TEST_URLS dla tej pary.
-                            </p>
-                          ) : t.scriptMissing ? (
-                            <p className="text-claret mt-1 text-[0.7rem] font-bold uppercase tracking-wide">
-                              Brak skryptu Apps Script
-                            </p>
-                          ) : (
-                            <p className="text-moss mt-1 text-[0.7rem] font-medium">Skrypt gotowy</p>
-                          )}
+                          <p className="dash-sans text-depths text-sm font-bold">{t.subject}</p>
+                          <p className="text-muted mt-0.5 text-[0.7rem] font-medium leading-snug">{t.level}</p>
                         </div>
-                        {t.url ? (
-                          <a
-                            href={t.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="dash-sans shrink-0 rounded-full bg-[#000C4A] px-2.5 py-1 text-[0.65rem] font-bold text-lime"
-                          >
-                            Otwórz Forms
-                          </a>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))
-                )}
-              </ul>
+                      </li>
+                    ))}
+                  </ol>
+                );
+              })()}
             </section>
 
             <section>
@@ -451,12 +408,7 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                     onChange={(e) => handleSentToggle(e.target.checked)}
                   />
                   <span className="dash-sans text-depths text-sm font-medium leading-snug">
-                    Wysłałem / wysłałam linki do testów
-                    <span className="text-muted mt-0.5 block text-xs font-normal">
-                      {!sentDate
-                        ? "Najpierw wybierz datę wysłania."
-                        : "Status zmieni się na „W toku” i policzymy 3 dni robocze na odpowiedź."}
-                    </span>
+                    Test wysłany
                   </span>
                 </label>
               </div>
@@ -466,7 +418,11 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
               <section>
                 <h3 className="section-label">Wyniki testów</h3>
                 <div className="mt-2">
-                  <TestDeadlineBadge sentAt={candidate.test_sent_at} />
+                  <TestProgressBadge
+                    sentAt={candidate.test_sent_at}
+                    completed={completed}
+                    expected={expected}
+                  />
                 </div>
                 <div className="mt-3 rounded-app border border-panel-frame/30 bg-paper p-3.5">
                   <div className="flex items-baseline justify-between gap-2">
@@ -488,9 +444,13 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                     ) : (
                       testRows.map((t) => (
                         <li
-                          key={`${t.extra ? "extra" : "req"}-${t.subject}-${t.level}`}
+                          key={`${t.kind}-${t.subject}-${t.level}`}
                           className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ${
-                            t.extra ? "bg-toffee/10 ring-1 ring-toffee/25" : "bg-snow"
+                            t.kind === "retry"
+                              ? "bg-paper ring-1 ring-panel-frame/30"
+                              : t.kind === "extra"
+                                ? "bg-toffee/10 ring-1 ring-toffee/25"
+                                : "bg-snow"
                           }`}
                         >
                           <div className="min-w-0">
@@ -500,9 +460,13 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                                 {t.level}
                               </p>
                             ) : null}
-                            {t.extra ? (
-                              <p className="text-toffee mt-0.5 text-[0.65rem] font-bold">
-                                Dodatkowy wynik (inny poziom niż na liście)
+                            {t.note ? (
+                              <p
+                                className={`mt-0.5 text-[0.65rem] font-medium ${
+                                  t.kind === "retry" ? "text-muted" : "text-toffee"
+                                }`}
+                              >
+                                {t.note}
                               </p>
                             ) : null}
                           </div>

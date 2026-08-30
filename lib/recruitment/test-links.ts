@@ -96,9 +96,7 @@ export type SuggestedTest = {
   level: string;
   label: string;
   url: string | null;
-  /** Brak formularza w TEST_URLS dla tej pary. */
   missing: boolean;
-  /** Forms jest, ale brak skryptu Apps Script. */
   scriptMissing: boolean;
 };
 
@@ -131,14 +129,23 @@ export function canonicalizeLevel(level: string): string {
   return aliases[n] || level.trim().replace(/\s+/g, " ");
 }
 
-/** Ujednolica nazwę przedmiotu (Język polski → Polski w linkach; zachowuje czytelny label). */
-export function canonicalizeSubject(subject: string): string {
-  const key = resolveSubjectKey(subject);
-  return key ?? subject.trim();
+/** Poziom z zgłoszenia → jaki test wysłać (Matura traktujemy jak rozszerzony). */
+export function levelForTestSuggestion(level: string): string {
+  const n = normKey(level);
+  if (n === "matura" || n === "matura poziom podstawowy" || n === "matura poziom rozszerzony") {
+    return "Szkoła średnia - poziom rozszerzony";
+  }
+  return canonicalizeLevel(level);
 }
 
 function levelRank(level: string): number {
   return LEVEL_RANK[normKey(level)] ?? 0;
+}
+
+/** Ujednolica nazwę przedmiotu (Język polski → Polski w linkach; zachowuje czytelny label). */
+export function canonicalizeSubject(subject: string): string {
+  const key = resolveSubjectKey(subject);
+  return key ?? subject.trim();
 }
 
 /** Najwyższy poziom spośród zaznaczonych (np. z pytania o poziomy). */
@@ -218,12 +225,31 @@ function resolveSubjectKey(subject: string): string | null {
 
 function resolveLevelUrl(byLevel: Record<string, string>, level: string): string | null {
   if (!level) return null;
+  const canonical = canonicalizeLevel(level);
+  if (byLevel[canonical]) return byLevel[canonical]!;
   if (byLevel[level]) return byLevel[level]!;
   const n = normKey(level);
   for (const [key, url] of Object.entries(byLevel)) {
     if (normKey(key) === n) return url;
   }
   return null;
+}
+
+/** Dobiera poziom testu i URL — Matura → rozszerzony, potem najwyższy dostępny w TEST_URLS. */
+function resolveTestLevelAndUrl(
+  byLevel: Record<string, string>,
+  applicationLevel: string,
+): { level: string; url: string | null } {
+  const preferred = levelForTestSuggestion(applicationLevel);
+  const direct = resolveLevelUrl(byLevel, preferred);
+  if (direct) return { level: preferred, url: direct };
+
+  const ranked = Object.keys(byLevel).sort((a, b) => levelRank(b) - levelRank(a));
+  for (const key of ranked) {
+    const url = byLevel[key];
+    if (url) return { level: key, url };
+  }
+  return { level: preferred, url: null };
 }
 
 export function parseRequiredTests(raw: unknown): RequiredTest[] {
@@ -352,6 +378,74 @@ export function findResultForRequired(
   return results.find((r) => sameSubject(r.subject, required.subject)) ?? null;
 }
 
+export type CandidateTestDisplayRow = {
+  subject: string;
+  level: string;
+  score: string | null;
+  note?: string;
+  kind: "required" | "retry" | "extra";
+};
+
+function resultEntryKey(entry: Pick<TestResultEntry, "subject" | "level">): string {
+  return `${normKey(entry.subject)}::${normKey(entry.level)}`;
+}
+
+/** Jedna linia na wymagany test; wynik z innego poziomu scala się z wierszem wymaganym. */
+export function buildCandidateTestDisplayRows(
+  required: RequiredTest[],
+  results: TestResultEntry[],
+): CandidateTestDisplayRow[] {
+  const rows: CandidateTestDisplayRow[] = [];
+  const used = new Set<string>();
+
+  for (const t of required) {
+    const forSubject = results.filter((r) => sameSubject(r.subject, t.subject));
+    const primary = findResultForRequired(results, t);
+
+    if (!primary) {
+      rows.push({ subject: t.subject, level: t.level, score: null, kind: "required" });
+      continue;
+    }
+
+    used.add(resultEntryKey(primary));
+    const exactLevel = normKey(primary.level) === normKey(t.level);
+    rows.push({
+      subject: t.subject,
+      level: t.level,
+      score: primary.score,
+      note: exactLevel ? undefined : `Wykonano: ${primary.level}`,
+      kind: "required",
+    });
+
+    for (const r of forSubject) {
+      const key = resultEntryKey(r);
+      if (used.has(key)) continue;
+      used.add(key);
+      rows.push({
+        subject: r.subject,
+        level: r.level,
+        score: r.score,
+        note: "Kolejna próba",
+        kind: "retry",
+      });
+    }
+  }
+
+  for (const r of results) {
+    const key = resultEntryKey(r);
+    if (used.has(key)) continue;
+    used.add(key);
+    rows.push({
+      subject: r.subject,
+      level: r.level,
+      score: r.score,
+      kind: "extra",
+    });
+  }
+
+  return rows;
+}
+
 /** Dobiera URL z TEST_URLS dla listy required_tests. */
 export function resolveTestLinks(requiredTests: RequiredTest[]): ResolvedTestLink[] {
   return suggestTestsToSend(requiredTests)
@@ -380,16 +474,19 @@ export function suggestTestsToSend(requiredTests: RequiredTest[]): SuggestedTest
   return requiredTests.map((t) => {
     const subjectKey = resolveSubjectKey(t.subject);
     const byLevel = subjectKey ? TEST_URLS[subjectKey] : null;
-    const url = byLevel ? resolveLevelUrl(byLevel, t.level) : null;
     const subject = subjectKey ?? t.subject;
-    const missing = !url;
+    const resolved = byLevel
+      ? resolveTestLevelAndUrl(byLevel, t.level)
+      : { level: levelForTestSuggestion(t.level), url: null as string | null };
+    const url = resolved.url;
+    const displayLevel = resolved.level;
     return {
       subject,
-      level: t.level,
-      label: t.level ? `${subject} · ${t.level}` : subject,
+      level: displayLevel,
+      label: displayLevel ? `${subject} · ${displayLevel}` : subject,
       url,
-      missing,
-      scriptMissing: !missing && !hasAppsScript(subjectKey, t.level),
+      missing: !url,
+      scriptMissing: Boolean(url) && !hasAppsScript(subjectKey, displayLevel),
     };
   });
 }
@@ -408,4 +505,112 @@ export function offeringsFromCandidate(candidate: {
     out.push(key);
   }
   return out;
+}
+
+export type CandidateTestWorkflow = "NOT_SENT" | "IN_PROGRESS" | "DONE" | "OVERDUE";
+
+export const CANDIDATE_TEST_WORKFLOW_ORDER: CandidateTestWorkflow[] = [
+  "OVERDUE",
+  "NOT_SENT",
+  "IN_PROGRESS",
+  "DONE",
+];
+
+export const CANDIDATE_TEST_WORKFLOW_LABEL: Record<CandidateTestWorkflow, string> = {
+  NOT_SENT: "Test nie wysłany",
+  IN_PROGRESS: "W toku",
+  DONE: "Zrobione",
+  OVERDUE: "Po czasie",
+};
+
+function dateOnly(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isWeekend(d: Date): boolean {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+export function addBusinessDays(from: Date, days: number): Date {
+  const result = dateOnly(from);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    if (!isWeekend(result)) added += 1;
+  }
+  return result;
+}
+
+/** Liczba dni roboczych między datami (dodatnia, gdy `to` jest po `from`). */
+export function businessDaysBetween(from: Date, to: Date): number {
+  const a = dateOnly(from);
+  const b = dateOnly(to);
+  const sign = b.getTime() >= a.getTime() ? 1 : -1;
+  const start = sign === 1 ? a : b;
+  const end = sign === 1 ? b : a;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur.getTime() < end.getTime()) {
+    cur.setDate(cur.getDate() + 1);
+    if (!isWeekend(cur)) count += 1;
+  }
+  return count * sign;
+}
+
+export function countCompletedRequiredTests(
+  required: RequiredTest[],
+  results: TestResultEntry[],
+): number {
+  return required.filter((t) =>
+    results.some((r) => r.subject.trim().toLowerCase() === t.subject.trim().toLowerCase()),
+  ).length;
+}
+
+export function getCandidateTestProgress(candidate: {
+  required_tests: unknown;
+  test_results: unknown;
+  tests_expected: number | null;
+  tests_completed: number | null;
+}): { required: RequiredTest[]; expected: number; completed: number } {
+  const required = parseRequiredTests(candidate.required_tests);
+  const results = parseTestResultsList(candidate.test_results);
+  const expected = Math.max(candidate.tests_expected || required.length, 0);
+  const completed = countCompletedRequiredTests(required, results);
+  return { required, expected, completed };
+}
+
+/** Etap procesu testowego (tylko dla otwartych kandydatów). */
+export function getCandidateTestWorkflow(candidate: {
+  status: string;
+  test_sent_manually: boolean;
+  test_sent_at: string | null;
+  required_tests: unknown;
+  test_results: unknown;
+  tests_expected: number | null;
+  tests_completed: number | null;
+}): CandidateTestWorkflow | null {
+  if (candidate.status === "HIRED" || candidate.status === "REJECTED") return null;
+
+  if (!candidate.test_sent_manually || !candidate.test_sent_at) {
+    return "NOT_SENT";
+  }
+
+  const { expected, completed } = getCandidateTestProgress(candidate);
+  if (expected > 0 && completed >= expected) {
+    return "DONE";
+  }
+
+  const sent = new Date(`${candidate.test_sent_at.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(sent.getTime())) {
+    return "NOT_SENT";
+  }
+
+  const deadline = addBusinessDays(sent, 3);
+  const diff = businessDaysBetween(dateOnly(new Date()), deadline);
+  if (diff < 0) {
+    return "OVERDUE";
+  }
+
+  return "IN_PROGRESS";
 }
