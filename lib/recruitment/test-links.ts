@@ -739,15 +739,28 @@ export const CANDIDATE_TEST_WORKFLOW_LABEL: Record<CandidateTestWorkflow, string
   OVERDUE: "Po czasie",
 };
 
-function dateOnly(d: Date): Date {
+/** Ile dni roboczych na oddanie testów (włącznie z dniem startu zegara). */
+export const TEST_RESPONSE_BUSINESS_DAYS = 3;
+
+export function dateOnly(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function isWeekend(d: Date): boolean {
+export function isWeekend(d: Date): boolean {
   const day = d.getDay();
   return day === 0 || day === 6;
 }
 
+/** Pierwszy dzień roboczy w dniu `from` lub później (sob/nd → poniedziałek). */
+export function firstBusinessDayOnOrAfter(from: Date): Date {
+  const result = dateOnly(from);
+  while (isWeekend(result)) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
+/** Dodaje N kolejnych dni roboczych po `from` (dzień startu się nie liczy). */
 export function addBusinessDays(from: Date, days: number): Date {
   const result = dateOnly(from);
   let added = 0;
@@ -758,7 +771,45 @@ export function addBusinessDays(from: Date, days: number): Date {
   return result;
 }
 
-/** Liczba dni roboczych między datami (dodatnia, gdy `to` jest po `from`). */
+/**
+ * Termin oddania testów: 3 dni robocze od wysyłki.
+ * Sobota/niedziela → zegar od poniedziałku (dzień 1 z 3).
+ * Np. wysłane w sobotę → pon–śr; wysłane w poniedziałek → pon–śr.
+ */
+export function testResponseWindow(sentAt: Date): { start: Date; deadline: Date } {
+  const start = firstBusinessDayOnOrAfter(sentAt);
+  // start = dzień 1 → dokończ do TEST_RESPONSE_BUSINESS_DAYS
+  const deadline = addBusinessDays(start, TEST_RESPONSE_BUSINESS_DAYS - 1);
+  return { start, deadline };
+}
+
+export function testResponseDeadline(sentAt: Date): Date {
+  return testResponseWindow(sentAt).deadline;
+}
+
+/**
+ * Dni robocze od `from` do `to` włącznie (oba końce).
+ * Ujemne = ile dni roboczych po terminie.
+ */
+export function businessDaysInclusive(from: Date, to: Date): number {
+  const a = dateOnly(from);
+  const b = dateOnly(to);
+  if (a.getTime() === b.getTime()) {
+    return isWeekend(a) ? 0 : 1;
+  }
+  const sign = b.getTime() > a.getTime() ? 1 : -1;
+  const start = sign === 1 ? a : b;
+  const end = sign === 1 ? b : a;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur.getTime() <= end.getTime()) {
+    if (!isWeekend(cur)) count += 1;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count * sign;
+}
+
+/** Liczba dni roboczych między datami (bez dnia `from`; dodatnia, gdy `to` jest po `from`). */
 export function businessDaysBetween(from: Date, to: Date): number {
   const a = dateOnly(from);
   const b = dateOnly(to);
@@ -772,6 +823,28 @@ export function businessDaysBetween(from: Date, to: Date): number {
     if (!isWeekend(cur)) count += 1;
   }
   return count * sign;
+}
+
+/**
+ * Ile dni roboczych zostało na oddanie (włącznie z dziś / dniem startu zegara).
+ * Nie liczy dni przed otwarciem okna (np. wysyłka datowana na jutro).
+ * <0 = po terminie.
+ */
+export function businessDaysLeftUntil(
+  deadline: Date,
+  today: Date = new Date(),
+  clockStart?: Date,
+): number {
+  const t = dateOnly(today);
+  const d = dateOnly(deadline);
+  if (t.getTime() > d.getTime()) {
+    return -businessDaysBetween(d, t);
+  }
+  const from =
+    clockStart && dateOnly(clockStart).getTime() > t.getTime()
+      ? dateOnly(clockStart)
+      : t;
+  return businessDaysInclusive(from, d);
 }
 
 export function countCompletedRequiredTests(
@@ -820,13 +893,13 @@ export function getCandidateTestWorkflow(candidate: {
     return "DONE";
   }
 
-  const sent = new Date(`${candidate.test_sent_at.slice(0, 10)}T00:00:00`);
+  const sent = new Date(`${candidate.test_sent_at.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(sent.getTime())) {
     return "NOT_SENT";
   }
 
-  const deadline = addBusinessDays(sent, 3);
-  const diff = businessDaysBetween(dateOnly(new Date()), deadline);
+  const { start, deadline } = testResponseWindow(sent);
+  const diff = businessDaysLeftUntil(deadline, new Date(), start);
   if (diff < 0) {
     return "OVERDUE";
   }

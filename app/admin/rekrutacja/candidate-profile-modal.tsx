@@ -10,12 +10,14 @@ import {
 } from "@/lib/actions/recruitment";
 import {
   buildCandidateTestDisplayRows,
+  businessDaysLeftUntil,
   getCandidateTestProgress,
   groupSubjectLevels,
   isFailingScore,
   parseRequiredTests,
   parseTestResultsList,
   suggestTestsToSend,
+  testResponseWindow,
 } from "@/lib/recruitment/test-links";
 import type { Candidate, CandidateStatus } from "@/lib/types/database";
 
@@ -81,41 +83,6 @@ function formatDatePl(d: Date): string {
   }
 }
 
-function dateOnly(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function isWeekend(d: Date): boolean {
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
-function addBusinessDays(from: Date, days: number): Date {
-  const result = dateOnly(from);
-  let added = 0;
-  while (added < days) {
-    result.setDate(result.getDate() + 1);
-    if (!isWeekend(result)) added += 1;
-  }
-  return result;
-}
-
-/** Liczba dni roboczych między dwiema datami (dodatnia, jeśli `to` jest po `from`). */
-function businessDaysBetween(from: Date, to: Date): number {
-  const a = dateOnly(from);
-  const b = dateOnly(to);
-  const sign = b.getTime() >= a.getTime() ? 1 : -1;
-  const start = sign === 1 ? a : b;
-  const end = sign === 1 ? b : a;
-  let count = 0;
-  const cur = new Date(start);
-  while (cur.getTime() < end.getTime()) {
-    cur.setDate(cur.getDate() + 1);
-    if (!isWeekend(cur)) count += 1;
-  }
-  return count * sign;
-}
-
 function TestProgressBadge({
   sentAt,
   completed,
@@ -135,12 +102,11 @@ function TestProgressBadge({
 
   if (!sentAt || expected <= 0) return null;
 
-  const sent = new Date(`${sentAt.slice(0, 10)}T00:00:00`);
+  const sent = new Date(`${sentAt.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(sent.getTime())) return null;
 
-  const deadline = addBusinessDays(sent, 3);
-  const today = dateOnly(new Date());
-  const diff = businessDaysBetween(today, deadline);
+  const { start, deadline } = testResponseWindow(sent);
+  const diff = businessDaysLeftUntil(deadline, new Date(), start);
   const deadlineLabel = formatDatePl(deadline);
   const pending = Math.max(expected - completed, 0);
   const progressNote = completed > 0 ? ` · oddano ${completed}/${expected}` : "";
@@ -152,20 +118,22 @@ function TestProgressBadge({
     return (
       <p className="dash-sans inline-flex items-center rounded-full border border-claret/40 bg-claret/10 px-2.5 py-1 text-[0.7rem] font-bold text-claret">
         Brakuje {pending} {pending === 1 ? "testu" : "testów"} · termin minął {overdue}{" "}
-        {overdue === 1 ? "dzień roboczy" : "dni robocze"} temu ({deadlineLabel}){progressNote}
+        {overdue === 1 ? "dzień roboczy" : "dni robocze"} temu ({deadlineLabel})
+        {progressNote}
       </p>
     );
   }
 
-  if (diff > 1) {
+  if (diff > 2) {
     return (
       <p className="dash-sans inline-flex items-center rounded-full border border-toffee/40 bg-toffee/10 px-2.5 py-1 text-[0.7rem] font-bold text-toffee">
-        Brakuje {pending} · termin {deadlineLabel} · jeszcze {diff} dni robocze{progressNote}
+        Brakuje {pending} · termin {deadlineLabel} · jeszcze {diff} dni robocze
+        {progressNote}
       </p>
     );
   }
 
-  if (diff === 1) {
+  if (diff === 2) {
     return (
       <p className="dash-sans inline-flex items-center rounded-full border border-toffee/40 bg-toffee/10 px-2.5 py-1 text-[0.7rem] font-bold text-toffee">
         Brakuje {pending} · termin jutro ({deadlineLabel}){progressNote}
