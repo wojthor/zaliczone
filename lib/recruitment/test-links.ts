@@ -155,9 +155,10 @@ export function pickHighestLevel(levels: string[]): string {
   for (const level of levels) {
     const l = level.trim();
     if (!l) continue;
-    const rank = levelRank(l);
-    if (rank > bestRank || (rank === bestRank && l.length > best.length)) {
-      best = l;
+    const canonical = canonicalizeLevel(l);
+    const rank = levelRank(canonical);
+    if (rank > bestRank || (rank === bestRank && canonical.length > best.length)) {
+      best = canonical || l;
       bestRank = rank;
     }
   }
@@ -193,9 +194,154 @@ export function asStringList(raw: unknown): string[] {
   return [];
 }
 
+export type SubjectLevels = {
+  subject: string;
+  levels: string[];
+};
+
 /**
- * Przedmioty × najwyższy poziom → jeden test na przedmiot.
- * Np. [Biologia, Chemia] + [podstawowy, rozszerzony] → oba na rozszerzonym.
+ * Grupuje zaznaczenia z formularza: przedmiot → wszystkie poziomy (rosnąco).
+ * `required_tests` może mieć wiele wierszy na ten sam przedmiot.
+ */
+export function groupSubjectLevels(tests: RequiredTest[]): SubjectLevels[] {
+  const map = new Map<string, { subject: string; levels: string[]; order: number }>();
+  let order = 0;
+  for (const t of tests) {
+    const subject = t.subject.trim();
+    if (!subject) continue;
+    const key = normKey(subject);
+    const level = canonicalizeLevel(t.level) || t.level.trim();
+    let row = map.get(key);
+    if (!row) {
+      row = { subject: canonicalizeSubject(subject), levels: [], order: order++ };
+      map.set(key, row);
+    }
+    if (level && !row.levels.some((l) => normKey(l) === normKey(level))) {
+      row.levels.push(level);
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => a.order - b.order)
+    .map(({ subject, levels }) => ({
+      subject,
+      levels: [...levels].sort((a, b) => levelRank(a) - levelRank(b)),
+    }));
+}
+
+/** Jeden test na przedmiot = najwyższy zaznaczony poziom. */
+export function highestRequiredTests(tests: RequiredTest[]): RequiredTest[] {
+  return groupSubjectLevels(tests).map(({ subject, levels }) => ({
+    subject,
+    level: pickHighestLevel(levels) || levels[levels.length - 1] || "",
+  }));
+}
+
+export function countUniqueSubjects(tests: RequiredTest[]): number {
+  return groupSubjectLevels(tests).length;
+}
+
+/**
+ * CheckboxGrid / mapa przedmiot → poziomy → płaska lista wszystkich zaznaczeń.
+ * Zachowuje każdy poziom (do wyświetlenia); podpowiedź testów bierze najwyższy.
+ */
+export function buildRequiredTestsFromOfferings(
+  offerings: Record<string, string[]> | SubjectLevels[],
+): RequiredTest[] {
+  const out: RequiredTest[] = [];
+  const seen = new Set<string>();
+
+  const push = (subjectRaw: string, levelsRaw: string[]) => {
+    const subject = subjectRaw.trim();
+    if (!subject) return;
+    for (const levelRaw of levelsRaw) {
+      const level = canonicalizeLevel(levelRaw) || levelRaw.trim();
+      if (!level) continue;
+      const key = `${normKey(subject)}::${normKey(level)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ subject, level });
+    }
+  };
+
+  if (Array.isArray(offerings)) {
+    for (const row of offerings) {
+      push(row.subject, row.levels);
+    }
+  } else {
+    for (const [subject, levels] of Object.entries(offerings)) {
+      push(subject, levels);
+    }
+  }
+  return out;
+}
+
+/**
+ * Parsuje notatkę „Biologia: SP, SS pp; Chemia: SP” → wszystkie pary przedmiot×poziom.
+ * Forms / stary skrypt często klei poziomy przecinkiem bez spacji.
+ */
+export function parseLevelsNote(raw: unknown): RequiredTest[] {
+  if (typeof raw !== "string") return [];
+  const text = raw.trim();
+  if (!text) return [];
+
+  const map: Record<string, string[]> = {};
+  for (const chunk of text.split(";")) {
+    const part = chunk.trim();
+    if (!part) continue;
+    const colon = part.indexOf(":");
+    if (colon <= 0) continue;
+    const subject = part.slice(0, colon).trim();
+    const levels = asStringList(part.slice(colon + 1));
+    if (!subject || levels.length === 0) continue;
+    map[subject] = [...(map[subject] ?? []), ...levels];
+  }
+  return buildRequiredTestsFromOfferings(map);
+}
+
+/**
+ * Parsuje siatkę z Forms: { "Biologia": ["Szkoła podstawowa", ...] }
+ * albo wiersze „Biologia [Szkoła podstawowa]”.
+ */
+export function parseOfferingsGrid(raw: unknown): RequiredTest[] {
+  if (!raw) return [];
+
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const map: Record<string, string[]> = {};
+    for (const [subject, levels] of Object.entries(raw as Record<string, unknown>)) {
+      map[subject] = asStringList(levels);
+    }
+    return buildRequiredTestsFromOfferings(map);
+  }
+
+  if (Array.isArray(raw)) {
+    const map: Record<string, string[]> = {};
+    for (const row of raw) {
+      if (row && typeof row === "object" && !Array.isArray(row)) {
+        const subject = String((row as { subject?: unknown }).subject ?? "").trim();
+        const levels = asStringList(
+          (row as { levels?: unknown; level?: unknown }).levels ??
+            (row as { level?: unknown }).level,
+        );
+        if (!subject) continue;
+        map[subject] = [...(map[subject] ?? []), ...levels];
+        continue;
+      }
+      const m = String(row ?? "").match(/^(.+?)\s*\[(.+)\]\s*$/);
+      if (!m) continue;
+      const subject = m[1]!.trim();
+      const level = m[2]!.trim();
+      if (!subject || !level) continue;
+      map[subject] = [...(map[subject] ?? []), level];
+    }
+    return buildRequiredTestsFromOfferings(map);
+  }
+
+  return [];
+}
+
+/**
+ * Ostateczność: osobne listy przedmiotów + poziomów (ten sam najwyższy poziom na wszystkie).
+ * Nie oddaje różnic per przedmiot — używaj tylko gdy nie ma CheckboxGrid.
  */
 export function buildRequiredTestsFromSubjectsAndLevels(
   subjects: string[],
@@ -204,10 +350,11 @@ export function buildRequiredTestsFromSubjectsAndLevels(
   const cleanSubjects = subjects.map((s) => s.trim()).filter(Boolean);
   if (cleanSubjects.length === 0) return [];
   const highest = pickHighestLevel(levels);
+  if (!highest) return [];
   const out: RequiredTest[] = [];
   const seen = new Set<string>();
   for (const subject of cleanSubjects) {
-    const key = subject.toLowerCase();
+    const key = normKey(subject);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ subject, level: highest });
@@ -235,7 +382,7 @@ function resolveLevelUrl(byLevel: Record<string, string>, level: string): string
   return null;
 }
 
-/** Dobiera poziom testu i URL — Matura → rozszerzony, potem najwyższy dostępny w TEST_URLS. */
+/** Dobiera poziom testu i URL — Matura → rozszerzony. Nie podnosimy poziomu do wyższego dostępnego Forms. */
 function resolveTestLevelAndUrl(
   byLevel: Record<string, string>,
   applicationLevel: string,
@@ -243,12 +390,6 @@ function resolveTestLevelAndUrl(
   const preferred = levelForTestSuggestion(applicationLevel);
   const direct = resolveLevelUrl(byLevel, preferred);
   if (direct) return { level: preferred, url: direct };
-
-  const ranked = Object.keys(byLevel).sort((a, b) => levelRank(b) - levelRank(a));
-  for (const key of ranked) {
-    const url = byLevel[key];
-    if (url) return { level: key, url };
-  }
   return { level: preferred, url: null };
 }
 
@@ -259,14 +400,26 @@ export function parseRequiredTests(raw: unknown): RequiredTest[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const subject = String((item as { subject?: unknown }).subject ?? "").trim();
-    const levelRaw = String((item as { level?: unknown }).level ?? "").trim();
     if (!subject) continue;
-    const levelParts = asStringList(levelRaw);
-    const level = levelParts.length > 1 ? pickHighestLevel(levelParts) : levelRaw;
-    const key = `${subject}::${level}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ subject, level });
+    const levelParts = asStringList((item as { level?: unknown }).level);
+    const levels =
+      levelParts.length > 0
+        ? levelParts
+        : asStringList((item as { levels?: unknown }).levels);
+    if (levels.length === 0) {
+      const key = `${normKey(subject)}::`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ subject, level: "" });
+      continue;
+    }
+    for (const part of levels) {
+      const level = canonicalizeLevel(part) || part.trim();
+      const key = `${normKey(subject)}::${normKey(level)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ subject, level });
+    }
   }
   return out;
 }
@@ -398,7 +551,8 @@ export function buildCandidateTestDisplayRows(
   const rows: CandidateTestDisplayRow[] = [];
   const used = new Set<string>();
 
-  for (const t of required) {
+  // Wyniki: jeden wiersz na przedmiot (najwyższy wymagany poziom), nie każdy zaznaczony poziom.
+  for (const t of highestRequiredTests(required)) {
     const forSubject = results.filter((r) => sameSubject(r.subject, t.subject));
     const primary = findResultForRequired(results, t);
 
@@ -458,10 +612,6 @@ export function resolveTestLinks(requiredTests: RequiredTest[]): ResolvedTestLin
     }));
 }
 
-/**
- * Podpowiedź: jakie testy wysłać na podstawie required_tests ze zgłoszenia.
- * Pokazuje też brakujące URL-e (przedmiot/poziom bez Forms).
- */
 function hasAppsScript(subjectKey: string | null, level: string): boolean {
   if (!subjectKey) return false;
   const levels = TESTS_WITH_APPS_SCRIPT[subjectKey];
@@ -470,8 +620,12 @@ function hasAppsScript(subjectKey: string | null, level: string): boolean {
   return levels.some((l) => normKey(l) === n);
 }
 
+/**
+ * Podpowiedź: jeden test na przedmiot = najwyższy zaznaczony poziom.
+ * Nie podnosimy poziomu tylko dlatego, że w TEST_URLS jest wyższy Forms.
+ */
 export function suggestTestsToSend(requiredTests: RequiredTest[]): SuggestedTest[] {
-  return requiredTests.map((t) => {
+  return highestRequiredTests(requiredTests).map((t) => {
     const subjectKey = resolveSubjectKey(t.subject);
     const byLevel = subjectKey ? TEST_URLS[subjectKey] : null;
     const subject = subjectKey ?? t.subject;
@@ -562,8 +716,8 @@ export function countCompletedRequiredTests(
   required: RequiredTest[],
   results: TestResultEntry[],
 ): number {
-  return required.filter((t) =>
-    results.some((r) => r.subject.trim().toLowerCase() === t.subject.trim().toLowerCase()),
+  return highestRequiredTests(required).filter((t) =>
+    results.some((r) => normKey(r.subject) === normKey(t.subject)),
   ).length;
 }
 
@@ -575,7 +729,10 @@ export function getCandidateTestProgress(candidate: {
 }): { required: RequiredTest[]; expected: number; completed: number } {
   const required = parseRequiredTests(candidate.required_tests);
   const results = parseTestResultsList(candidate.test_results);
-  const expected = Math.max(candidate.tests_expected || required.length, 0);
+  const expected = Math.max(
+    candidate.tests_expected || 0,
+    countUniqueSubjects(required),
+  );
   const completed = countCompletedRequiredTests(required, results);
   return { required, expected, completed };
 }

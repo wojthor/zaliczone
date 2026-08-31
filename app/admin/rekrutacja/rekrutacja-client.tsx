@@ -7,6 +7,7 @@ import {
   CANDIDATE_TEST_WORKFLOW_ORDER,
   getCandidateTestProgress,
   getCandidateTestWorkflow,
+  highestRequiredTests,
   parseTestResults,
   type CandidateTestWorkflow,
 } from "@/lib/recruitment/test-links";
@@ -305,7 +306,7 @@ function CandidateCard({
           </div>
         </div>
 
-        <SubjectChips required={required} results={results} />
+        <SubjectChips required={highestRequiredTests(required)} results={results} />
 
         <TestProgressFooter completed={completed} expected={expected} pct={pct} workflow={bucket} />
       </button>
@@ -330,13 +331,13 @@ function SubjectChips({
         const score = results[t.subject]?.score;
         return (
           <span
-            key={`${t.subject}-${t.level}`}
+            key={t.subject}
             className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
               score ? "bg-moss/15 text-moss" : "bg-paper text-depths"
             }`}
           >
             {t.subject}
-            {score ? ` ${score}` : t.level ? ` · ${t.level}` : ""}
+            {score ? ` ${score}` : ""}
           </span>
         );
       })}

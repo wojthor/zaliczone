@@ -14,7 +14,8 @@
 
 ## Logika najwyższego poziomu
 
-Kandydat zaznacza w siatce wiele poziomów per przedmiot. **Na każdy przedmiot idzie tylko jeden test** — z najwyższego zaznaczonego poziomu.
+Kandydat zaznacza w **siatce** (CheckboxGrid) poziomy **per przedmiot**.  
+**Na każdy przedmiot idzie tylko jeden test** — z najwyższego zaznaczonego poziomu dla tego przedmiotu.
 
 Kolejność (rosnąco):
 1. Szkoła podstawowa  
@@ -22,15 +23,16 @@ Kolejność (rosnąco):
 3. Szkoła średnia - poziom rozszerzony  
 4. Matura / Matura - poziom podstawowy / Matura - poziom rozszerzony  
 
+**Ważne:** nie używaj osobnych pytań „Jakiego przedmiotu…” + „Na jakim poziomie…” jako głównego źródła — wtedy ten sam najwyższy poziom leci na *wszystkie* przedmioty (błąd typu: Chemia SP + Biologia ROZ → obie ROZ albo obie SP).
+
 ## A) Formularz główny (APPLICATION)
 
 Flow: **najpierw to zgłoszenie** tworzy kartę w `/admin/rekrutacja`. Testy dopinasz później.
 
-Pytania (dopasuj tytuły 1:1 do Forms):
-- `Jakiego przedmiotu chcesz uczyć?` — wielokrotny wybór (przedmioty)
-- `Na jakim poziomie chcesz udzielać korepetycji?` — wielokrotny wybór (poziomy)
+Pytanie kluczowe (tytuł 1:1 jak w Forms):
+- `Przedmioty i poziomy` — **CheckboxGrid** (wiersze = przedmioty, kolumny = poziomy)
 
-Logika: **jeden test na każdy przedmiot**, na **najwyższym** zaznaczonym poziomie.
+W bazie zapisujemy **wszystkie** zaznaczenia (do podglądu), a panel podpowiada **jeden test na przedmiot** (najwyższy poziom).
 
 **Już wypełnione zgłoszenia:** wklej skrypt → Run → **`backfillExistingApplications`** (raz). Potem `onFormSubmit` łapie tylko nowe.
 
@@ -40,14 +42,12 @@ var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 
 var LEVEL_RANK = {
-  "Szkoła podstawowa": 1,
-  "Szkoła średnia - poziom podstawowy": 2,
-  "Szkoła średnia - poziom rozszerzony": 3,
-  "Szkoła średnia (poziom podstawowy)": 2,
-  "Szkoła średnia (poziom rozszerzony)": 3,
-  "Matura": 4,
-  "Matura - poziom podstawowy": 4,
-  "Matura - poziom rozszerzony": 5,
+  "szkola podstawowa": 1,
+  "szkola srednia poziom podstawowy": 2,
+  "szkola srednia poziom rozszerzony": 3,
+  "matura": 4,
+  "matura poziom podstawowy": 4,
+  "matura poziom rozszerzony": 5,
 };
 
 function onFormSubmit(e) {
@@ -94,19 +94,23 @@ function buildApplicationDataFromResponse(r) {
     for (var i = 0; i < items.length; i++) {
       if (items[i].getItem().getTitle() === title) {
         var resp = items[i].getResponse();
-        return Array.isArray(resp) ? resp : String(resp || "").trim();
+        return Array.isArray(resp) ? resp : (resp && typeof resp === "object" ? resp : String(resp || "").trim());
       }
     }
     return "";
   }
 
-  var subjects = toList(ans("Jakiego przedmiotu chcesz uczyć?"));
-  var levels = toList(ans("Na jakim poziomie chcesz udzielać korepetycji?"));
-  var requiredTests = buildRequiredTests(subjects, levels);
-
-  // Fallback: CheckboxGrid „Przedmioty i poziomy”, jeśli nadal używasz siatki
+  // 1) CheckboxGrid — poziomy PER przedmiot (właściwe źródło)
+  var requiredTests = allLevelsPerSubject(ans("Przedmioty i poziomy"));
   if (requiredTests.length === 0) {
-    requiredTests = highestLevelPerSubject(ans("Przedmioty i poziomy"));
+    requiredTests = allLevelsPerSubject(ans("Jakich przedmiotów i na jakim poziomie chcesz uczyć?"));
+  }
+
+  // 2) Ostateczność: dwa osobne pytania (ten sam najwyższy poziom na wszystkie — niedokładne)
+  if (requiredTests.length === 0) {
+    var subjects = toList(ans("Jakiego przedmiotu chcesz uczyć?"));
+    var levels = toList(ans("Na jakim poziomie chcesz udzielać korepetycji?"));
+    requiredTests = buildRequiredTestsSameLevel(subjects, levels);
   }
 
   var first = String(ans("Imię") || "");
@@ -117,19 +121,37 @@ function buildApplicationDataFromResponse(r) {
   try { email = r.getRespondentEmail() || ""; } catch (_) {}
   if (!email) email = String(ans("E-mail") || ans("Adres e-mail") || "");
 
+  var offerings = {};
+  requiredTests.forEach(function (t) {
+    if (!offerings[t.subject]) offerings[t.subject] = [];
+    if (offerings[t.subject].indexOf(t.level) === -1) offerings[t.subject].push(t.level);
+  });
+
   return {
     full_name: fullName,
     email: String(email).toLowerCase().trim(),
     phone: String(ans("Telefon") || ""),
     dob: String(ans("Data urodzenia") || ""),
-    student_status: /tak|yes/i.test(String(ans("Czy jesteś studentem?"))),
-    university: String(ans("Uczelnia") || ""),
-    experience: /tak|yes/i.test(String(ans("Doświadczenie") || ans("Czy masz doświadczenie?"))),
-    subjects: subjects,
-    teaching_levels: levels,
+    student_status: /tak|yes/i.test(String(
+      ans("Czy jesteś studentem?") ||
+      ans("Czy jesteś studentem/studentką?") ||
+      ans("Status studenta") ||
+      ""
+    )),
+    university: String(ans("Nazwa i adres uczelni") || ans("Uczelnia") || ""),
+    experience: /tak|yes/i.test(String(ans("Doświadczenie") || ans("Czy masz doświadczenie?") || ans("Czy masz doświadczenie w nauczaniu?") || "")),
+    offerings: offerings,
     required_tests: requiredTests,
-    levels: requiredTests.map(function (t) { return t.subject + ": " + t.level; }).join("; "),
-    hours_per_week: String(ans("Ile godzin tygodniowo?") || ""),
+    levels: Object.keys(offerings).map(function (s) {
+      return s + ": " + offerings[s].join(", ");
+    }).join("; "),
+    hours_per_week: String(
+      ans("Ile godzin tygodniowo?") ||
+      ans("Ile godzin tygodniowo chcesz pracować?") ||
+      ans("Ile godzin w tygodniu?") ||
+      ans("Dostępność godzinowa") ||
+      ""
+    ),
     cv_url: String(ans("CV") || ans("Link do CV") || ""),
   };
 }
@@ -141,11 +163,27 @@ function toList(v) {
   return s.split(/[,;\n|]+/).map(function (x) { return x.trim(); }).filter(Boolean);
 }
 
+function normKey(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/ą/g, "a").replace(/ć/g, "c").replace(/ę/g, "e")
+    .replace(/ł/g, "l").replace(/ń/g, "n").replace(/ó/g, "o")
+    .replace(/ś/g, "s").replace(/ź/g, "z").replace(/ż/g, "z")
+    .replace(/[()]/g, " ")
+    .replace(/\s*-\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levelRank(level) {
+  return LEVEL_RANK[normKey(level)] || 0;
+}
+
 function pickHighestLevel(levels) {
   var best = "";
   var bestRank = -1;
   levels.forEach(function (level) {
-    var rank = LEVEL_RANK[level] || 0;
+    var rank = levelRank(level);
     if (rank > bestRank) {
       best = level;
       bestRank = rank;
@@ -154,30 +192,21 @@ function pickHighestLevel(levels) {
   return best;
 }
 
-/** Każdy przedmiot → jeden test na najwyższym zaznaczonym poziomie. */
-function buildRequiredTests(subjects, levels) {
-  var highest = pickHighestLevel(levels);
-  var out = [];
-  var seen = {};
-  subjects.forEach(function (subject) {
-    subject = String(subject || "").trim();
-    if (!subject || seen[subject.toLowerCase()]) return;
-    seen[subject.toLowerCase()] = true;
-    out.push({ subject: subject, level: highest });
-  });
-  return out;
-}
-
-function highestLevelPerSubject(grid) {
+/** Wszystkie zaznaczenia z siatki (wiele poziomów na przedmiot). */
+function allLevelsPerSubject(grid) {
   var map = {};
   function consider(subject, level) {
     subject = String(subject || "").trim();
     level = String(level || "").trim();
     if (!subject || !level) return;
-    var rank = LEVEL_RANK[level] || 0;
-    if (!map[subject] || rank > map[subject].rank) {
-      map[subject] = { level: level, rank: rank };
+    // Forms często zwraca "SP,SS pp,SS roz" jako JEDEN string — rozbijamy.
+    var parts = level.split(/[,;|]+/);
+    if (parts.length > 1) {
+      parts.forEach(function (p) { consider(subject, p); });
+      return;
     }
+    if (!map[subject]) map[subject] = {};
+    map[subject][level] = true;
   }
   if (grid && typeof grid === "object" && !Array.isArray(grid)) {
     Object.keys(grid).forEach(function (subject) {
@@ -191,9 +220,27 @@ function highestLevelPerSubject(grid) {
       if (m) consider(m[1], m[2]);
     });
   }
-  return Object.keys(map).map(function (subject) {
-    return { subject: subject, level: map[subject].level };
+  var out = [];
+  Object.keys(map).forEach(function (subject) {
+    Object.keys(map[subject]).forEach(function (level) {
+      out.push({ subject: subject, level: level });
+    });
   });
+  return out;
+}
+
+/** Fallback: jeden wspólny najwyższy poziom na wszystkie przedmioty. */
+function buildRequiredTestsSameLevel(subjects, levels) {
+  var highest = pickHighestLevel(levels);
+  var out = [];
+  var seen = {};
+  subjects.forEach(function (subject) {
+    subject = String(subject || "").trim();
+    if (!subject || !highest || seen[subject.toLowerCase()]) return;
+    seen[subject.toLowerCase()] = true;
+    out.push({ subject: subject, level: highest });
+  });
+  return out;
 }
 
 function postJson(payload) {

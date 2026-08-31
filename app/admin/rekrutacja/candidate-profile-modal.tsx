@@ -10,6 +10,8 @@ import {
 } from "@/lib/actions/recruitment";
 import {
   buildCandidateTestDisplayRows,
+  getCandidateTestProgress,
+  groupSubjectLevels,
   parseRequiredTests,
   parseTestResultsList,
   suggestTestsToSend,
@@ -216,12 +218,10 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
   if (!open) return null;
 
   const required = parseRequiredTests(candidate.required_tests);
+  const subjectLevels = groupSubjectLevels(required);
   const results = parseTestResultsList(candidate.test_results);
   const testRows = buildCandidateTestDisplayRows(required, results);
-  const expected = Math.max(candidate.tests_expected || required.length, 0);
-  const completed = required.filter((t) =>
-    results.some((r) => r.subject.trim().toLowerCase() === t.subject.trim().toLowerCase()),
-  ).length;
+  const { expected, completed } = getCandidateTestProgress(candidate);
   const progressPct = expected > 0 ? Math.min(100, Math.round((completed / expected) * 100)) : 0;
   const closed = candidate.status === "HIRED" || candidate.status === "REJECTED";
   const age = ageFromDob(candidate.dob);
@@ -329,18 +329,18 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
             <section>
               <h3 className="section-label">Przedmioty i poziomy</h3>
               <p className="text-muted mt-1 text-xs">Zaznaczone w formularzu zgłoszeniowym.</p>
-              {required.length === 0 ? (
+              {subjectLevels.length === 0 ? (
                 <p className="text-muted mt-3 text-xs">Brak przedmiotów w zgłoszeniu.</p>
               ) : (
                 <ul className="mt-3 divide-y divide-panel-frame/25 overflow-hidden rounded-app border border-panel-frame/25 bg-snow">
-                  {required.map((t) => (
+                  {subjectLevels.map((t) => (
                     <li
-                      key={`level-${t.subject}-${t.level}`}
-                      className="flex items-baseline justify-between gap-4 px-3 py-2.5"
+                      key={`level-${t.subject}`}
+                      className="flex items-start justify-between gap-4 px-3 py-2.5"
                     >
                       <span className="dash-sans text-depths text-sm font-semibold">{t.subject}</span>
-                      <span className="text-muted shrink-0 text-right text-xs font-medium leading-snug">
-                        {t.level || "—"}
+                      <span className="text-muted max-w-[60%] shrink-0 text-right text-xs font-medium leading-snug">
+                        {t.levels.length > 0 ? t.levels.join(", ") : "—"}
                       </span>
                     </li>
                   ))}
@@ -351,32 +351,30 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
             <section>
               <h3 className="section-label">Testy do wysłania</h3>
               <p className="text-muted mt-1 text-xs leading-relaxed">
-                Jeden test na przedmiot — najwyższy poziom do wysłania.
+                Jeden test na przedmiot — najwyższy zaznaczony poziom.
               </p>
-              {(() => {
-                const toSend = suggestions.filter((t) => t.url);
-                if (toSend.length === 0) {
-                  return <p className="text-muted mt-3 text-xs">Brak testów do wysłania.</p>;
-                }
-                return (
-                  <ol className="mt-3 space-y-2">
-                    {toSend.map((t, index) => (
-                      <li
-                        key={`suggest-${t.subject}-${t.level}`}
-                        className="flex gap-3 rounded-app border border-[#000C4A]/15 border-l-4 border-l-[#000C4A] bg-[#000C4A]/4 px-3 py-2.5"
-                      >
-                        <span className="dash-mono text-muted mt-0.5 text-[0.65rem] font-bold tabular-nums">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="dash-sans text-depths text-sm font-bold">{t.subject}</p>
-                          <p className="text-muted mt-0.5 text-[0.7rem] font-medium leading-snug">{t.level}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                );
-              })()}
+              {suggestions.length === 0 ? (
+                <p className="text-muted mt-3 text-xs">Brak testów do wysłania.</p>
+              ) : (
+                <ol className="mt-3 space-y-2">
+                  {suggestions.map((t, index) => (
+                    <li
+                      key={`suggest-${t.subject}-${t.level}`}
+                      className="flex gap-3 rounded-app border border-[#000C4A]/15 border-l-4 border-l-[#000C4A] bg-[#000C4A]/4 px-3 py-2.5"
+                    >
+                      <span className="dash-mono text-muted mt-0.5 text-[0.65rem] font-bold tabular-nums">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="dash-sans text-depths text-sm font-bold">{t.subject}</p>
+                        <p className="text-muted mt-0.5 text-[0.7rem] font-medium leading-snug">
+                          {t.level}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </section>
 
             <section>

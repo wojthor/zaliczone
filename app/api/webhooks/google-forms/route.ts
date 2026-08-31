@@ -5,6 +5,9 @@ import {
   buildRequiredTestsFromSubjectsAndLevels,
   canonicalizeLevel,
   countSubjectsWithResults,
+  countUniqueSubjects,
+  parseLevelsNote,
+  parseOfferingsGrid,
   parseRequiredTests,
   parseTestResultsList,
   upsertTestResult,
@@ -63,26 +66,45 @@ function parseDob(v: unknown): string | null {
   return null;
 }
 
-/** required_tests z payloadu albo z pól przedmiotów + poziomów. */
+/**
+ * Preferuj najbogatsze źródło poziomów per przedmiot.
+ * `levels` z Forms często ma wszystkie zaznaczenia, a required_tests — tylko najwyższy.
+ */
 function resolveApplicationTests(body: Record<string, unknown>) {
-  let requiredTests = parseRequiredTests(body.required_tests ?? body.requiredTests);
-  if (requiredTests.length === 0) {
-    requiredTests = buildRequiredTestsFromSubjectsAndLevels(
-      asStringList(
-        body.subjects ??
-          body.teaching_subjects ??
-          body.teachingSubjects ??
-          body.przedmioty,
-      ),
-      asStringList(
-        body.teaching_levels ??
-          body.teachingLevels ??
-          body.poziomy ??
-          (Array.isArray(body.levels) ? body.levels : undefined),
-      ),
-    );
-  }
-  return requiredTests;
+  const fromGrid = parseOfferingsGrid(
+    body.offerings ??
+      body.subject_levels ??
+      body.subjectLevels ??
+      body.checkbox_grid ??
+      body.checkboxGrid ??
+      body.przedmioty_poziomy,
+  );
+  const fromLevelsNote = parseLevelsNote(
+    typeof body.levels === "string" ? body.levels : body.levels_note,
+  );
+  const fromRequired = parseRequiredTests(body.required_tests ?? body.requiredTests);
+  const fromSubjects = buildRequiredTestsFromSubjectsAndLevels(
+    asStringList(
+      body.subjects ??
+        body.teaching_subjects ??
+        body.teachingSubjects ??
+        body.przedmioty,
+    ),
+    asStringList(
+      body.teaching_levels ??
+        body.teachingLevels ??
+        body.poziomy ??
+        (Array.isArray(body.levels) ? body.levels : undefined),
+    ),
+  );
+
+  const candidates = [fromGrid, fromLevelsNote, fromRequired, fromSubjects].filter(
+    (list) => list.length > 0,
+  );
+  if (candidates.length === 0) return [];
+
+  // Wybierz listę z największą liczbą par przedmiot×poziom (najpełniejsze zaznaczenia).
+  return candidates.reduce((best, cur) => (cur.length > best.length ? cur : best));
 }
 
 export async function POST(req: Request) {
@@ -151,13 +173,13 @@ export async function POST(req: Request) {
         phone: asText(body.phone),
         dob: parseDob(body.dob ?? body.date_of_birth ?? body.birth_date),
         student_status: asBool(body.student_status ?? body.studentStatus),
-        university: asText(body.university),
+        university: asText(body.university) ?? asText(body.university_name) ?? asText(body.uczelnia),
         experience: asBool(body.experience),
         required_tests: requiredTests,
         levels: levelsNote,
         hours_per_week: asText(body.hours_per_week ?? body.hoursPerWeek),
         cv_url: asText(body.cv_url ?? body.cvUrl),
-        tests_expected: requiredTests.length,
+        tests_expected: countUniqueSubjects(requiredTests),
         tests_completed: 0,
         test_results: {},
         test_sent_manually: false,
@@ -264,7 +286,10 @@ export async function POST(req: Request) {
         test_results: nextResults,
         tests_completed: testsCompleted,
         required_tests: nextRequired,
-        tests_expected: Math.max(Number(candidate.tests_expected) || 0, nextRequired.length),
+        tests_expected: Math.max(
+          Number(candidate.tests_expected) || 0,
+          countUniqueSubjects(nextRequired),
+        ),
         status: "IN_PROGRESS",
       })
       .eq("id", candidate.id)
