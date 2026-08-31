@@ -298,6 +298,43 @@ export function parseLevelsNote(raw: unknown): RequiredTest[] {
   return buildRequiredTestsFromOfferings(map);
 }
 
+/** Czy nazwa to wiersz „Inne” / „Inne:” z siatki Forms. */
+export function isInneSubject(subject: string): boolean {
+  return /^inne:?$/i.test(subject.trim());
+}
+
+/**
+ * Zamienia „Inne” na konkretny przedmiot z pola tekstowego / wyniku testu.
+ * Np. Helena → Język hiszpański.
+ */
+export function resolveInneSubjects(
+  tests: RequiredTest[],
+  otherSubject?: string | null,
+  results: TestResultEntry[] = [],
+): RequiredTest[] {
+  if (!tests.some((t) => isInneSubject(t.subject))) return tests;
+
+  let replacement = (otherSubject || "").trim();
+  if (!replacement && results.length > 0) {
+    const known = new Set(
+      tests.filter((t) => !isInneSubject(t.subject)).map((t) => normKey(t.subject)),
+    );
+    const hit = results.find(
+      (r) => !isInneSubject(r.subject) && !known.has(normKey(r.subject)),
+    );
+    if (hit) replacement = hit.subject.trim();
+  }
+  if (!replacement) {
+    return tests.map((t) =>
+      isInneSubject(t.subject) ? { ...t, subject: "Inne" } : t,
+    );
+  }
+
+  return tests.map((t) =>
+    isInneSubject(t.subject) ? { ...t, subject: replacement } : t,
+  );
+}
+
 /**
  * Parsuje siatkę z Forms: { "Biologia": ["Szkoła podstawowa", ...] }
  * albo wiersze „Biologia [Szkoła podstawowa]”.

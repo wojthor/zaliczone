@@ -6,17 +6,26 @@ import {
   canonicalizeLevel,
   countSubjectsWithResults,
   countUniqueSubjects,
+  groupSubjectLevels,
   parseLevelsNote,
   parseOfferingsGrid,
   parseRequiredTests,
   parseTestResultsList,
+  resolveInneSubjects,
   upsertTestResult,
 } from "@/lib/recruitment/test-links";
 import type { CandidateStatus } from "@/lib/types/database";
+import type { RequiredTest } from "@/lib/recruitment/test-links";
 
 export const runtime = "nodejs";
 
 const OPEN_STATUSES: CandidateStatus[] = ["NEW", "IN_PROGRESS"];
+
+function groupSubjectLevelsNote(tests: RequiredTest[]): string {
+  return groupSubjectLevels(tests)
+    .map((t) => `${t.subject}: ${t.levels.join(", ")}`)
+    .join("; ");
+}
 
 function assertWebhookSecret(req: Request): boolean {
   const secret = process.env.GOOGLE_FORMS_WEBHOOK_SECRET?.trim();
@@ -104,7 +113,14 @@ function resolveApplicationTests(body: Record<string, unknown>) {
   if (candidates.length === 0) return [];
 
   // Wybierz listę z największą liczbą par przedmiot×poziom (najpełniejsze zaznaczenia).
-  return candidates.reduce((best, cur) => (cur.length > best.length ? cur : best));
+  const richest = candidates.reduce((best, cur) => (cur.length > best.length ? cur : best));
+  const otherSubject =
+    asText(body.other_subject) ??
+    asText(body.otherSubject) ??
+    asText(body.inne) ??
+    asText(body.inne_przedmiot) ??
+    asText(body.subject_other);
+  return resolveInneSubjects(richest, otherSubject);
 }
 
 export async function POST(req: Request) {
@@ -151,8 +167,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "full_name is required" }, { status: 400 });
       }
 
-      const requiredTests = resolveApplicationTests(body);
-      if (requiredTests.length === 0) {
+      const requiredTestsRaw = resolveApplicationTests(body);
+      if (requiredTestsRaw.length === 0) {
         return NextResponse.json(
           {
             error:
@@ -161,31 +177,6 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-
-      const levelsNote =
-        asText(body.levels_note) ??
-        (typeof body.levels === "string" ? asText(body.levels) : null) ??
-        requiredTests.map((t) => `${t.subject}: ${t.level}`).join("; ");
-
-      const row = {
-        full_name: fullName,
-        email,
-        phone: asText(body.phone),
-        dob: parseDob(body.dob ?? body.date_of_birth ?? body.birth_date),
-        student_status: asBool(body.student_status ?? body.studentStatus),
-        university: asText(body.university) ?? asText(body.university_name) ?? asText(body.uczelnia),
-        experience: asBool(body.experience),
-        required_tests: requiredTests,
-        levels: levelsNote,
-        hours_per_week: asText(body.hours_per_week ?? body.hoursPerWeek),
-        cv_url: asText(body.cv_url ?? body.cvUrl),
-        tests_expected: countUniqueSubjects(requiredTests),
-        tests_completed: 0,
-        test_results: {},
-        test_sent_manually: false,
-        tests_reviewed_manually: false,
-        status: "NEW" as const,
-      };
 
       // Najpierw otwarte zgłoszenie; potem dowolne po e-mailu (żeby backfill nie
       // tworzył duplikatów po REJECTED/HIRED).
@@ -209,6 +200,41 @@ export async function POST(req: Request) {
             .limit(1)
             .maybeSingle()
         ).data;
+
+      const otherSubject =
+        asText(body.other_subject) ??
+        asText(body.otherSubject) ??
+        asText(body.inne) ??
+        asText(body.inne_przedmiot) ??
+        asText(body.subject_other);
+
+      const requiredTests = resolveInneSubjects(
+        requiredTestsRaw,
+        otherSubject,
+        existing ? parseTestResultsList(existing.test_results) : [],
+      );
+
+      const levelsNote = groupSubjectLevelsNote(requiredTests);
+
+      const row = {
+        full_name: fullName,
+        email,
+        phone: asText(body.phone),
+        dob: parseDob(body.dob ?? body.date_of_birth ?? body.birth_date),
+        student_status: asBool(body.student_status ?? body.studentStatus),
+        university: asText(body.university) ?? asText(body.university_name) ?? asText(body.uczelnia),
+        experience: asBool(body.experience),
+        required_tests: requiredTests,
+        levels: levelsNote,
+        hours_per_week: asText(body.hours_per_week ?? body.hoursPerWeek),
+        cv_url: asText(body.cv_url ?? body.cvUrl),
+        tests_expected: countUniqueSubjects(requiredTests),
+        tests_completed: 0,
+        test_results: {},
+        test_sent_manually: false,
+        tests_reviewed_manually: false,
+        status: "NEW" as const,
+      };
 
       if (existing) {
         const prevResults = parseTestResultsList(existing.test_results);

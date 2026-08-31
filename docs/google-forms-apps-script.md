@@ -114,6 +114,32 @@ function buildApplicationDataFromResponse(r) {
   var gridInfo = findCheckboxGrid(r);
   var requiredTests = allLevelsPerSubject(gridInfo);
 
+  // Pole tekstowe przy „Inne” → konkretny przedmiot (np. hiszpański)
+  var otherSubject = String(
+    ans("Jeśli Inne, podaj przedmiot") ||
+      ans("Jeśli zaznaczyłeś/aś Inne, napisz jaki przedmiot") ||
+      ans("Jaki inny przedmiot?") ||
+      ans("Podaj inny przedmiot") ||
+      ans("Inny przedmiot") ||
+      ans("Inne - jaki przedmiot?") ||
+      ""
+  ).trim();
+  if (otherSubject) {
+    requiredTests = requiredTests.map(function (t) {
+      if (/^inne:?$/i.test(String(t.subject || "").trim())) {
+        return { subject: otherSubject, level: t.level };
+      }
+      return t;
+    });
+  } else {
+    requiredTests = requiredTests.map(function (t) {
+      if (/^inne:?$/i.test(String(t.subject || "").trim())) {
+        return { subject: "Inne", level: t.level };
+      }
+      return t;
+    });
+  }
+
   var first = String(ans("Imię") || "");
   var last = String(ans("Nazwisko") || "");
   var fullName =
@@ -157,6 +183,7 @@ function buildApplicationDataFromResponse(r) {
     ),
     offerings: offerings,
     required_tests: requiredTests,
+    other_subject: otherSubject || "",
     levels: Object.keys(offerings)
       .map(function (s) {
         return s + ": " + offerings[s].join(", ");
@@ -187,7 +214,11 @@ function findCheckboxGrid(r) {
     var rows = GRID_ROWS.slice();
     try {
       var fromItem = item.asCheckboxGridItem().getRows();
-      if (fromItem && fromItem.length) rows = fromItem;
+      if (fromItem && fromItem.length) {
+        rows = fromItem.map(function (row) {
+          return String(row || "").replace(/:$/, "").trim();
+        });
+      }
     } catch (e) {
       Logger.log("getRows fallback GRID_ROWS: " + e);
     }
