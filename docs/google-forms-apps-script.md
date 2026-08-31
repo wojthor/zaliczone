@@ -29,8 +29,7 @@ Kolejność (rosnąco):
 
 Flow: **najpierw to zgłoszenie** tworzy kartę w `/admin/rekrutacja`. Testy dopinasz później.
 
-Pytanie kluczowe (tytuł 1:1 jak w Forms):
-- `Przedmioty i poziomy` — **CheckboxGrid** (wiersze = przedmioty, kolumny = poziomy)
+Pytanie kluczowe: **CheckboxGrid** (w Forms: „Na jakim poziomie chcesz udzielać korepetycji?” — skrypt i tak znajduje siatkę po typie, nie tylko po tytule).
 
 W bazie zapisujemy **wszystkie** zaznaczenia (do podglądu), a panel podpowiada **jeden test na przedmiot** (najwyższy poziom).
 
@@ -41,14 +40,22 @@ W bazie zapisujemy **wszystkie** zaznaczenia (do podglądu), a panel podpowiada 
 var WEBHOOK_URL = "https://www.zaliczone.edu.pl/api/webhooks/google-forms";
 var WEBHOOK_SECRET = "ZMIEŃ_NA_SEKRET"; // = GOOGLE_FORMS_WEBHOOK_SECRET z Vercel
 
-var LEVEL_RANK = {
-  "szkola podstawowa": 1,
-  "szkola srednia poziom podstawowy": 2,
-  "szkola srednia poziom rozszerzony": 3,
-  "matura": 4,
-  "matura poziom podstawowy": 4,
-  "matura poziom rozszerzony": 5,
-};
+/**
+ * Kolejność wierszy siatki MUSI być 1:1 jak w Forms.
+ * (Forms API zwraca tablicę poziomów po INDEKSIE wiersza, bez nazw przedmiotów.)
+ */
+var GRID_ROWS = [
+  "Język polski",
+  "Matematyka",
+  "Język angielski",
+  "Język niemiecki",
+  "Biologia",
+  "Chemia",
+  "Fizyka",
+  "Historia",
+  "Geografia",
+  "Inne",
+];
 
 function onFormSubmit(e) {
   try {
@@ -58,7 +65,7 @@ function onFormSubmit(e) {
   }
 }
 
-/** Run → backfillExistingApplications — jednorazowo importuje już wypełnione zgłoszenia. */
+/** Run → backfillExistingApplications */
 function backfillExistingApplications() {
   var form = FormApp.getActiveForm();
   var responses = form.getResponses();
@@ -94,152 +101,156 @@ function buildApplicationDataFromResponse(r) {
     for (var i = 0; i < items.length; i++) {
       if (items[i].getItem().getTitle() === title) {
         var resp = items[i].getResponse();
-        return Array.isArray(resp) ? resp : (resp && typeof resp === "object" ? resp : String(resp || "").trim());
+        return Array.isArray(resp)
+          ? resp
+          : resp && typeof resp === "object"
+            ? resp
+            : String(resp || "").trim();
       }
     }
     return "";
   }
 
-  // 1) CheckboxGrid — poziomy PER przedmiot (właściwe źródło)
-  var requiredTests = allLevelsPerSubject(ans("Przedmioty i poziomy"));
-  if (requiredTests.length === 0) {
-    requiredTests = allLevelsPerSubject(ans("Jakich przedmiotów i na jakim poziomie chcesz uczyć?"));
-  }
-
-  // 2) Ostateczność: dwa osobne pytania (ten sam najwyższy poziom na wszystkie — niedokładne)
-  if (requiredTests.length === 0) {
-    var subjects = toList(ans("Jakiego przedmiotu chcesz uczyć?"));
-    var levels = toList(ans("Na jakim poziomie chcesz udzielać korepetycji?"));
-    requiredTests = buildRequiredTestsSameLevel(subjects, levels);
-  }
+  var gridInfo = findCheckboxGrid(r);
+  var requiredTests = allLevelsPerSubject(gridInfo);
 
   var first = String(ans("Imię") || "");
   var last = String(ans("Nazwisko") || "");
-  var fullName = String(ans("Imię i nazwisko") || "").trim() || (first + " " + last).trim();
+  var fullName =
+    String(ans("Imię i nazwisko") || "").trim() || (first + " " + last).trim();
 
   var email = "";
-  try { email = r.getRespondentEmail() || ""; } catch (_) {}
+  try {
+    email = r.getRespondentEmail() || "";
+  } catch (_) {}
   if (!email) email = String(ans("E-mail") || ans("Adres e-mail") || "");
 
   var offerings = {};
   requiredTests.forEach(function (t) {
     if (!offerings[t.subject]) offerings[t.subject] = [];
-    if (offerings[t.subject].indexOf(t.level) === -1) offerings[t.subject].push(t.level);
+    if (offerings[t.subject].indexOf(t.level) === -1) {
+      offerings[t.subject].push(t.level);
+    }
   });
 
   return {
     full_name: fullName,
     email: String(email).toLowerCase().trim(),
-    phone: String(ans("Telefon") || ""),
+    phone: String(ans("Telefon") || ans("Numer telefonu") || ""),
     dob: String(ans("Data urodzenia") || ""),
-    student_status: /tak|yes/i.test(String(
-      ans("Czy jesteś studentem?") ||
-      ans("Czy jesteś studentem/studentką?") ||
-      ans("Status studenta") ||
-      ""
-    )),
+    student_status: /tak|yes/i.test(
+      String(
+        ans("Czy jesteś studentem?") ||
+          ans("Czy jesteś studentem/studentką?") ||
+          ans("Status studenta") ||
+          ""
+      )
+    ),
     university: String(ans("Nazwa i adres uczelni") || ans("Uczelnia") || ""),
-    experience: /tak|yes/i.test(String(ans("Doświadczenie") || ans("Czy masz doświadczenie?") || ans("Czy masz doświadczenie w nauczaniu?") || "")),
+    experience: /tak|yes/i.test(
+      String(
+        ans("Doświadczenie") ||
+          ans("Czy masz doświadczenie?") ||
+          ans("Czy masz doświadczenie w nauczaniu?") ||
+          ""
+      )
+    ),
     offerings: offerings,
     required_tests: requiredTests,
-    levels: Object.keys(offerings).map(function (s) {
-      return s + ": " + offerings[s].join(", ");
-    }).join("; "),
+    levels: Object.keys(offerings)
+      .map(function (s) {
+        return s + ": " + offerings[s].join(", ");
+      })
+      .join("; "),
     hours_per_week: String(
       ans("Ile godzin tygodniowo?") ||
-      ans("Ile godzin tygodniowo chcesz pracować?") ||
-      ans("Ile godzin w tygodniu?") ||
-      ans("Dostępność godzinowa") ||
-      ""
+        ans("Ile godzin tygodniowo chcesz pracować?") ||
+        ans("Ile godzin w tygodniu?") ||
+        ans("Dostępność godzinowa") ||
+        ""
     ),
     cv_url: String(ans("CV") || ans("Link do CV") || ""),
   };
 }
 
-function toList(v) {
-  if (Array.isArray(v)) return v.map(function (x) { return String(x || "").trim(); }).filter(Boolean);
-  var s = String(v || "").trim();
-  if (!s) return [];
-  return s.split(/[,;\n|]+/).map(function (x) { return x.trim(); }).filter(Boolean);
-}
+/**
+ * Forms zwraca CHECKBOX_GRID jako tablicę:
+ * [ null | ["poziom", …], … ] — indeks = wiersz siatki.
+ * Nazwy przedmiotów bierzemy z getRows() albo z GRID_ROWS.
+ */
+function findCheckboxGrid(r) {
+  var items = r.getItemResponses();
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i].getItem();
+    if (item.getType() != FormApp.ItemType.CHECKBOX_GRID) continue;
 
-function normKey(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/ą/g, "a").replace(/ć/g, "c").replace(/ę/g, "e")
-    .replace(/ł/g, "l").replace(/ń/g, "n").replace(/ó/g, "o")
-    .replace(/ś/g, "s").replace(/ź/g, "z").replace(/ż/g, "z")
-    .replace(/[()]/g, " ")
-    .replace(/\s*-\s*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function levelRank(level) {
-  return LEVEL_RANK[normKey(level)] || 0;
-}
-
-function pickHighestLevel(levels) {
-  var best = "";
-  var bestRank = -1;
-  levels.forEach(function (level) {
-    var rank = levelRank(level);
-    if (rank > bestRank) {
-      best = level;
-      bestRank = rank;
+    var rows = GRID_ROWS.slice();
+    try {
+      var fromItem = item.asCheckboxGridItem().getRows();
+      if (fromItem && fromItem.length) rows = fromItem;
+    } catch (e) {
+      Logger.log("getRows fallback GRID_ROWS: " + e);
     }
-  });
-  return best;
+
+    var response = items[i].getResponse();
+    Logger.log(
+      "CHECKBOX_GRID title=[" +
+        item.getTitle() +
+        "] rows=" +
+        JSON.stringify(rows) +
+        " raw=" +
+        JSON.stringify(response)
+    );
+    return { rows: rows, response: response };
+  }
+  Logger.log("Brak CHECKBOX_GRID w odpowiedzi");
+  return null;
 }
 
-/** Wszystkie zaznaczenia z siatki (wiele poziomów na przedmiot). */
-function allLevelsPerSubject(grid) {
-  var map = {};
-  function consider(subject, level) {
+function allLevelsPerSubject(gridInfo) {
+  var out = [];
+  var seen = {};
+  if (!gridInfo || !gridInfo.response) return out;
+
+  var rows = gridInfo.rows || GRID_ROWS;
+  var response = gridInfo.response;
+
+  function push(subject, level) {
     subject = String(subject || "").trim();
     level = String(level || "").trim();
     if (!subject || !level) return;
-    // Forms często zwraca "SP,SS pp,SS roz" jako JEDEN string — rozbijamy.
-    var parts = level.split(/[,;|]+/);
-    if (parts.length > 1) {
-      parts.forEach(function (p) { consider(subject, p); });
-      return;
-    }
-    if (!map[subject]) map[subject] = {};
-    map[subject][level] = true;
+    var key = subject.toLowerCase() + "::" + level.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({ subject: subject, level: level });
   }
-  if (grid && typeof grid === "object" && !Array.isArray(grid)) {
-    Object.keys(grid).forEach(function (subject) {
-      var levels = grid[subject];
-      if (Array.isArray(levels)) levels.forEach(function (lvl) { consider(subject, lvl); });
-      else consider(subject, levels);
-    });
-  } else if (Array.isArray(grid)) {
-    grid.forEach(function (row) {
-      var m = String(row).match(/^(.+?)\s*\[(.+)\]\s*$/);
-      if (m) consider(m[1], m[2]);
-    });
-  }
-  var out = [];
-  Object.keys(map).forEach(function (subject) {
-    Object.keys(map[subject]).forEach(function (level) {
-      out.push({ subject: subject, level: level });
-    });
-  });
-  return out;
-}
 
-/** Fallback: jeden wspólny najwyższy poziom na wszystkie przedmioty. */
-function buildRequiredTestsSameLevel(subjects, levels) {
-  var highest = pickHighestLevel(levels);
-  var out = [];
-  var seen = {};
-  subjects.forEach(function (subject) {
-    subject = String(subject || "").trim();
-    if (!subject || !highest || seen[subject.toLowerCase()]) return;
-    seen[subject.toLowerCase()] = true;
-    out.push({ subject: subject, level: highest });
-  });
+  // Główny format Forms: tablica po indeksie wiersza
+  if (Array.isArray(response)) {
+    for (var i = 0; i < response.length; i++) {
+      var subject = rows[i];
+      var levels = response[i];
+      if (!subject || levels == null) continue;
+      if (Array.isArray(levels)) {
+        for (var j = 0; j < levels.length; j++) push(subject, levels[j]);
+      } else {
+        push(subject, levels);
+      }
+    }
+    return out;
+  }
+
+  // Stary format obiektu: { "Biologia": ["…"], … }
+  if (typeof response === "object") {
+    Object.keys(response).forEach(function (subject) {
+      var levels = response[subject];
+      if (Array.isArray(levels)) {
+        levels.forEach(function (lvl) { push(subject, lvl); });
+      } else {
+        push(subject, levels);
+      }
+    });
+  }
   return out;
 }
 
