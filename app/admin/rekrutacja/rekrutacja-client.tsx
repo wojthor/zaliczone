@@ -5,11 +5,15 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
   CANDIDATE_TEST_WORKFLOW_LABEL,
   CANDIDATE_TEST_WORKFLOW_ORDER,
+  findResultForRequired,
   getCandidateTestProgress,
   getCandidateTestWorkflow,
   highestRequiredTests,
-  parseTestResults,
+  isFailingScore,
+  parseTestResultsList,
   type CandidateTestWorkflow,
+  type RequiredTest,
+  type TestResultEntry,
 } from "@/lib/recruitment/test-links";
 import type { Candidate, CandidateStatus } from "@/lib/types/database";
 import { CandidateProfileModal } from "./candidate-profile-modal";
@@ -270,7 +274,7 @@ function CandidateCard({
   onSelect: (id: string) => void;
 }) {
   const { required, expected, completed } = getCandidateTestProgress(c);
-  const results = parseTestResults(c.test_results);
+  const results = parseTestResultsList(c.test_results);
   const pct = expected > 0 ? Math.min(100, Math.round((completed / expected) * 100)) : 0;
   const bucket = workflow ?? getCandidateTestWorkflow(c);
   const workflowBadge = bucket ? WORKFLOW_META[bucket].badge : null;
@@ -318,8 +322,8 @@ function SubjectChips({
   required,
   results,
 }: {
-  required: { subject: string; level: string }[];
-  results: Record<string, { score: string; level: string }>;
+  required: RequiredTest[];
+  results: TestResultEntry[];
 }) {
   if (required.length === 0) {
     return <span className="text-muted text-[0.65rem]">Brak listy testów</span>;
@@ -328,12 +332,18 @@ function SubjectChips({
   return (
     <div className="flex flex-wrap gap-1">
       {required.map((t) => {
-        const score = results[t.subject]?.score;
+        const hit = findResultForRequired(results, t);
+        const score = hit?.score ?? null;
+        const failed = score ? isFailingScore(score) : false;
         return (
           <span
             key={t.subject}
             className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
-              score ? "bg-moss/15 text-moss" : "bg-paper text-depths"
+              !score
+                ? "bg-paper text-depths"
+                : failed
+                  ? "bg-claret/15 text-claret"
+                  : "bg-moss/15 text-moss"
             }`}
           >
             {t.subject}

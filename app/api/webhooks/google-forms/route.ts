@@ -226,7 +226,10 @@ export async function POST(req: Request) {
         experience: asBool(body.experience),
         required_tests: requiredTests,
         levels: levelsNote,
-        hours_per_week: asText(body.hours_per_week ?? body.hoursPerWeek),
+        hours_per_week:
+          asText(body.hours_per_week ?? body.hoursPerWeek) ??
+          asText(body.preferred_hours) ??
+          asText(body.preferowana_liczba_godzin),
         cv_url: asText(body.cv_url ?? body.cvUrl),
         tests_expected: countUniqueSubjects(requiredTests),
         tests_completed: 0,

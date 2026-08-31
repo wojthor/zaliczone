@@ -12,6 +12,7 @@ import {
   buildCandidateTestDisplayRows,
   getCandidateTestProgress,
   groupSubjectLevels,
+  isFailingScore,
   parseRequiredTests,
   parseTestResultsList,
   suggestTestsToSend,
@@ -440,11 +441,15 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                     {testRows.length === 0 ? (
                       <li className="text-muted text-xs">Brak testów na liście.</li>
                     ) : (
-                      testRows.map((t) => (
+                      testRows.map((t) => {
+                        const failed = t.score ? isFailingScore(t.score) : false;
+                        return (
                         <li
                           key={`${t.kind}-${t.subject}-${t.level}`}
                           className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ${
-                            t.kind === "retry"
+                            failed
+                              ? "bg-claret/10 ring-1 ring-claret/25"
+                              : t.kind === "retry"
                               ? "bg-paper ring-1 ring-panel-frame/30"
                               : t.kind === "extra"
                                 ? "bg-toffee/10 ring-1 ring-toffee/25"
@@ -470,13 +475,18 @@ export function CandidateProfileModal({ candidate, open, onClose, onChanged }: P
                           </div>
                           <span
                             className={`dash-mono shrink-0 text-sm font-bold tabular-nums ${
-                              t.score ? "text-moss" : "text-muted"
+                              !t.score
+                                ? "text-muted"
+                                : failed
+                                  ? "text-claret"
+                                  : "text-moss"
                             }`}
                           >
                             {t.score ?? "Oczekuje"}
                           </span>
                         </li>
-                      ))
+                        );
+                      })
                     )}
                   </ul>
 

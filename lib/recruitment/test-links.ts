@@ -473,6 +473,31 @@ export function parseTestResults(raw: unknown): Record<string, { score: string; 
   return out;
 }
 
+/** Parsuje „14/15”, „14 / 15”, „0.93” → udział 0–1. */
+export function parseScoreRatio(score: string): number | null {
+  const s = score.trim().replace(",", ".");
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (m) {
+    const earned = Number(m[1]);
+    const max = Number(m[2]);
+    if (!Number.isFinite(earned) || !Number.isFinite(max) || max <= 0) return null;
+    return earned / max;
+  }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) {
+    const n = Number(pct[1]);
+    return Number.isFinite(n) ? n / 100 : null;
+  }
+  return null;
+}
+
+/** Wynik poniżej progu zaliczenia (domyślnie 75%). */
+export function isFailingScore(score: string, threshold = 0.75): boolean {
+  const ratio = parseScoreRatio(score);
+  if (ratio == null) return false;
+  return ratio < threshold;
+}
+
 function resultKey(subject: string, level: string): string {
   return `${normKey(subject)}::${normKey(level)}`;
 }

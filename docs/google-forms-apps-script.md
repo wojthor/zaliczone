@@ -31,6 +31,12 @@ Flow: **najpierw to zgłoszenie** tworzy kartę w `/admin/rekrutacja`. Testy dop
 
 Pytanie kluczowe: **CheckboxGrid** (w Forms: „Na jakim poziomie chcesz udzielać korepetycji?” — skrypt i tak znajduje siatkę po typie, nie tylko po tytule).
 
+**„Inne” w dwóch miejscach:**
+1. **„Jakiego przedmiotu chcesz uczyć?”** — opcja Other `Inne:` + wpisany tekst (nazwa przedmiotu, np. hiszpański).
+2. **Wiersz „Inne” w siatce poziomów** — zaznaczone poziomy dla tego przedmiotu.
+
+Skrypt bierze poziomy z (2), a nazwę z tekstu przy (1). Bez tego w panelu zostaje samo „Inne”.
+
 W bazie zapisujemy **wszystkie** zaznaczenia (do podglądu), a panel podpowiada **jeden test na przedmiot** (najwyższy poziom).
 
 **Już wypełnione zgłoszenia:** wklej skrypt → Run → **`backfillExistingApplications`** (raz). Potem `onFormSubmit` łapie tylko nowe.
@@ -114,16 +120,17 @@ function buildApplicationDataFromResponse(r) {
   var gridInfo = findCheckboxGrid(r);
   var requiredTests = allLevelsPerSubject(gridInfo);
 
-  // Pole tekstowe przy „Inne” → konkretny przedmiot (np. hiszpański)
-  var otherSubject = String(
-    ans("Jeśli Inne, podaj przedmiot") ||
-      ans("Jeśli zaznaczyłeś/aś Inne, napisz jaki przedmiot") ||
-      ans("Jaki inny przedmiot?") ||
-      ans("Podaj inny przedmiot") ||
-      ans("Inny przedmiot") ||
-      ans("Inne - jaki przedmiot?") ||
-      ""
-  ).trim();
+  /**
+   * Dwa miejsca z „Inne” w Forms:
+   * 1) „Jakiego przedmiotu chcesz uczyć?” — opcja Other „Inne:” + wpisany tekst
+   *    (np. hiszpański / Fotografia, Filmoznawstwo)
+   * 2) wiersz „Inne” w siatce „Na jakim poziomie…” — poziomy dla tego przedmiotu
+   * Poziomy bierzemy z siatki; nazwę przedmiotu z (1).
+   */
+  var otherSubject = extractOtherSubject(ans);
+  if (otherSubject) {
+    Logger.log("other_subject=[" + otherSubject + "]");
+  }
   if (otherSubject) {
     requiredTests = requiredTests.map(function (t) {
       if (/^inne:?$/i.test(String(t.subject || "").trim())) {
@@ -166,7 +173,8 @@ function buildApplicationDataFromResponse(r) {
     dob: String(ans("Data urodzenia") || ""),
     student_status: /tak|yes/i.test(
       String(
-        ans("Czy jesteś studentem?") ||
+        ans("Czy posiadasz aktualny status studenta?") ||
+          ans("Czy jesteś studentem?") ||
           ans("Czy jesteś studentem/studentką?") ||
           ans("Status studenta") ||
           ""
@@ -175,7 +183,9 @@ function buildApplicationDataFromResponse(r) {
     university: String(ans("Nazwa i adres uczelni") || ans("Uczelnia") || ""),
     experience: /tak|yes/i.test(
       String(
-        ans("Doświadczenie") ||
+        ans("Czy posiadasz doświadczenie na podobnym stanowisku") ||
+          ans("Czy posiadasz doświadczenie na podobnym stanowisku?") ||
+          ans("Doświadczenie") ||
           ans("Czy masz doświadczenie?") ||
           ans("Czy masz doświadczenie w nauczaniu?") ||
           ""
@@ -190,7 +200,8 @@ function buildApplicationDataFromResponse(r) {
       })
       .join("; "),
     hours_per_week: String(
-      ans("Ile godzin tygodniowo?") ||
+      ans("Preferowana liczba godzin w tygodniu") ||
+        ans("Ile godzin tygodniowo?") ||
         ans("Ile godzin tygodniowo chcesz pracować?") ||
         ans("Ile godzin w tygodniu?") ||
         ans("Dostępność godzinowa") ||
@@ -198,6 +209,67 @@ function buildApplicationDataFromResponse(r) {
     ),
     cv_url: String(ans("CV") || ans("Link do CV") || ""),
   };
+}
+
+/**
+ * Tekst z opcji Other „Inne:” przy „Jakiego przedmiotu chcesz uczyć?”
+ * albo z osobnego pola tekstowego (starsze warianty formularza).
+ */
+function extractOtherSubject(ans) {
+  var dedicated = String(
+    ans("Jeśli Inne, podaj przedmiot") ||
+      ans("Jeśli zaznaczyłeś/aś Inne, napisz jaki przedmiot") ||
+      ans("Jaki inny przedmiot?") ||
+      ans("Podaj inny przedmiot") ||
+      ans("Inny przedmiot") ||
+      ans("Inne - jaki przedmiot?") ||
+      ""
+  ).trim();
+  if (dedicated) return dedicated;
+
+  var raw = ans("Jakiego przedmiotu chcesz uczyć?");
+  var list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === "object") {
+    // rzadki wariant
+    for (var k in raw) {
+      if (Object.prototype.hasOwnProperty.call(raw, k) && raw[k]) {
+        list.push(k);
+      }
+    }
+  } else if (raw) {
+    list = [String(raw)];
+  }
+
+  var known = {};
+  for (var i = 0; i < GRID_ROWS.length; i++) {
+    known[String(GRID_ROWS[i]).toLowerCase()] = true;
+  }
+  // aliasy bez „Język …”
+  known["polski"] = true;
+  known["angielski"] = true;
+  known["niemiecki"] = true;
+  known["matma"] = true;
+
+  var others = [];
+  for (var j = 0; j < list.length; j++) {
+    var s = String(list[j] || "").trim();
+    if (!s) continue;
+
+    // Forms czasem zwraca „Inne: Fotografia…” albo sam wpisany tekst
+    var m = s.match(/^inne\s*:\s*(.+)$/i);
+    if (m) {
+      others.push(m[1].trim());
+      continue;
+    }
+    if (/^inne:?$/i.test(s)) continue;
+
+    var key = s.replace(/:$/, "").trim().toLowerCase();
+    if (known[key]) continue;
+    others.push(s.replace(/:$/, "").trim());
+  }
+  return others.join(", ");
 }
 
 /**
