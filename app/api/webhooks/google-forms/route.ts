@@ -187,7 +187,9 @@ export async function POST(req: Request) {
         status: "NEW" as const,
       };
 
-      const { data: existing } = await supabase
+      // Najpierw otwarte zgłoszenie; potem dowolne po e-mailu (żeby backfill nie
+      // tworzył duplikatów po REJECTED/HIRED).
+      const { data: existingOpen } = await supabase
         .from("candidates")
         .select("id, status, test_results, tests_completed, test_sent_manually, tests_reviewed_manually")
         .ilike("email", email)
@@ -196,9 +198,22 @@ export async function POST(req: Request) {
         .limit(1)
         .maybeSingle();
 
+      const existing =
+        existingOpen ??
+        (
+          await supabase
+            .from("candidates")
+            .select("id, status, test_results, tests_completed, test_sent_manually, tests_reviewed_manually")
+            .ilike("email", email)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).data;
+
       if (existing) {
         const prevResults = parseTestResultsList(existing.test_results);
         const completed = countSubjectsWithResults(prevResults);
+        const closed = existing.status === "HIRED" || existing.status === "REJECTED";
         const { data, error } = await supabase
           .from("candidates")
           .update({
@@ -214,13 +229,22 @@ export async function POST(req: Request) {
             cv_url: row.cv_url,
             tests_expected: row.tests_expected,
             tests_completed: completed,
-            status: completed > 0 || existing.test_sent_manually ? "IN_PROGRESS" : "NEW",
+            // Nie otwieraj ponownie odrzuconych / zatrudnionych przy backfillu.
+            status: closed
+              ? existing.status
+              : completed > 0 || existing.test_sent_manually
+                ? "IN_PROGRESS"
+                : "NEW",
           })
           .eq("id", existing.id)
           .select("*")
           .single();
         if (error) throw error;
-        return NextResponse.json({ ok: true, action: "updated", candidate: data });
+        return NextResponse.json({
+          ok: true,
+          action: closed ? "updated_closed" : "updated",
+          candidate: data,
+        });
       }
 
       const { data, error } = await supabase.from("candidates").insert(row).select("*").single();
