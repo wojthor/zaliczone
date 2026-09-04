@@ -32,7 +32,24 @@ const STATUS_BADGE: Record<CandidateStatus, string> = {
   HIRED: "bg-lime/40 text-depths",
 };
 
-type ViewFilter = "PIPELINE" | CandidateTestWorkflow | "HIRED" | "REJECTED";
+type ViewFilter = "PIPELINE" | "SHORTLIST" | CandidateTestWorkflow | "HIRED" | "REJECTED";
+
+type SortMode =
+  | "newest"
+  | "oldest"
+  | "az"
+  | "za"
+  | "studentYes"
+  | "studentNo";
+
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: "newest", label: "Najnowsi" },
+  { value: "oldest", label: "Najstarsi" },
+  { value: "az", label: "Imię A–Z" },
+  { value: "za", label: "Imię Z–A" },
+  { value: "studentYes", label: "Status studenta: Tak najpierw" },
+  { value: "studentNo", label: "Status studenta: Nie najpierw" },
+];
 
 const WORKFLOW_META: Record<
   CandidateTestWorkflow,
@@ -66,6 +83,7 @@ const WORKFLOW_META: Record<
 
 const FILTER_PILLS: { key: ViewFilter; label: string }[] = [
   { key: "PIPELINE", label: "Aktywni" },
+  { key: "SHORTLIST", label: "Rekrutacja" },
   ...CANDIDATE_TEST_WORKFLOW_ORDER.map((key) => ({
     key,
     label: CANDIDATE_TEST_WORKFLOW_LABEL[key],
@@ -78,15 +96,42 @@ function isOpenCandidate(c: Candidate): boolean {
   return c.status === "NEW" || c.status === "IN_PROGRESS";
 }
 
+function sortCandidates(list: Candidate[], mode: SortMode): Candidate[] {
+  const next = [...list];
+  next.sort((a, b) => {
+    if (mode === "newest") return b.created_at.localeCompare(a.created_at);
+    if (mode === "oldest") return a.created_at.localeCompare(b.created_at);
+    if (mode === "az") return a.full_name.localeCompare(b.full_name, "pl");
+    if (mode === "za") return b.full_name.localeCompare(a.full_name, "pl");
+    if (mode === "studentYes") {
+      const byStatus = Number(b.student_status) - Number(a.student_status);
+      return byStatus !== 0 ? byStatus : a.full_name.localeCompare(b.full_name, "pl");
+    }
+    const byStatus = Number(a.student_status) - Number(b.student_status);
+    return byStatus !== 0 ? byStatus : a.full_name.localeCompare(b.full_name, "pl");
+  });
+  return next;
+}
+
 export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Candidate[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState<ViewFilter>("PIPELINE");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const openCandidates = useMemo(
-    () => initialCandidates.filter(isOpenCandidate),
-    [initialCandidates],
+    () => sortCandidates(initialCandidates.filter(isOpenCandidate), sortMode),
+    [initialCandidates, sortMode],
+  );
+
+  const shortlistCandidates = useMemo(
+    () =>
+      sortCandidates(
+        initialCandidates.filter((c) => !c.student_status),
+        sortMode,
+      ),
+    [initialCandidates, sortMode],
   );
 
   const grouped = useMemo(() => {
@@ -105,13 +150,19 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
 
   const closedRows = useMemo(() => {
     if (filter === "HIRED") {
-      return initialCandidates.filter((c) => c.status === "HIRED");
+      return sortCandidates(
+        initialCandidates.filter((c) => c.status === "HIRED"),
+        sortMode,
+      );
     }
     if (filter === "REJECTED") {
-      return initialCandidates.filter((c) => c.status === "REJECTED");
+      return sortCandidates(
+        initialCandidates.filter((c) => c.status === "REJECTED"),
+        sortMode,
+      );
     }
     return [];
-  }, [filter, initialCandidates]);
+  }, [filter, initialCandidates, sortMode]);
 
   const selected = useMemo(
     () => initialCandidates.find((c) => c.id === selectedId) ?? null,
@@ -121,6 +172,7 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
   const counts = useMemo(() => {
     const map: Record<string, number> = {
       PIPELINE: openCandidates.length,
+      SHORTLIST: shortlistCandidates.length,
       HIRED: initialCandidates.filter((c) => c.status === "HIRED").length,
       REJECTED: initialCandidates.filter((c) => c.status === "REJECTED").length,
     };
@@ -128,7 +180,7 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
       map[key] = grouped[key].length;
     }
     return map;
-  }, [grouped, initialCandidates, openCandidates.length]);
+  }, [grouped, initialCandidates, openCandidates.length, shortlistCandidates.length]);
 
   return (
     <div className="space-y-6">
@@ -142,9 +194,28 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
             Formularz → testy → wyniki z Forms → decyzja
           </p>
         </div>
-        <p className="dash-mono text-muted text-xs font-semibold tabular-nums">
-          {initialCandidates.length} osób · {openCandidates.length} aktywnych
-        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1">
+            <span className="text-muted text-[10px] font-bold uppercase tracking-[0.12em]">
+              Sortowanie
+            </span>
+            <select
+              className="dash-sans text-depths rounded-full border border-panel-frame/40 bg-snow px-3 py-1.5 text-[0.7rem] font-bold"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              aria-label="Sortowanie kandydatów"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="dash-mono text-muted text-xs font-semibold tabular-nums">
+            {initialCandidates.length} osób · {openCandidates.length} aktywnych
+          </p>
+        </div>
       </header>
 
       <div className="flex flex-wrap gap-1.5">
@@ -184,6 +255,16 @@ export function RekrutacjaClient({ initialCandidates }: { initialCandidates: Can
               />
             ))}
           </div>
+        )
+      ) : filter === "SHORTLIST" ? (
+        shortlistCandidates.length === 0 ? (
+          <EmptyState message="Brak osób ze statusem studenta „Nie”." />
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {shortlistCandidates.map((c) => (
+              <CandidateCard key={c.id} candidate={c} onSelect={setSelectedId} />
+            ))}
+          </ul>
         )
       ) : filter === "HIRED" || filter === "REJECTED" ? (
         closedRows.length === 0 ? (
@@ -306,6 +387,13 @@ function CandidateCard({
               className={`rounded-full px-2 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-wide ${STATUS_BADGE[c.status]}`}
             >
               {STATUS_LABEL[c.status]}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[0.55rem] font-extrabold uppercase tracking-wide ${
+                c.student_status ? "bg-moss/15 text-moss" : "bg-claret/10 text-claret"
+              }`}
+            >
+              Student: {c.student_status ? "Tak" : "Nie"}
             </span>
           </div>
         </div>

@@ -7,6 +7,8 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
+  /** googleapis jest ogromne — nie bundluj go w dev (szybsze kompilacje API/drive). */
+  serverExternalPackages: ["googleapis"],
   /** Zdjęcia nauczycieli (do 5 MB) idą przez Server Action uploadTutorPhoto. */
   experimental: {
     serverActions: {
