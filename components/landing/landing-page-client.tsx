@@ -8,6 +8,7 @@ import { SUBJECTS } from "@/lib/subjects";
 import { COMPANY } from "@/lib/company";
 import { submitTutorWaitlist } from "@/lib/actions/waitlist";
 import type { PublicTutorCard } from "@/lib/data/queries";
+import { PrivacyConsentPopup } from "@/components/landing/privacy-consent-popup";
 
 const DAYS = [
   { id: "pon", label: "Pon" },
@@ -808,6 +809,8 @@ export function LandingPageClient({
           </p>
         </div>
       </footer>
+
+      <PrivacyConsentPopup />
     </div>
   );
 }

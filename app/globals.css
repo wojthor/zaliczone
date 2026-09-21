@@ -194,6 +194,18 @@
   letter-spacing: -0.01em;
 }
 
+.dash-fonts-sans {
+  --font-dash-sans: "Space Grotesk", system-ui, sans-serif;
+}
+
+.dash-fonts-mono {
+  --font-dash-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+.font-logo {
+  font-family: "Poppins", system-ui, sans-serif;
+}
+
 @keyframes hopToPaid {
   0% {
     transform: translateX(0) scale(1);

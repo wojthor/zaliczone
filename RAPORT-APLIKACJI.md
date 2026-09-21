@@ -1,8 +1,9 @@
 # Raport aplikacji Zaliczone — od A do Z
 
-**Data raportu:** 24 sierpnia 2026  
+**Data raportu:** 6 września 2026  
 **Repozytorium:** `zaliczone`  
-**Cel dokumentu:** kompletny opis funkcjonalny i techniczny — każda podstrona, panel, zakładka, reguła biznesowa, mutacja, cache i stack.
+**Cel dokumentu:** kompletny opis funkcjonalny i techniczny — każda podstrona, panel, zakładka, reguła biznesowa, mutacja, cache i stack.  
+**Od poprzedniej wersji (24.08.2026):** pełny pipeline rekrutacji Google Forms → panel admina, terminy testów (3 dni robocze), wyniki na kafelkach z progiem 75%.
 
 ---
 
@@ -31,9 +32,10 @@
 
 **Zaliczone** to aplikacja webowa do zarządzania agencją korepetycji:
 
-- **Koordynator (ADMIN)** — weryfikuje wpłaty uczniów, wypłaca nauczycieli, prowadzi księgowość (NDG/JDG), zarządza kadrą i cennikiem.
+- **Koordynator (ADMIN)** — weryfikuje wpłaty uczniów, wypłaca nauczycieli, prowadzi księgowość (NDG/JDG), zarządza kadrą i cennikiem, **prowadzi rekrutację korepetytorów** (Google Forms → testy → zatrudnienie).
 - **Korepetytor (TUTOR)** — planuje lekcje, prowadzi uczniów, zgłasza lekcje do weryfikacji, ogląda finanse i generuje ewidencję godzin do podpisu.
 - **Uczeń** — **nie ma konta** w systemie. To rekord w tabeli `students` przypisany do nauczyciela (imię, przedmiot, poziom, kontakt, ewentualna blokada).
+- **Kandydat** — **nie ma konta**; rekord w `candidates` z formularza rekrutacyjnego / wyników quizów.
 
 Landing publiczny (`/`) pozwala znaleźć korepetytora (filtr poziom/przedmiot/dni) i zostawić zgłoszenie waitlisty e-mailem.
 
@@ -89,7 +91,7 @@ Admin tworzy konto (`createTutorAccount`) → e-mail invite (Resend) → link `/
 
 ### Premia nauczyciela
 
-- Progi: **40 / 50 / 60 godzin** lekcji `VERIFIED` → po **+100 zł** na próg (łącznie do **300 zł**). Pasek na dashboardzie pokazuje tylko aktualny segment.
+- Progi: **50 / 60 / 70 godzin** lekcji `VERIFIED` → po **+100 zł** na próg (łącznie do **300 zł**). Pasek na dashboardzie pokazuje tylko aktualny segment.
 - Udział bazowy tutora w stawce klienta (fallback): **70%** (`TUTOR_SHARE = 0.7`).
 - W praktyce wynagrodzenie liczone jest ze **stawek pracownika z cennika** (`worker_rate_pln` × godziny) + premia.
 
@@ -305,7 +307,7 @@ Pomocnicze: `lessonDatesFromDraft`, `assertNoTutorTimeConflict` / overlap `[star
 
 **Layout:** `app/admin/layout.tsx` + `AdminLayoutClient`.
 
-**Sidebar:** Główna, Kalendarz, Lekcje, Wypłaty, Księgowość, Nauczyciele, Cennik i przedmioty, wylogowanie.
+**Sidebar:** Główna, Kalendarz, Lekcje, Wypłaty, Księgowość, Nauczyciele, **Rekrutacja**, Cennik i przedmioty, wylogowanie.
 
 **Global search:** nauczyciele, lekcje, strony admina (`searchWorkspace`).
 
@@ -497,20 +499,96 @@ Wydruki = React + CSS print / „Zapisz jako PDF” w przeglądarce (bez Puppete
 
 ---
 
+### 7.8 `/admin/rekrutacja` — Rekrutacja korepetytorów
+
+**Cel:** pipeline od zgłoszenia Google Forms, przez wysyłkę / wyniki testów, po zatrudnienie lub odrzucenie.
+
+**Źródło danych:** tabela `candidates` (webhook Forms + edycja w panelu). Dokumentacja skryptów: `docs/google-forms-apps-script.md`.
+
+#### Flow operacyjny
+
+```
+Google Form (APPLICATION)
+        │  Apps Script → POST /api/webhooks/google-forms
+        ▼
+  Karta kandydata (NEW)
+        │  Admin: podpowiedź testów → wysyłka e-mailem (poza panelem)
+        │  checkbox „Test wysłany” + data wysyłki
+        ▼
+  IN_PROGRESS (+ termin 3 dni roboczych)
+        │  Quizy Google Forms (TEST_RESULT) dopinają wyniki po e-mailu
+        ▼
+  Hire → createTutorAccount  |  Reject → e-mail + status REJECTED
+```
+
+**Kolejność reguł:** najpierw zgłoszenie APPLICATION tworzy kartę. Sam wynik quizu **nie** powinien być jedynym źródłem pełnego profilu (stub możliwy historycznie; produkcyjnie APPLICATION-first).
+
+#### Statusy kandydata
+
+| Status | Znaczenie |
+|--------|-----------|
+| `NEW` | Nowe zgłoszenie / jeszcze bez wysłanych testów |
+| `IN_PROGRESS` | W procesie (testy wysłane lub w toku) |
+| `HIRED` | Zatrudniony (konto TUTOR) |
+| `REJECTED` | Odrzucony (backfill APPLICATION **nie** tworzy duplikatu — `updated_closed`) |
+
+#### Grupy workflow (otwarte kandydatury)
+
+| Bucket | Warunek (skrót) |
+|--------|-----------------|
+| **Po czasie** | Testy wysłane, nie wszystkie oddane, po terminie |
+| **Test nie wysłany** | Brak `test_sent_manually` / `test_sent_at` |
+| **W toku** | Wysłane, w oknie 3 dni roboczych |
+| **Zrobione** | Wszystkie oczekiwane przedmioty mają wynik |
+
+Logika: `getCandidateTestWorkflow` / `testResponseWindow` w `lib/recruitment/test-links.ts`.
+
+#### Termin na testy (3 dni robocze)
+
+- Start zegara = pierwszy **dzień roboczy** w dniu wysyłki lub później (**sob/nd → poniedziałek**).
+- Termin = **3. dzień roboczy włącznie** (np. poniedziałek → środa).
+- Badge w profilu: „jeszcze X dni robocze” — **X ≤ 3**.
+
+#### UI kafelków i profilu
+
+- **Przedmioty i poziomy** — wszystkie zaznaczenia z CheckboxGrid (per przedmiot).
+- **Testy do wysłania** — jeden test na przedmiot = **najwyższy** zaznaczony poziom; Matura w podpowiedzi mapuje się na SS rozszerzony (gdy brak osobnego Forms).
+- Chip na liście: `Niemiecki 15/15` (dopasowanie po znormalizowanej nazwie, np. `Język niemiecki` ↔ `Niemiecki`).
+- Wynik **&lt; 75%** → czerwony (kafelek + profil); ≥ 75% → zielony.
+- Checkboxy: **Test wysłany** (+ data), **Testy sprawdzone samodzielnie**.
+- Hire / Reject z potwierdzeniem.
+
+#### CheckboxGrid i „Inne”
+
+Forms zwraca siatkę jako tablicę poziomów **po indeksie wiersza**. Apps Script mapuje wiersze (`Język polski` … `Inne`) i czyta tekst z opcji Other przy pytaniu **„Jakiego przedmiotu chcesz uczyć?”** (np. hiszpański, fotografia).
+
+#### Actions (`lib/actions/recruitment.ts`)
+
+| Action | Opis |
+|--------|------|
+| `setCandidateTestsSent` | Flaga + `test_sent_at` |
+| `setCandidateTestsReviewed` | Flaga przeglądu wyników |
+| `setCandidateStatus` | Zmiana statusu |
+| `hireCandidate` | Status HIRED + `createTutorAccount` (przedmioty z `required_tests`) |
+| `rejectCandidate` | Status REJECTED + e-mail odrzucenia (Resend) |
+
+---
+
 ## 8. API (Route Handlers)
 
 | Endpoint | Dostęp | Cel |
 |----------|--------|-----|
 | `GET /api/drive/files/[fileId]?tutorId=` | TUTOR: własny folder; ADMIN: wymaga `tutorId` | Strumień pliku z folderu nauczyciela (Docs → PDF) |
 | `GET /api/drive/invoices/[fileId]` | **tylko ADMIN** | Strumień faktury z drzewa Faktury |
+| `POST /api/webhooks/google-forms` | Header `x-webhook-secret` = `GOOGLE_FORMS_WEBHOOK_SECRET` | `APPLICATION` upsert kandydata; `TEST_RESULT` dopina wynik do karty po e-mailu |
 
-`Cache-Control: private, no-store`. Asercje: plik musi należeć do właściwego folderu.
+`Cache-Control: private, no-store` (Drive). Webhook: JSON `{ type, data|… }`; bez poprawnego sekretu → `401`.
 
 ---
 
 ## 9. Model danych (Supabase)
 
-Migracje SQL **nie leżą w tym repo** — stosowane ręcznie w projekcie Supabase (odniesienia w komentarzach: `0002`…`0017`).
+Część migracji leży w repo: `supabase/migrations/` (`0002`…`0020`). Uruchamiane ręcznie w SQL Editorze Supabase; kod ma fallbacki przy braku kolumn.
 
 ### Tabele (skrót)
 
@@ -528,6 +606,24 @@ Migracje SQL **nie leżą w tym repo** — stosowane ręcznie w projekcie Supaba
 | `document_folders` / `document_files` | Drzewo dokumentów (Storage) |
 | `alerts` | UNPAID_STREAK, STOP_TEACHING, STUDENT_BLOCKED |
 | `notifications` | EWIDENCJA_REQUEST, CENNIK_UPDATE, PAYOUT, INFO |
+| `candidates` | Rekrutacja: zgłoszenie Forms, poziomy, wyniki testów, status |
+
+### `candidates` (migracje 0018–0020)
+
+| Kolumna | Opis |
+|---------|------|
+| `full_name`, `email`, `phone`, `dob` | Dane osobowe |
+| `student_status`, `university`, `experience` | Profil studenta / doświadczenie |
+| `required_tests` | JSONB: lista `{ subject, level }` (wszystkie zaznaczenia) |
+| `levels` | Notatka tekstowa „Przedmiot: poziomy…” |
+| `hours_per_week`, `cv_url` | Dostępność / CV |
+| `tests_expected` / `tests_completed` | Liczniki (expected ≈ unikalne przedmioty) |
+| `test_results` | JSONB: lista `{ subject, level, score }` (wiele poziomów OK) |
+| `test_sent_manually`, `test_sent_at` | Wysyłka testów + data startu terminu |
+| `tests_reviewed_manually` | Admin sprawdził wyniki |
+| `status` | `NEW` \| `IN_PROGRESS` \| `REJECTED` \| `HIRED` |
+
+RLS: tylko `ADMIN` (select/insert/update/delete). Webhook używa **service role**.
 
 ### Storage buckets
 
@@ -556,6 +652,13 @@ closeMonth, switchToJDG
 markPayoutPaid, unmarkPayoutPaid
 adminVerifyLesson, adminRejectLessonPayment
 createOperatingExpense, deleteOperatingExpense
+```
+
+### Rekrutacja (`lib/actions/recruitment.ts`)
+
+```
+setCandidateTestsSent, setCandidateTestsReviewed
+setCandidateStatus, hireCandidate, rejectCandidate
 ```
 
 ### Tutor / wspólne
@@ -592,7 +695,7 @@ createOperatingExpense, deleteOperatingExpense
 | Dokumenty prawne | **MDX** (`@next/mdx`) |
 | Testy | **Vitest 2.1.9** |
 | Lint | ESLint 9 + `eslint-config-next` |
-| Dev | `next dev --webpack` |
+| Dev | `next dev` (Turbopack domyślnie w Next 16; `dev:clean` czyści `.next`) |
 
 **Konfiguracja:** `experimental.serverActions.bodySizeLimit: "6mb"` (zdjęcia ≤ 5 MB).  
 **React Compiler:** peer opcjonalny Nexta — **nie jest jawnie włączony** w `next.config.ts`.
@@ -648,6 +751,14 @@ Dodatkowo: **`React.cache`** na `getCurrentUserProfile` i części list lekcji �
 
 ## 13. Integracje zewnętrzne
 
+### Google Forms + Apps Script (rekrutacja)
+
+- Formularz główny (**APPLICATION**) + osobne quizy przedmiotów (**TEST_RESULT**).
+- Skrypt w `docs/google-forms-apps-script.md`: `onFormSubmit`, `backfillExistingApplications`, `backfillExistingTestResults`.
+- Endpoint: `https://www.zaliczone.edu.pl/api/webhooks/google-forms`.
+- Env: `GOOGLE_FORMS_WEBHOOK_SECRET` (Vercel + Apps Script `WEBHOOK_SECRET`).
+- CheckboxGrid: mapowanie indeks → przedmiot; Other „Inne:” z pytania o przedmiot.
+
 ### Google Drive — nauczyciele
 
 - Root: `GOOGLE_DRIVE_TEACHERS_FOLDER_ID`.
@@ -664,7 +775,7 @@ Dodatkowo: **`React.cache`** na `getCurrentUserProfile` i części list lekcji �
 ### Resend
 
 - From: marka Zaliczone / `kontakt@zaliczone.edu.pl`.
-- Maile: welcome invite, potwierdzenie wypłaty, waitlista z landingu.
+- Maile: welcome invite, potwierdzenie wypłaty, waitlista z landingu, **odrzucenie kandydata** (`sendRecruitmentRejectionEmail`).
 
 ### Firma (`lib/company.ts`)
 
@@ -676,12 +787,13 @@ Dodatkowo: **`React.cache`** na `getCurrentUserProfile` i części list lekcji �
 
 1. **Middleware** — rozdział ADMIN/TUTOR + publiczne ścieżki.
 2. **Server Actions** — `requireAdmin` / sprawdzenie `tutor_id = user.id`.
-3. **Service role** — świadomie używany do KPI, admin mutations i omijania edge-case RLS („sukces przy 0 wierszach”).
+3. **Service role** — świadomie używany do KPI, admin mutations, webhook rekrutacji i omijania edge-case RLS.
 4. **API Drive** — asercja przynależności pliku do folderu tutora / drzewa faktur.
 5. **Signed URL** dokumentów Storage — krótki TTL (~120 s).
 6. **Sanityzacja `next`** w auth callback.
-7. **Zamknięty miesiąc** — twarda blokada mutacji finansowych/lekcyjnych.
-8. **RLS** — zakładane w Supabase; app nie polega wyłącznie na RLS (defense in depth przez actions + middleware).
+7. **Webhook Google Forms** — wymaga `GOOGLE_FORMS_WEBHOOK_SECRET` w Production.
+8. **Zamknięty miesiąc** — twarda blokada mutacji finansowych/lekcyjnych.
+9. **RLS** — zakładane w Supabase; app nie polega wyłącznie na RLS (defense in depth przez actions + middleware).
 
 ---
 
@@ -714,13 +826,16 @@ Brak E2E w repo.
 1. **Brak roli STUDENT** — uczniowie to dane, nie loginy.
 2. **`/powiadomienia`** — redirect; inbox powiadomień niepodpięty do UI nauczyciela.
 3. **`/kalendarz` (tutor)** — alias → terminarz.
-4. **Migracje SQL poza gitem** — schemat trzeba utrzymywać w Supabase; kod ma fallbacki.
+4. **Migracje SQL** — pliki w `supabase/migrations/`, ale nadal uruchamiane ręcznie w Supabase (brak automatycznego CI migrate).
 5. **Lista płac PDF vs tabela wypłat** — możliwe różnice 70% vs stawki cennika.
 6. **Checkbox „zgodność z kontem” przy zamknięciu miesiąca** — tylko UI.
 7. **Przełączenie NDG→JDG** — nieodwracalne w aplikacji.
 8. **Waitlista** — e-mail, bez trwałego rekordu DB w akcji.
 9. **React Compiler** — nie włączony jawnie.
 10. **Umowy kończące się ≤30 dni** — usunięte z dashboardu admina (zastąpione donutem Podział).
+11. **Rekrutacja — nie wszystkie przedmioty mają Forms** (np. Historia, Geografia, hiszpański) — podpowiedź bez URL.
+12. **Wysyłka linków do testów** — poza panelem (ręczny e-mail); panel tylko oznacza „wysłane” + datę.
+13. **Backfill Forms** — wymaga aktualnego Apps Script w każdym formularzu; quizy muszą mieć oceny „natychmiast” lub arkusz Score.
 
 ---
 
@@ -738,16 +853,22 @@ app/
     wyplaty/ (+ lista-plac)         Wypłaty
     ksiegowosc/ (+ ewidencja, koszty)
     nauczyciele/ (+ [id])
+    rekrutacja/                     Pipeline kandydatów
     cennik/, kalendarz/
-  api/drive/                        Stream plików
+  api/
+    drive/                          Stream plików
+    webhooks/google-forms/          APPLICATION + TEST_RESULT
 lib/
-  actions/                          Server Actions
+  actions/                          Server Actions (+ recruitment.ts)
+  recruitment/test-links.ts         Poziomy, terminy, chipy, sugestie testów
   data/queries.ts, mutations.ts, mappers.ts
   cache.ts                          Tagi cache
   podatki*.ts, dates.ts, guards.ts
   google-drive/                     Drive helpers
   emails/                           Resend
   supabase/                         clients + middleware
+supabase/migrations/                SQL 0002…0020 (m.in. candidates)
+docs/google-forms-apps-script.md    Canonical Apps Script
 components/                         UI współdzielone
 ```
 
@@ -755,7 +876,11 @@ components/                         UI współdzielone
 
 ## Podsumowanie jednolinijkowe
 
-**Zaliczone** to Next.js 16 + React 19 + Supabase + Drive + Resend: publiczny matching korepetytorów, panel nauczyciela (lekcje → weryfikacja), panel admina (rozliczenia → wypłaty → księgowość NDG/JDG z zamknięciem miesiąca), z dwupoziomowym cache (`updateTag` vs TTL KPI) i graceful degradation przy braku migracji/integracji.
+**Zaliczone** to Next.js 16 + React 19 + Supabase + Drive + Resend + Google Forms: publiczny matching korepetytorów, panel nauczyciela (lekcje → weryfikacja), panel admina (rozliczenia → wypłaty → księgowość NDG/JDG + **rekrutacja Forms→testy→hire**), z dwupoziomowym cache i graceful degradation przy braku migracji/integracji.
+
+---
+
+*Koniec raportu.*
 
 ---
 

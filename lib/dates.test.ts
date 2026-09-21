@@ -6,53 +6,53 @@ function canShowGenerateButton(hasVerifiedLessons: boolean, monthKey: string, to
 }
 
 describe("bonusProgress", () => {
-  it("liczy progi 40 / 50 / 60 h i łącznie do 300 zł", () => {
+  it("liczy progi 50 / 60 / 70 h i łącznie do 300 zł", () => {
     expect(maxBonusPln()).toBe(300);
     expect(bonusProgress(0)).toMatchObject({
-      threshold: 40,
+      threshold: 50,
       bonusPln: 0,
       achieved: false,
       maxed: false,
       ratio: 0,
     });
-    expect(bonusProgress(20)).toMatchObject({
-      threshold: 40,
-      remaining: 20,
+    expect(bonusProgress(25)).toMatchObject({
+      threshold: 50,
+      remaining: 25,
       bonusPln: 0,
       ratio: 0.5,
     });
-    expect(bonusProgress(40)).toMatchObject({
-      threshold: 50,
+    expect(bonusProgress(50)).toMatchObject({
+      threshold: 60,
       bonusPln: 100,
       achieved: true,
       ratio: 0,
       remaining: 10,
     });
-    expect(bonusProgress(45)).toMatchObject({
-      threshold: 50,
+    expect(bonusProgress(55)).toMatchObject({
+      threshold: 60,
       bonusPln: 100,
       ratio: 0.5,
       remaining: 5,
     });
-    expect(bonusProgress(50)).toMatchObject({
-      threshold: 60,
+    expect(bonusProgress(60)).toMatchObject({
+      threshold: 70,
       bonusPln: 200,
       ratio: 0,
     });
-    expect(bonusProgress(60)).toMatchObject({
-      threshold: 60,
+    expect(bonusProgress(70)).toMatchObject({
+      threshold: 70,
       bonusPln: 300,
       maxed: true,
       ratio: 1,
     });
-    expect(bonusProgress(72).bonusPln).toBe(300);
+    expect(bonusProgress(82).bonusPln).toBe(300);
   });
 
   it("ma trzy progi po 100 zł w konfiguracji", () => {
     expect(DATES.bonus.tiers).toEqual([
-      { hoursThreshold: 40, bonusPln: 100 },
       { hoursThreshold: 50, bonusPln: 100 },
       { hoursThreshold: 60, bonusPln: 100 },
+      { hoursThreshold: 70, bonusPln: 100 },
     ]);
   });
 });

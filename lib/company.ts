@@ -9,7 +9,7 @@ export const COMPANY = {
   address: "ul. Słonimskiego 1/48 Gdańsk",
   email: "kontakt@zaliczone.edu.pl",
   /** Numer rachunku do przelewów od rodziców / uczniów. */
-  bankAccount: "………………",
+  bankAccount: "39 1160 2202 0000 0007 3524 4970",
   /** Numer telefonu do BLIK. */
-  phone: "………………",
+  phone: "780 890 905",
 } as const;

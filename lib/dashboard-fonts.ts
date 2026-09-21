@@ -1,20 +1,11 @@
-import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
-
 /**
- * Typografia panelu finansowego admina - świadomie osobna od fontu body (system-ui)
- * i od logo (Poppins). Space Grotesk niesie „inżynierski” charakter nagłówków/etykiet;
- * IBM Plex Mono to ledger dla wszystkich liczb (kwoty, godziny, liczniki) - tabular-nums.
+ * Typografia panelu — Space Grotesk + IBM Plex Mono (CSS z `app/layout.tsx`).
+ * `variable` = klasa CSS ustawiająca `--font-dash-*` (jak kiedyś next/font).
  */
-export const dashboardSans = Space_Grotesk({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-dash-sans",
-  display: "swap",
-});
+export const dashboardSans = {
+  variable: "dash-fonts-sans",
+};
 
-export const dashboardMono = IBM_Plex_Mono({
-  subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700"],
-  variable: "--font-dash-mono",
-  display: "swap",
-});
+export const dashboardMono = {
+  variable: "dash-fonts-mono",
+};

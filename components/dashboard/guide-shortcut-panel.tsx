@@ -87,6 +87,24 @@ export function GuideShortcutPanel() {
             {COMPANY.name}
           </p>
           <p className="truncate text-[0.68rem] leading-snug text-muted">{COMPANY.address}</p>
+          <dl className="mt-2 space-y-2">
+            <div>
+              <dt className="text-[0.6rem] font-extrabold uppercase tracking-[0.08em] text-muted">
+                Telefon (BLIK)
+              </dt>
+              <dd className="mt-0.5 font-mono text-base font-extrabold tracking-wide text-depths">
+                {COMPANY.phone}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[0.55rem] font-bold uppercase tracking-[0.08em] text-muted">
+                Numer konta
+              </dt>
+              <dd className="break-all font-mono text-[0.72rem] font-bold tracking-wide text-depths">
+                {COMPANY.bankAccount}
+              </dd>
+            </div>
+          </dl>
         </div>
       </div>
     </section>

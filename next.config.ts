@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "6mb",
     },
   },
+  /** Next 16.3+ generuje AGENTS.md przy starcie — wyłączamy. */
+  // @ts-expect-error agentRules pojawia się w nowszych Next; typy paczki mogą być starsze
+  agentRules: false,
   images: {
     remotePatterns: [
       {

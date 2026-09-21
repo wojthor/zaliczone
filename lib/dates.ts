@@ -86,15 +86,15 @@ export const DATES = {
 
   /**
    * Premie miesięczne dla nauczyciela (lekcje VERIFIED).
-   * Progi kumulatywne: 40 h → +100 zł, 50 h → kolejne +100 zł, 60 h → kolejne +100 zł
+   * Progi kumulatywne: 50 h → +100 zł, 60 h → kolejne +100 zł, 70 h → kolejne +100 zł
    * (łącznie do `maxBonusPln` = 300 zł).
-   * Pasek na dashboardzie pokazuje tylko aktualny segment (do 40, potem do 50, potem do 60).
+   * Pasek na dashboardzie pokazuje tylko aktualny segment (do 50, potem do 60, potem do 70).
    */
   bonus: {
     tiers: [
-      { hoursThreshold: 40, bonusPln: 100 },
       { hoursThreshold: 50, bonusPln: 100 },
       { hoursThreshold: 60, bonusPln: 100 },
+      { hoursThreshold: 70, bonusPln: 100 },
     ],
   },
 
@@ -198,11 +198,11 @@ export function maxBonusPln(): number {
 /**
  * Postęp do premii wielostopniowej.
  * `threshold` / `ratio` / `remaining` dotyczą **aktualnego segmentu** paska
- * (0→40, potem 40→50, potem 50→60). `bonusPln` = łącznie już zarobiona premia.
+ * (0→50, potem 50→60, potem 60→70). `bonusPln` = łącznie już zarobiona premia.
  */
 export function bonusProgress(hoursDone: number): {
   done: number;
-  /** Cel bieżącego segmentu (40 / 50 / 60). */
+  /** Cel bieżącego segmentu (50 / 60 / 70). */
   threshold: number;
   /** Ile godzin brakuje do końca bieżącego segmentu. */
   remaining: number;
@@ -214,7 +214,7 @@ export function bonusProgress(hoursDone: number): {
   bonusPln: number;
   /** Premia za bieżący segment (do etykiety „+100 zł”). */
   segmentBonusPln: number;
-  /** Wszystkie progi zdobyte (60 h+). */
+  /** Wszystkie progi zdobyte (70 h+). */
   maxed: boolean;
 } {
   const tiers = DATES.bonus.tiers;

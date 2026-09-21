@@ -75,9 +75,9 @@ const DEADLINES = [
   },
   {
     id: "premia",
-    when: `40 / 50 / 60 h · łącznie do ${DATES.bonus.tiers.reduce((s, t) => s + t.bonusPln, 0)} zł`,
+    when: `${DATES.bonus.tiers.map((t) => t.hoursThreshold).join(" / ")} h · łącznie do ${DATES.bonus.tiers.reduce((s, t) => s + t.bonusPln, 0)} zł`,
     what: "Premia miesięczna",
-    how: "40 h zatwierdzonych → +100 zł, 50 h → kolejne +100 zł, 60 h → kolejne +100 zł (łącznie do 300 zł). Liczą się tylko lekcje ze statusem „zatwierdzona”.",
+    how: "50 h zatwierdzonych → +100 zł, 60 h → kolejne +100 zł, 70 h → kolejne +100 zł (łącznie do 300 zł). Liczą się tylko lekcje ze statusem „zatwierdzona”.",
     tag: "Próg",
   },
 ] as const;
