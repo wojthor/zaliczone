@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/page-shell";
+import { BonusProgressBar } from "@/components/bonus-progress-bar";
 import { tutorPayoutFromCennik, sumTutorPayoutFromCennik, financeLinesHours } from "@/lib/data/mappers";
 import { TUTOR_SHARE, bonusProgress, ewidencjaAvailableFromHint, isEwidencjaPdfAvailable } from "@/lib/dates";
+import { isFilmikMode } from "@/lib/filmik";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 
@@ -153,7 +155,7 @@ export function FinanseClient({
             rel="noopener noreferrer"
             className="landing-navy inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold text-lime"
           >
-            Generuj
+            {isFilmikMode() ? "Wygeneruj ewidencję" : "Generuj"}
           </a>
         ) : (
           <p className="text-muted max-w-[16rem] shrink-0 text-right text-[11px] leading-snug">
@@ -258,6 +260,11 @@ export function FinanseClient({
           </p>
         </div>
       </div>
+
+      <section className="mb-6">
+        <h2 className="section-label mb-2">Status premii</h2>
+        <BonusProgressBar hoursDone={hoursMonth} showCelebration />
+      </section>
 
       <section className="soft-panel p-4">
         <h2 className="section-label">Twoje zatwierdzone lekcje</h2>

@@ -6,6 +6,8 @@
  * Format dni w miesiącu: liczby 1–31
  */
 
+import { isFilmikMode } from "@/lib/filmik";
+
 /** Udział nauczyciela w stawce klienta (0.7 = 70%) */
 export const TUTOR_SHARE = 0.7;
 
@@ -116,6 +118,10 @@ export function ewidencjaUnlockDate(monthKey: string): Date {
 
 /** Czy dziś (albo podana data) jest już dniem odblokowania PDF za miesiąc M. */
 export function isEwidencjaPdfAvailable(monthKey: string, today = new Date()): boolean {
+  // Tryb Filmik: zawsze odblokowane (nagranie „Wygeneruj ewidencję”).
+  if (isFilmikMode()) {
+    return true;
+  }
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return start >= ewidencjaUnlockDate(monthKey);
 }

@@ -221,6 +221,19 @@ function LessonModal({
     );
   }, [draft.subject, students]);
 
+  const canSave = Boolean(
+    draft.subject &&
+      draft.studentId &&
+      draft.dateIso &&
+      draft.start &&
+      draft.end &&
+      draft.start < draft.end &&
+      (draft.recurrence !== "custom" || draft.selectedWeekdays.length > 0) &&
+      (mode === "edit" ||
+        draft.recurrence === "once" ||
+        (draft.untilDateIso && draft.untilDateIso >= draft.dateIso)),
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <button type="button" className="absolute inset-0 bg-[#000C4A]/50" aria-label="Zamknij" onClick={onClose} />
@@ -448,9 +461,14 @@ function LessonModal({
             </button>
             <button
               type="button"
-              className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+              className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:cursor-not-allowed disabled:opacity-45 touch-manipulation"
               onClick={onSave}
-              disabled={saving || activeSubjects.length === 0}
+              disabled={saving || !canSave || activeSubjects.length === 0}
+              title={
+                canSave
+                  ? undefined
+                  : "Uzupełnij przedmiot, ucznia, godzinę i powtarzanie"
+              }
             >
               {saving ? <Spinner /> : null}
               {saving ? "Zapisywanie…" : "Zapisz"}
@@ -933,78 +951,80 @@ function TerminarzInner({
               const isPast = Boolean(lesson.date && lesson.date < today);
               const canEdit = !isPast && status === "PLANNED";
               const canDelete = !isPast && status === "PLANNED";
+              const hint = status === "UNPAID"
+                ? "Brak wpłaty od rodzica - skontaktuj się i ponów w planie tygodnia."
+                : needsAction && status === "PLANNED"
+                  ? "Po zajęciach zalicz lekcję w planie tygodnia."
+                  : isPast
+                    ? "Zajęcia zakończone - bez edycji"
+                    : status !== "PLANNED"
+                      ? "Edycja i usuwanie tylko dla lekcji zaplanowanych"
+                      : null;
               return (
                 <li
                   key={lesson.id}
-                  className="soft-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="soft-panel grid grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[2.75rem_minmax(7.5rem,1fr)_minmax(0,1.35fr)_minmax(0,1.45fr)_minmax(11rem,1.15fr)] sm:gap-x-4"
                 >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className="avatar-initials h-10 w-10 shrink-0 text-sm">
-                      {lesson.initials}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {lesson.studentId ? (
-                          <Link
-                            href="/uczniowie"
-                            className="truncate text-sm font-extrabold text-depths underline-offset-2 hover:text-depths hover:underline"
-                            title="Przejdź do uczniów"
-                          >
-                            {lesson.studentName}
-                          </Link>
-                        ) : (
-                          <p className="truncate text-sm font-extrabold text-depths">{lesson.studentName}</p>
-                        )}
-                        <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
-                      </div>
-                      <p className="truncate text-xs text-muted">
-                        {lesson.subject} · {lesson.classLabel}
-                      </p>
-                      <p className="text-[0.6875rem] text-muted">
-                        {lesson.date ? formatLessonDatePl(lesson.date) : dayLabel(lesson.dayIndex)} ·{" "}
-                        {lesson.start}–{lesson.end}
-                      </p>
-                      {status === "UNPAID" ? (
-                        <p className="mt-1 text-[0.65rem] font-bold text-depths">
-                          Brak wpłaty od rodzica - skontaktuj się i ponów w planie tygodnia.
-                        </p>
-                      ) : null}
-                      {needsAction && status === "PLANNED" ? (
-                        <p className="text-muted mt-1 text-[0.65rem]">
-                          Po zajęciach zalicz lekcję w planie tygodnia.
-                        </p>
-                      ) : null}
-                      {isPast ? (
-                        <p className="text-muted mt-1 text-[0.65rem]">Zajęcia zakończone - bez edycji</p>
-                      ) : status !== "PLANNED" ? (
-                        <p className="text-muted mt-1 text-[0.65rem]">
-                          Edycja i usuwanie tylko dla lekcji zaplanowanych
-                        </p>
-                      ) : null}
+                  <span className="avatar-initials row-span-2 h-10 w-10 shrink-0 self-center text-sm sm:row-span-1">
+                    {lesson.initials}
+                  </span>
+
+                  <div className="min-w-0">
+                    {lesson.studentId ? (
+                      <Link
+                        href="/uczniowie"
+                        className="block truncate text-sm font-extrabold text-depths underline-offset-2 hover:underline"
+                        title="Przejdź do uczniów"
+                      >
+                        {lesson.studentName}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm font-extrabold text-depths">{lesson.studentName}</p>
+                    )}
+                    <div className="mt-1">
+                      <LessonStatusBadge status={lesson.status} isCompleted={lesson.isCompleted} />
                     </div>
                   </div>
-                  {canEdit || canDelete ? (
-                    <div className="flex shrink-0 gap-2">
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime"
-                          onClick={() => openEdit(lesson)}
-                        >
-                          Edytuj
-                        </button>
-                      ) : null}
-                      {canDelete ? (
-                        <button
-                          type="button"
-                          className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
-                          onClick={() => removeLesson(lesson)}
-                        >
-                          Usuń
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
+
+                  <p className="col-start-2 min-w-0 truncate text-xs font-semibold text-depths sm:col-start-auto sm:text-sm">
+                    {lesson.subject}
+                    <span className="font-medium text-muted"> · {lesson.classLabel}</span>
+                  </p>
+
+                  <p className="col-start-2 min-w-0 text-[0.6875rem] font-semibold tabular-nums text-muted sm:col-start-auto sm:text-xs">
+                    {lesson.date ? formatLessonDatePl(lesson.date) : dayLabel(lesson.dayIndex)}
+                    <span className="text-depths/70"> · {lesson.start}–{lesson.end}</span>
+                  </p>
+
+                  <div className="col-span-2 flex min-h-[2.5rem] min-w-0 flex-col items-start justify-center gap-1.5 sm:col-span-1 sm:items-end sm:text-right">
+                    {hint ? (
+                      <p className="text-muted w-full text-[0.65rem] leading-snug">{hint}</p>
+                    ) : (
+                      <span className="hidden sm:block" aria-hidden />
+                    )}
+                    {canEdit || canDelete ? (
+                      <div className="flex shrink-0 gap-2">
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="landing-navy rounded-full px-3 py-1.5 text-xs font-semibold text-lime"
+                            onClick={() => openEdit(lesson)}
+                          >
+                            Edytuj
+                          </button>
+                        ) : null}
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="rounded-full border border-panel-frame/35 bg-snow px-3 py-1.5 text-xs font-semibold text-depths"
+                            onClick={() => removeLesson(lesson)}
+                          >
+                            Usuń
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </li>
               );
             })

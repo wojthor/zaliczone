@@ -6,11 +6,17 @@ import { PageShell } from "@/components/page-shell";
 import { Spinner, useToast } from "@/components/ui/toast";
 import { insertStudent, updateStudent, deleteStudent } from "@/lib/actions/students";
 import { AlertsBanner } from "@/components/alerts/alerts-banner";
-import { LessonStatusBadge } from "@/components/lesson/lesson-status-badge";
+import {
+  LessonStatusBadge,
+  resolveLessonStatus,
+} from "@/components/lesson/lesson-status-badge";
 import type { Lesson } from "@/components/dashboard/lesson-data";
 import type { AppAlert, StudentUi } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 import { levelsAllowedForSubjects, subjectsFromOfferings } from "@/lib/tutor-offerings";
+
+type LessonHistoryStatusFilter = "all" | "verified" | "unpaid";
+type LessonHistorySort = "newest" | "oldest";
 
 function formatLessonDatePl(dateIso: string | undefined): string {
   if (!dateIso) return "Bez daty";
@@ -84,6 +90,9 @@ export function UczniowieClient({
   const [draft, setDraft] = useState<NewStudentDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
   const [lessonsModalStudent, setLessonsModalStudent] = useState<StudentUi | null>(null);
+  const [lessonHistoryStatus, setLessonHistoryStatus] =
+    useState<LessonHistoryStatusFilter>("all");
+  const [lessonHistorySort, setLessonHistorySort] = useState<LessonHistorySort>("newest");
 
   const lessonsByStudent = useMemo(() => {
     const map = new Map<string, Lesson[]>();
@@ -93,15 +102,32 @@ export function UczniowieClient({
       if (list) list.push(lesson);
       else map.set(lesson.studentId, [lesson]);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.start.localeCompare(a.start));
-    }
     return map;
   }, [lessons]);
 
-  const lessonsModalItems = lessonsModalStudent
-    ? (lessonsByStudent.get(lessonsModalStudent.id) ?? [])
-    : [];
+  const lessonsModalItems = useMemo(() => {
+    if (!lessonsModalStudent) return [];
+    let list = [...(lessonsByStudent.get(lessonsModalStudent.id) ?? [])];
+    if (lessonHistoryStatus === "verified") {
+      list = list.filter((lesson) => resolveLessonStatus(lesson.status, lesson.isCompleted) === "VERIFIED");
+    } else if (lessonHistoryStatus === "unpaid") {
+      list = list.filter((lesson) => resolveLessonStatus(lesson.status, lesson.isCompleted) === "UNPAID");
+    }
+    list.sort((a, b) => {
+      const byDate = (a.date ?? "").localeCompare(b.date ?? "");
+      const byStart = a.start.localeCompare(b.start);
+      const cmp = byDate || byStart;
+      return lessonHistorySort === "newest" ? -cmp : cmp;
+    });
+    return list;
+  }, [lessonsModalStudent, lessonsByStudent, lessonHistoryStatus, lessonHistorySort]);
+
+  const canSaveStudent = Boolean(
+    draft.name.trim() &&
+      draft.classLabel &&
+      (draft.selectedSubjects ?? []).length > 0 &&
+      subjectOptions.length > 0,
+  );
 
   const allowedLevels = useMemo(() => {
     const allowed = new Set(
@@ -405,7 +431,11 @@ export function UczniowieClient({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLessonsModalStudent(student)}
+                      onClick={() => {
+                        setLessonHistoryStatus("all");
+                        setLessonHistorySort("newest");
+                        setLessonsModalStudent(student);
+                      }}
                       className="rounded-full border border-panel-frame/45 bg-snow px-3 py-1.5 text-xs font-semibold text-depths transition hover:bg-mist"
                     >
                       Lekcje
@@ -560,9 +590,14 @@ export function UczniowieClient({
               </button>
               <button
                 type="button"
-                className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:opacity-60 touch-manipulation"
+                className="landing-navy inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-lime disabled:cursor-not-allowed disabled:opacity-45 touch-manipulation"
                 onClick={saveStudent}
-                disabled={saving || subjectOptions.length === 0}
+                disabled={saving || !canSaveStudent}
+                title={
+                  canSaveStudent
+                    ? undefined
+                    : "Uzupełnij imię, przedmiot i poziom"
+                }
               >
                 {saving ? <Spinner /> : null}
                 {saving ? "Zapisywanie…" : editId ? "Zapisz" : "Dodaj"}
@@ -580,7 +615,7 @@ export function UczniowieClient({
             aria-label="Zamknij"
             onClick={() => setLessonsModalStudent(null)}
           />
-          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(38rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow sm:max-w-[min(38rem,94vw)] sm:rounded-app">
+          <div className="confirm-dialog-in relative z-10 flex max-h-[min(92dvh,40rem)] w-full max-w-[min(42rem,100%)] flex-col overflow-hidden rounded-t-app bg-snow sm:max-w-[min(42rem,94vw)] sm:rounded-app">
             <span className="mx-auto mt-2 mb-1 block h-1 w-10 shrink-0 rounded-full bg-panel-frame/40 sm:hidden" />
             <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-6">
               <h2 className="text-depths text-lg font-semibold tracking-tight">
@@ -588,13 +623,58 @@ export function UczniowieClient({
               </h2>
               <p className="text-muted mt-0.5 text-xs font-semibold">
                 {lessonsModalItems.length}{" "}
-                {lessonsModalItems.length === 1 ? "lekcja" : "lekcji"} w historii
+                {lessonsModalItems.length === 1 ? "lekcja" : "lekcji"}
+                {lessonHistoryStatus === "all" ? " w historii" : " po filtrze"}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { id: "all", label: "Wszystkie" },
+                    { id: "verified", label: "Zatwierdzone" },
+                    { id: "unpaid", label: "Nieopłacone" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setLessonHistoryStatus(opt.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      lessonHistoryStatus === opt.id
+                        ? "landing-navy text-lime"
+                        : "bg-luster text-depths hover:bg-mist"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <span className="mx-0.5 hidden h-4 w-px bg-panel-frame/50 sm:block" aria-hidden />
+                {(
+                  [
+                    { id: "newest", label: "Od najpóźniejszych" },
+                    { id: "oldest", label: "Od najwcześniejszych" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setLessonHistorySort(opt.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      lessonHistorySort === opt.id
+                        ? "landing-navy text-lime"
+                        : "bg-luster text-depths hover:bg-mist"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
               {lessonsModalItems.length === 0 ? (
                 <p className="text-muted py-6 text-center text-sm">
-                  Brak zapisanych lekcji z tym uczniem.
+                  {lessonHistoryStatus === "all"
+                    ? "Brak zapisanych lekcji z tym uczniem."
+                    : "Brak lekcji dla wybranego filtra."}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
