@@ -947,19 +947,19 @@ function TerminarzInner({
           ) : (
             filteredForMonth.map((lesson) => {
               const status = resolveLessonStatus(lesson.status, lesson.isCompleted);
-              const needsAction = status === "UNPAID" || status === "PLANNED";
               const isPast = Boolean(lesson.date && lesson.date < today);
               const canEdit = !isPast && status === "PLANNED";
               const canDelete = !isPast && status === "PLANNED";
-              const hint = status === "UNPAID"
-                ? "Brak wpłaty od rodzica - skontaktuj się i ponów w planie tygodnia."
-                : needsAction && status === "PLANNED"
-                  ? "Po zajęciach zalicz lekcję w planie tygodnia."
-                  : isPast
-                    ? "Zajęcia zakończone - bez edycji"
-                    : status !== "PLANNED"
-                      ? "Edycja i usuwanie tylko dla lekcji zaplanowanych"
-                      : null;
+              const hint =
+                status === "UNPAID"
+                  ? "Brak wpłaty od rodzica - skontaktuj się i ponów w planie tygodnia."
+                  : status === "PLANNED"
+                    ? isPast
+                      ? "Zajęcia zakończone - bez edycji"
+                      : "Po zajęciach zalicz lekcję w planie tygodnia."
+                    : isPast
+                      ? "Zajęcia zakończone - bez edycji"
+                      : "Edycja i usuwanie tylko dla lekcji zaplanowanych";
               return (
                 <li
                   key={lesson.id}
