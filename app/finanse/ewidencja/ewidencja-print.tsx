@@ -22,18 +22,6 @@ function hoursFromMinutes(minutes: number): string {
   });
 }
 
-function weekdayFromIso(dateIso: string): string {
-  return new Intl.DateTimeFormat("pl-PL", { weekday: "long" }).format(
-    new Date(`${dateIso}T12:00:00`),
-  );
-}
-
-function weekdayShortFromIso(dateIso: string): string {
-  return new Intl.DateTimeFormat("pl-PL", { weekday: "short" }).format(
-    new Date(`${dateIso}T12:00:00`),
-  );
-}
-
 function formatDdMmYyyy(dateIso: string): string {
   const [y, m, d] = dateIso.split("-");
   if (!y || !m || !d) return dateIso;
@@ -178,9 +166,6 @@ export function EwidencjaPrintView({
                     <div className="min-w-0">
                       <p className="text-sm font-bold tabular-nums text-[#000C4A]">
                         {formatDdMmYyyy(row.dateIso)}
-                        <span className="ml-1.5 font-semibold capitalize text-neutral-500">
-                          · {weekdayShortFromIso(row.dateIso)}
-                        </span>
                       </p>
                       <p className="mt-0.5 truncate text-sm font-medium text-neutral-800">
                         {row.activityType}
@@ -205,9 +190,6 @@ export function EwidencjaPrintView({
                     Data
                   </th>
                   <th className="border border-black bg-neutral-100 px-2 py-2 text-left font-bold">
-                    Dzień tygodnia
-                  </th>
-                  <th className="border border-black bg-neutral-100 px-2 py-2 text-left font-bold">
                     Poziom nauczania
                   </th>
                   <th className="border border-black bg-neutral-100 px-2 py-2 text-left font-bold">
@@ -216,7 +198,7 @@ export function EwidencjaPrintView({
                   <th className="border border-black bg-neutral-100 px-2 py-2 text-right font-bold">
                     Liczba godzin
                   </th>
-                  <th className="border border-black bg-neutral-100 px-2 py-2 text-left font-bold">
+                  <th className="w-[9.5rem] min-w-[9.5rem] border border-black bg-neutral-100 px-3 py-2 text-left font-bold print:w-[10rem] print:min-w-[10rem]">
                     Podpis
                   </th>
                 </tr>
@@ -225,7 +207,7 @@ export function EwidencjaPrintView({
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={5}
                       className="border border-black px-2 py-6 text-center text-neutral-500"
                     >
                       Brak zatwierdzonych lekcji w tym miesiącu.
@@ -237,22 +219,21 @@ export function EwidencjaPrintView({
                       <td className="border border-black px-2 py-2 tabular-nums">
                         {formatDdMmYyyy(row.dateIso)}
                       </td>
-                      <td className="border border-black px-2 py-2 capitalize">
-                        {weekdayFromIso(row.dateIso)}
-                      </td>
                       <td className="border border-black px-2 py-2">{row.classLevel}</td>
                       <td className="border border-black px-2 py-2">{row.activityType}</td>
                       <td className="border border-black px-2 py-2 text-right tabular-nums">
                         {hoursFromMinutes(row.minutes)}
                       </td>
-                      <td className="border border-black px-2 py-2">&nbsp;</td>
+                      <td className="w-[9.5rem] min-w-[9.5rem] border border-black px-3 py-3 print:w-[10rem] print:min-w-[10rem]">
+                        &nbsp;
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={4} className="border border-black px-2 py-2.5 text-right font-bold">
+                  <td colSpan={3} className="border border-black px-2 py-2.5 text-right font-bold">
                     Razem godzin dydaktycznych
                   </td>
                   <td className="border border-black px-2 py-2.5 text-right font-bold tabular-nums">
@@ -264,15 +245,9 @@ export function EwidencjaPrintView({
             </table>
           </div>
 
-          <section className="mt-10 grid gap-8 sm:mt-12 sm:grid-cols-2 sm:gap-10 print:mt-12">
-            <div>
-              <div className="h-12 border-b border-black" />
-              <p className="mt-1 text-xs">Data i podpis zleceniobiorcy</p>
-            </div>
-            <div>
-              <div className="h-12 border-b border-black" />
-              <p className="mt-1 text-xs">Data i podpis zleceniodawcy</p>
-            </div>
+          <section className="mt-10 max-w-xs sm:mt-12 print:mt-12">
+            <div className="h-12 border-b border-black" />
+            <p className="mt-1 text-xs">Data i podpis zleceniobiorcy</p>
           </section>
         </article>
       </div>
