@@ -14,7 +14,6 @@ import {
   IconUsers,
   IconWallet,
 } from "@/components/icons";
-import { BrandLogoMark } from "@/components/brand-logo";
 import { GlobalSearchButton, GlobalSearchModal } from "@/components/search/global-search";
 import { signOut } from "@/lib/data/mutations";
 import { logoFont } from "@/lib/logo-font";
@@ -201,10 +200,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           href="/panel"
           onClick={closeMobile}
           title="Zaliczone"
-          aria-label="Zaliczone"
-          className="block shrink-0 transition hover:brightness-110"
+          className={`${logoFont.className} landing-navy flex h-14 w-14 items-center justify-center rounded-full text-[1.85rem] font-extrabold italic uppercase leading-none tracking-tighter text-lime`}
         >
-          <BrandLogoMark className="h-14 w-14" />
+          Z
         </Link>
 
         <div className={RAIL}>
