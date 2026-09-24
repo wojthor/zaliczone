@@ -16,7 +16,6 @@
     "seed:battle": "node --env-file=.env.local scripts/seed-battle.mjs",
     "seed:clean": "node --env-file=.env.local scripts/seed-clean.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
-    "seed:filmik": "node --env-file=.env.local scripts/seed-filmik.mjs",
     "seed:july21": "node --env-file=.env.local scripts/seed-july21.mjs",
     "seed:pit": "node --env-file=.env.local scripts/seed-tutor-pit.mjs",
     "test": "vitest run",

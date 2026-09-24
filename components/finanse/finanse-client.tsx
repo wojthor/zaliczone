@@ -5,7 +5,6 @@ import { PageShell } from "@/components/page-shell";
 import { BonusProgressBar } from "@/components/bonus-progress-bar";
 import { tutorPayoutFromCennik, sumTutorPayoutFromCennik, financeLinesHours } from "@/lib/data/mappers";
 import { TUTOR_SHARE, bonusProgress, ewidencjaAvailableFromHint, isEwidencjaPdfAvailable } from "@/lib/dates";
-import { isFilmikMode } from "@/lib/filmik";
 import type { FinanceLineUi, Payout } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 
@@ -155,7 +154,7 @@ export function FinanseClient({
             rel="noopener noreferrer"
             className="landing-navy inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold text-lime"
           >
-            {isFilmikMode() ? "Wygeneruj ewidencję" : "Generuj"}
+            Generuj
           </a>
         ) : (
           <p className="text-muted max-w-[16rem] shrink-0 text-right text-[11px] leading-snug">

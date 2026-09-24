@@ -1,5 +1,5 @@
 /**
- * Wyczyść wszystkie dane demo - zostaw tylko admin + Benio Beniowski (bez lekcji, uczniów itd.)
+ * Wyczyść dane operacyjne - zostaw tylko admina produkcyjnego (0 uczniów / lekcji).
  * Run: pnpm seed:clean
  */
 
@@ -11,22 +11,15 @@ if (!url || !serviceKey) {
   process.exit(1);
 }
 
-const KEEP_EMAILS = new Set(["admin@zaliczone.pl", "teacher@zaliczone.pl"]);
+const KEEP_EMAILS = new Set(["admin@zaliczone.edu.pl"]);
 
 const ACCOUNTS = [
   {
-    email: "admin@zaliczone.pl",
-    password: "123456",
+    email: "admin@zaliczone.edu.pl",
+    password: "Korki.124",
     role: "ADMIN",
-    full_name: "Administrator",
+    full_name: "Martyna Wilczyńska",
     active_subjects: [],
-  },
-  {
-    email: "teacher@zaliczone.pl",
-    password: "123456",
-    role: "TUTOR",
-    full_name: "Benio Beniowski",
-    active_subjects: ["Matematyka", "Fizyka"],
   },
 ];
 
@@ -57,6 +50,21 @@ async function createUser(account) {
   return body.id ?? body.user?.id;
 }
 
+async function updateUser(userId, account) {
+  const res = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+    method: "PUT",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      email: account.email,
+      password: account.password,
+      email_confirm: true,
+      user_metadata: { role: account.role, full_name: account.full_name },
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.msg || JSON.stringify(body));
+}
+
 async function deleteUser(userId) {
   const res = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
     method: "DELETE",
@@ -85,13 +93,14 @@ async function upsertProfile(userId, account) {
       phone: null,
       bank_account: null,
       olx_url: null,
+      accepting_students: true,
     }),
   });
   if (!res.ok) throw new Error(await res.text());
 }
 
 async function main() {
-  console.log("🧹 Czyszczenie bazy - zostają admin + Benio (pusto)\n");
+  console.log("🧹 Czyszczenie bazy - tryb produkcyjny (0 uczniów), sam admin\n");
 
   console.log("Usuwanie danych operacyjnych…");
   await restDelete("message_recipients", "id=not.is.null");
@@ -109,16 +118,22 @@ async function main() {
     console.log(`✓ Usunięto konto: ${user.email}`);
   }
 
+  const freshUsers = await listUsers();
   for (const account of ACCOUNTS) {
-    let id = users.find((u) => u.email === account.email)?.id;
-    if (!id) id = await createUser(account);
+    let id = freshUsers.find((u) => u.email === account.email)?.id;
+    if (!id) {
+      id = await createUser(account);
+      console.log(`✓ Utworzono ${account.email}`);
+    } else {
+      await updateUser(id, account);
+      console.log(`✓ Zaktualizowano ${account.email} (hasło / metadata)`);
+    }
     await upsertProfile(id, account);
-    console.log(`✓ ${account.email} (${account.role})`);
+    console.log(`✓ Profil ${account.email} (${account.role})`);
   }
 
   console.log("\n✅ Gotowe. Logowanie:");
-  console.log("  admin@zaliczone.pl / 123456  → panel admina (pusty)");
-  console.log("  teacher@zaliczone.pl / 123456 → Benio Beniowski (pusty terminarz)");
+  console.log("  admin@zaliczone.edu.pl / Korki.124  → panel admina (pusty)");
   console.log("\nCennik (price_tiers) z migracji 0003 pozostaje bez zmian.");
 }
 
