@@ -184,7 +184,7 @@ export async function createTutorAccount(input: {
   employmentType?: string | null;
 }) {
   const supabase = createServiceClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://zaliczone.edu.pl";
 
   const { data: list } = await supabase.auth.admin.listUsers();
   const existing = list?.users.find((u) => u.email === input.email);
