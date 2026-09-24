@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" role="img" aria-label="Zaliczone">
+  <title>Zaliczone</title>
+  <circle cx="28" cy="28" r="28" fill="#000C4A"/>
+  <g transform="translate(27.15 28) skewX(-12)">
+    <path fill="#D5ED21" d="M-13.2-14.4H13.2v5.9H1.1L13.2 8.5v5.9H-13.2v-5.9H-1.1L-13.2-8.5z"/>
+  </g>
+</svg>

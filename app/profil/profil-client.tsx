@@ -195,7 +195,7 @@ export function ProfilClient({
         <section className="soft-panel p-4 sm:p-5">
           <h2 className="section-label">Przedmioty i poziomy</h2>
           <div className="mt-4">
-            <p className="section-label !text-muted">Aktywne uprawnienia</p>
+            <p className="section-label !text-muted">Aktywne przedmioty</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {activeSubjects.length > 0 ? (
                 activeSubjects.map((subject) => (

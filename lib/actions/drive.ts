@@ -90,7 +90,6 @@ export async function getTutorDriveFilesForViewer(
           configured: true,
           folderId: null,
           files: [],
-          errorMessage: "Twój folder na dysku nie jest jeszcze gotowy. Skontaktuj się z koordynatorem.",
         };
       }
     }

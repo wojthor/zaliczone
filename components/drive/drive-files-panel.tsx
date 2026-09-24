@@ -21,7 +21,7 @@ export function DriveFilesPanel({
   drive,
   tutorId,
   title = "Twoje dokumenty",
-  emptyLabel = "Brak plików w folderze.",
+  emptyLabel = "Nic tu nie ma.",
 }: {
   drive: TutorDriveFilesResult;
   /** Wymagane dla admina (API sprawdza folder nauczyciela). */
