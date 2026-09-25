@@ -66,7 +66,7 @@ export function GuideShortcutPanel() {
           <p className="mt-0.5 truncate text-xs font-extrabold leading-snug text-depths">
             {COMPANY.name}
           </p>
-          <p className="truncate text-[0.68rem] leading-snug text-muted">{COMPANY.address}</p>
+          <p className="text-[0.68rem] leading-snug text-muted">{COMPANY.address}</p>
           <dl className="mt-1.5 space-y-1.5">
             <div>
               <dt className="text-[0.55rem] font-extrabold uppercase tracking-[0.08em] text-muted">
