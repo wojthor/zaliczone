@@ -6,7 +6,7 @@ export const COMPANY = {
   name: "Martyna Wilczyńska",
   owner: "Martyna Wilczyńska",
   nip: "………………",
-  address: "ul. Słonimskiego 1/48 Gdańsk",
+  address: "ul. Słonimskiego 1/48, 80-280 Gdańsk",
   email: "kontakt@zaliczone.edu.pl",
   /** Numer rachunku do przelewów od rodziców / uczniów. */
   bankAccount: "39 1160 2202 0000 0007 3524 4970",
