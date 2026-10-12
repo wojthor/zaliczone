@@ -475,6 +475,12 @@ export function LandingPageClient({
                 >
                   {COMPANY.email}
                 </a>
+                <a
+                  href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
+                  className="font-semibold text-lime transition hover:underline"
+                >
+                  {COMPANY.phone}
+                </a>
               </div>
             </div>
 
@@ -790,6 +796,12 @@ export function LandingPageClient({
               className="block font-semibold text-[#000C4A] break-all hover:text-[#000C4A]/80"
             >
               {COMPANY.email}
+            </a>
+            <a
+              href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}
+              className="block font-semibold text-[#000C4A] hover:text-[#000C4A]/80"
+            >
+              {COMPANY.phone}
             </a>
           </div>
         </div>
