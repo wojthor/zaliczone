@@ -50,7 +50,7 @@ export function BonusProgressBar({
     ? "Premia maksymalna!"
     : p.achieved
       ? "Kolejny próg premii"
-      : "Premia miesięczna";
+      : "Bonus miesięczny";
 
   return (
     <div className={`card-feature px-3 text-lime ${compact ? "p-3" : "p-4"} ${className}`}>
