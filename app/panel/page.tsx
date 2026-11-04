@@ -42,15 +42,17 @@ export default async function TutorPanelPage() {
   const totalPayout =
     Math.round((lessonsPayout + (bonus.achieved ? bonus.bonusPln : 0)) * 100) / 100;
 
-  const totalMinutes = lessons.reduce(
+  // Statystyki / godziny tylko z lekcji w bieżącym miesiącu kalendarzowym (nie „ogółem”).
+  const lessonsThisMonth = lessons.filter((lesson) => (lesson.date ?? "").startsWith(monthKey));
+  const totalMinutes = lessonsThisMonth.reduce(
     (sum, lesson) => sum + lessonDurationMinutes(lesson.start, lesson.end),
     0,
   );
   const lessonStats = {
-    total: lessons.length,
-    pending: lessons.filter((l) => l.status === "PENDING_VERIFICATION").length,
-    verified: lessons.filter((l) => l.status === "VERIFIED").length,
-    unpaid: lessons.filter((l) => l.status === "UNPAID").length,
+    total: lessonsThisMonth.length,
+    pending: lessonsThisMonth.filter((l) => l.status === "PENDING_VERIFICATION").length,
+    verified: lessonsThisMonth.filter((l) => l.status === "VERIFIED").length,
+    unpaid: lessonsThisMonth.filter((l) => l.status === "UNPAID").length,
     totalHours: Math.round((totalMinutes / 60) * 10) / 10,
   };
 

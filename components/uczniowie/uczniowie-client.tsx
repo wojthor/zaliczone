@@ -15,7 +15,12 @@ import type { AppAlert, StudentUi } from "@/lib/types/database";
 import type { PriceTier } from "@/lib/types/messages";
 import { levelsAllowedForSubjects, subjectsFromOfferings } from "@/lib/tutor-offerings";
 
-type LessonHistoryStatusFilter = "all" | "verified" | "unpaid";
+type LessonHistoryStatusFilter =
+  | "all"
+  | "PLANNED"
+  | "PENDING_VERIFICATION"
+  | "VERIFIED"
+  | "UNPAID";
 type LessonHistorySort = "newest" | "oldest";
 
 function formatLessonDatePl(dateIso: string | undefined): string {
@@ -108,10 +113,10 @@ export function UczniowieClient({
   const lessonsModalItems = useMemo(() => {
     if (!lessonsModalStudent) return [];
     let list = [...(lessonsByStudent.get(lessonsModalStudent.id) ?? [])];
-    if (lessonHistoryStatus === "verified") {
-      list = list.filter((lesson) => resolveLessonStatus(lesson.status, lesson.isCompleted) === "VERIFIED");
-    } else if (lessonHistoryStatus === "unpaid") {
-      list = list.filter((lesson) => resolveLessonStatus(lesson.status, lesson.isCompleted) === "UNPAID");
+    if (lessonHistoryStatus !== "all") {
+      list = list.filter(
+        (lesson) => resolveLessonStatus(lesson.status, lesson.isCompleted) === lessonHistoryStatus,
+      );
     }
     list.sort((a, b) => {
       const byDate = (a.date ?? "").localeCompare(b.date ?? "");
@@ -630,8 +635,10 @@ export function UczniowieClient({
                 {(
                   [
                     { id: "all", label: "Wszystkie" },
-                    { id: "verified", label: "Zatwierdzone" },
-                    { id: "unpaid", label: "Nieopłacone" },
+                    { id: "PLANNED", label: "Zaplanowane" },
+                    { id: "PENDING_VERIFICATION", label: "Do zatwierdzenia" },
+                    { id: "VERIFIED", label: "Zatwierdzone" },
+                    { id: "UNPAID", label: "Nieopłacone" },
                   ] as const
                 ).map((opt) => (
                   <button

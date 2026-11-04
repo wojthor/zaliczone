@@ -513,6 +513,16 @@ function TerminarzInner({
   const [subjectFilter, setSubjectFilter] = useState("");
   const [sortMode, setSortMode] = useState<"dateAsc" | "dateDesc" | "studentAz" | "studentZa" | "status">("dateAsc");
 
+  // Przy zmianie tygodnia opis/statystyki miesiąca podążają za widocznym tygodniem
+  // (czwartek ISO = reprezentatywny dzień tygodnia przy przejściu przez granicę miesięcy).
+  useEffect(() => {
+    const [ys, ms, ds] = weekMondayIso.split("-").map(Number);
+    if (!ys || !ms || !ds) return;
+    const thursday = new Date(ys, ms - 1, ds + 3, 12, 0, 0, 0);
+    const nextKey = `${thursday.getFullYear()}-${String(thursday.getMonth() + 1).padStart(2, "0")}`;
+    setListMonthKey(nextKey);
+  }, [weekMondayIso, setListMonthKey]);
+
   const lessonsMatchingSearch = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     if (!q) return lessons;

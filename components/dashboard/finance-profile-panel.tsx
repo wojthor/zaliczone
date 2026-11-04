@@ -83,7 +83,7 @@ export function FinanceProfilePanel({ totalPayout, lessonStats }: FinanceProfile
             <p className="text-depths text-[clamp(1.25rem,2.5vw,1.75rem)] font-extrabold tabular-nums leading-none tracking-tight">
               {hoursLabel}
             </p>
-            <p className="section-label mt-1">godz. łącznie</p>
+            <p className="section-label mt-1">godz. w tym miesiącu</p>
           </div>
           <div className="w-full shrink-0 border-t border-panel-frame/50 pt-2.5">
             <div className="grid grid-cols-4 items-center gap-1">

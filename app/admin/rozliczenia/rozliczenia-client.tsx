@@ -56,6 +56,7 @@ export function RozliczeniaClient({
   const [pulseId, setPulseId] = useState<string | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [weekMondayIso, setWeekMondayIso] = useWeekMondayIso(0);
+  const [daySort, setDaySort] = useState<"asc" | "desc">("asc");
   const [paymentDates, setPaymentDates] = useState<Record<string, string>>({});
   const [verifyTarget, setVerifyTarget] = useState<{
     id: string;
@@ -124,9 +125,9 @@ export function RozliczeniaClient({
   const unpaidWeekAll = unpaid.filter(inSelectedWeek).length;
   const weekTotalAll = pendingWeekAll + verifiedWeekAll + unpaidWeekAll;
 
-  const pendingByDay = groupByDayDesc(pendingInWeek);
-  const verifiedByDay = groupByDayDesc(verifiedInWeek);
-  const unpaidByDay = groupByDayDesc(unpaidInWeek);
+  const pendingByDay = groupByDay(pendingInWeek, daySort);
+  const verifiedByDay = groupByDay(verifiedInWeek, daySort);
+  const unpaidByDay = groupByDay(unpaidInWeek, daySort);
 
   function paymentIsoFor(id: string): string {
     return paymentDates[id] ?? todayIso();
@@ -239,6 +240,15 @@ export function RozliczeniaClient({
             onWeekMondayIsoChange={setWeekMondayIso}
             compact
           />
+          <select
+            value={daySort}
+            onChange={(e) => setDaySort(e.target.value as "asc" | "desc")}
+            className="dash-sans w-full shrink-0 rounded-app border border-panel-frame/40 bg-white px-2.5 py-1.5 text-xs text-depths sm:w-auto"
+            aria-label="Sortowanie lekcji"
+          >
+            <option value="asc">Od najwcześniejszych</option>
+            <option value="desc">Od najpóźniejszych</option>
+          </select>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -595,7 +605,10 @@ function LessonRow({
   );
 }
 
-function groupByDayDesc(rows: FinanceLineUi[]): [string, FinanceLineUi[]][] {
+function groupByDay(
+  rows: FinanceLineUi[],
+  order: "asc" | "desc" = "asc",
+): [string, FinanceLineUi[]][] {
   const seen = new Set<string>();
   const map = new Map<string, FinanceLineUi[]>();
   for (const r of rows) {
@@ -606,9 +619,17 @@ function groupByDayDesc(rows: FinanceLineUi[]): [string, FinanceLineUi[]][] {
     list.push(r);
     map.set(k, list);
   }
-  return [...map.entries()]
-    .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
-    .map(([k, list]) => [dayKeyToLabel(k), list] as [string, FinanceLineUi[]]);
+  const dayKeys = [...map.entries()].sort(([a], [b]) =>
+    order === "asc" ? a.localeCompare(b) : b.localeCompare(a),
+  );
+  return dayKeys.map(([k, list]) => {
+    const sorted = [...list].sort((a, b) => {
+      const byLabel = a.label.localeCompare(b.label, "pl");
+      const byStudent = a.studentName.localeCompare(b.studentName, "pl");
+      return byStudent || byLabel;
+    });
+    return [dayKeyToLabel(k), sorted] as [string, FinanceLineUi[]];
+  });
 }
 
 function dayKeyToLabel(dayKey: string): string {
