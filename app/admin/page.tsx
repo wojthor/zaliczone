@@ -9,6 +9,7 @@ import {
   getPriceTiers,
 } from "@/lib/data/queries";
 import type { FinanceLineUi } from "@/lib/types/database";
+import { INTERNAL_TEST_TUTOR_IDS } from "@/lib/internal-test-accounts";
 
 function formatTodayPl(d = new Date()): string {
   return new Intl.DateTimeFormat("pl-PL", {
@@ -46,9 +47,13 @@ export default async function AdminHomePage() {
     getAllTutorProfiles(),
     getAllOperatingExpenses(),
     getOpenAdminAlerts(),
-    createClient().then((supabase) =>
-      supabase.from("students").select("*", { count: "exact", head: true }),
-    ),
+    createClient().then((supabase) => {
+      let q = supabase.from("students").select("*", { count: "exact", head: true });
+      if (INTERNAL_TEST_TUTOR_IDS.size > 0) {
+        q = q.not("tutor_id", "in", `(${[...INTERNAL_TEST_TUTOR_IDS].join(",")})`);
+      }
+      return q;
+    }),
     getPriceTiers(),
   ]);
   const pendingLessons = dashboardLines.pending;

@@ -18,6 +18,7 @@ import {
   dbStudentToUi,
   nextLessonLabelForStudent,
 } from "@/lib/data/mappers";
+import { isInternalTestTutorId } from "@/lib/internal-test-accounts";
 import type {
   AdminTutorSummary,
   Candidate,
@@ -143,7 +144,8 @@ const getLessonsByStatusCached = cache(async (statusKey: string): Promise<Financ
 
   return ((data ?? []) as DbLessonWithRelations[])
     .map(dbLessonToFinanceLine)
-    .filter((line): line is FinanceLineUi => line !== null);
+    .filter((line): line is FinanceLineUi => line !== null)
+    .filter((line) => !isInternalTestTutorId(line.tutorId));
 });
 
 export async function getLessonsByStatus(statuses: LessonStatus[]): Promise<FinanceLineUi[]> {
@@ -229,7 +231,7 @@ export async function getAllTutorProfiles(): Promise<Profile[]> {
     .order("full_name");
 
   if (error) throw error;
-  return (data ?? []) as Profile[];
+  return ((data ?? []) as Profile[]).filter((p) => !isInternalTestTutorId(p.id));
 }
 
 async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]> {
@@ -245,10 +247,11 @@ async function fetchAdminTutorSummaries(mk: string): Promise<AdminTutorSummary[]
     ]);
 
   if (tutorsRes.error) throw tutorsRes.error;
-  const tutors = (tutorsRes.data ?? []) as Profile[];
+  const tutors = ((tutorsRes.data ?? []) as Profile[]).filter((p) => !isInternalTestTutorId(p.id));
 
   const studentsByTutor = new Map<string, number>();
   for (const row of studentCounts.data ?? []) {
+    if (isInternalTestTutorId(row.tutor_id)) continue;
     studentsByTutor.set(row.tutor_id, (studentsByTutor.get(row.tutor_id) ?? 0) + 1);
   }
 
@@ -370,6 +373,7 @@ export async function getPublicTutorCards(): Promise<PublicTutorCard[]> {
   const today = new Date().toISOString().slice(0, 10);
   return (rows ?? [])
     .filter((row) => {
+      if (isInternalTestTutorId(row.id)) return false;
       const former = Boolean(row.contract_end && String(row.contract_end) <= today);
       return !former;
     })
@@ -456,7 +460,7 @@ export async function getPayoutsForMonth(month: string): Promise<Payout[]> {
     .eq("month", month);
 
   if (error) throw error;
-  return (data ?? []) as Payout[];
+  return ((data ?? []) as Payout[]).filter((p) => !isInternalTestTutorId(p.tutor_id));
 }
 
 export async function getAllPayouts(): Promise<Payout[]> {
@@ -467,7 +471,7 @@ export async function getAllPayouts(): Promise<Payout[]> {
     .order("month", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as Payout[];
+  return ((data ?? []) as Payout[]).filter((p) => !isInternalTestTutorId(p.tutor_id));
 }
 
 export async function getTutorPayouts(tutorId: string): Promise<Payout[]> {
@@ -838,7 +842,9 @@ export const getOpenAdminAlerts = cache(async (): Promise<AppAlert[]> => {
     if (msg.includes("alerts") || error.code === "42P01" || error.code === "PGRST205") return [];
     throw error;
   }
-  return (data ?? []).map(mapAlertRow);
+  return (data ?? [])
+    .map(mapAlertRow)
+    .filter((a) => !isInternalTestTutorId(a.tutorId));
 });
 
 export async function getOpenTutorAlerts(tutorId: string): Promise<AppAlert[]> {

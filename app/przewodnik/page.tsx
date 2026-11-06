@@ -10,7 +10,7 @@ const GUIDE_VIDEO = {
   blurb:
     "Od terminarza i zaliczania lekcji, przez ewidencję godzin, po finanse i wypłatę - cały obieg w jednym nagraniu.",
   /** Ustaw np. https://www.youtube.com/embed/XXXX - puste = placeholder */
-  embedUrl: "https://www.youtube.com/embed/h9QMR2moNpQ",
+  embedUrl: "https://www.youtube.com/embed/ahAYkuivYtc",
 };
 
 function VideoBlock() {

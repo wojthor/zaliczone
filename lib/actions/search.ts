@@ -8,6 +8,7 @@ import {
   getTutorLessons,
   getTutorStudents,
 } from "@/lib/data/queries";
+import { isInternalTestTutorId } from "@/lib/internal-test-accounts";
 
 export type SearchHit = {
   id: string;
@@ -161,6 +162,7 @@ async function searchAdminWorkspace(needle: string): Promise<WorkspaceSearchResu
   ]);
 
   const teacherHits: SearchHit[] = (teacherRows ?? [])
+    .filter((t) => !isInternalTestTutorId(t.id as string))
     .filter((t) => normalize((t.full_name as string | null) ?? "").includes(needle))
     .slice(0, MAX_HITS)
     .map((t) => ({
