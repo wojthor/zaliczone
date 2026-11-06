@@ -96,7 +96,7 @@ export default async function AdminKalendarzPage() {
     },
     {
       id: "payout",
-      label: `Wypłaty + odznaczenie · ${prevLabel}`,
+      label: `Wynagrodzenia + odznaczenie · ${prevLabel}`,
       dateLabel: formatDayPl(payoutDeadlineIso),
       dateIso: payoutDeadlineIso,
       daysLeft: daysUntilIso(payoutDeadlineIso, today),

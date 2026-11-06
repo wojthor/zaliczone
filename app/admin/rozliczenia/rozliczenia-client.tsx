@@ -277,7 +277,7 @@ export function RozliczeniaClient({
 
         <PaymentsPanel
           title="Zatwierdzone"
-          subtitle="Data wpływu zablokowana. Idą do wypłat i księgowości."
+          subtitle="Data wpływu zablokowana. Idą do wynagrodzeń i księgowości."
           empty="Brak zatwierdzonych pozycji w wybranym tygodniu."
           groups={verifiedByDay}
           variant="verified"

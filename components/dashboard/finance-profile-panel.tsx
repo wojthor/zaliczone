@@ -67,7 +67,7 @@ export function FinanceProfilePanel({ totalPayout, lessonStats }: FinanceProfile
         </div>
         <p className="section-label flex shrink-0 items-center justify-center gap-1.5 !text-lime">
           <IconWallet className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-          Do wypłaty
+          Do wynagrodzenia
         </p>
         <p className="shrink-0 leading-none">
           <span className="text-[clamp(1.6rem,3.2vw,2.1rem)] font-extrabold tabular-nums tracking-tight text-snow">

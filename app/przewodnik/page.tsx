@@ -8,7 +8,7 @@ import { getCurrentUserProfile } from "@/lib/data/queries";
 const GUIDE_VIDEO = {
   title: "Jak działa panel ZALICZONE",
   blurb:
-    "Od terminarza i zaliczania lekcji, przez ewidencję godzin, po finanse i wypłatę - cały obieg w jednym nagraniu.",
+    "Od terminarza i zaliczania lekcji, przez ewidencję godzin, po finanse i wynagrodzenie - cały obieg w jednym nagraniu.",
   /** Ustaw np. https://www.youtube.com/embed/XXXX - puste = placeholder */
   embedUrl: "https://www.youtube.com/embed/ahAYkuivYtc",
 };
@@ -67,10 +67,10 @@ const DEADLINES = [
     tag: "Termin",
   },
   {
-    id: "wypłata",
+    id: "wynagrodzenie",
     when: `do ${DATES.payout.deadlineDayOfNextMonth}. dnia miesiąca`,
-    what: "Wypłata za poprzedni miesiąc",
-    how: "Koordynator księguje wypłatę najpóźniej do tego dnia - status zobaczysz w Finansach.",
+    what: "Wynagrodzenie za poprzedni miesiąc",
+    how: "Koordynator księguje wynagrodzenie najpóźniej do tego dnia - status zobaczysz w Finansach.",
     tag: "Termin",
   },
   {

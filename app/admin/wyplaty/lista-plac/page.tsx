@@ -61,7 +61,7 @@ export default async function ListaPlacPage({
     return (
       <div className="p-8 text-center">
         <p className="text-muted">
-          Podaj miesiąc wypłaty, np. /admin/wyplaty/lista-plac?month=2026-07 (lista za poprzedni miesiąc)
+          Podaj miesiąc wynagrodzenia, np. /admin/wyplaty/lista-plac?month=2026-07 (lista za poprzedni miesiąc)
         </p>
       </div>
     );

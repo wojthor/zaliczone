@@ -50,7 +50,7 @@ const MONTHLY_CYCLE: Array<{ id: string; day: number; label: string; href: strin
   { id: "rachunek-send", day: 3, label: "Wysyłka rachunków do podpisania", href: "/admin/wyplaty" },
   { id: "rachunek-deadline", day: 5, label: "Rachunki podpisane (do)", href: "/admin/wyplaty" },
   { id: "verification", day: 6, label: "Weryfikacja z systemem", href: "/admin/rozliczenia" },
-  { id: "payout", day: 10, label: "Wypłaty + odznaczenie", href: "/admin/wyplaty" },
+  { id: "payout", day: 10, label: "Wynagrodzenia + odznaczenie", href: "/admin/wyplaty" },
   { id: "month-close", day: 15, label: "Zamknięcie miesiąca + koszty", href: "/admin/ksiegowosc" },
   { id: "finance-review", day: 16, label: "Weryfikacja finansów (limity)", href: "/admin/ksiegowosc" },
   { id: "taxes", day: 20, label: "Podatki / zaliczka PIT (JDG)", href: "/admin/ksiegowosc" },
@@ -1048,7 +1048,7 @@ export function KalendarzClient({ deadlines }: { deadlines: DeadlineItem[] }) {
             accent="lime"
           />
           <ChecklistCard
-            title="Proces wypłat"
+            title="Proces wynagrodzeń"
             subtitle="Cykl na koniec miesiąca - od ewidencji po przelew."
             items={PAYOUT_ITEMS}
             storageKey="zaliczone-admin-checklist-payouts"

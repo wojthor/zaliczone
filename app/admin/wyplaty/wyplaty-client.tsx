@@ -122,7 +122,7 @@ export function WyplatyClient({
 
   const [selectedMonthKey, setSelectedMonthKey] = useState(nowKey);
 
-  /** Miesiąc wypłaty (wybór w UI) → lista dotyczy poprzedniego miesiąca lekcji. */
+  /** Miesiąc wynagrodzenia (wybór w UI) → lista dotyczy poprzedniego miesiąca lekcji. */
   const workMonthKey = useMemo(() => previousMonthKey(selectedMonthKey), [selectedMonthKey]);
 
   const linesForMonth = useMemo(
@@ -183,7 +183,7 @@ export function WyplatyClient({
     <div className="min-w-0 space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="dash-sans text-depths text-xl font-bold tracking-tight sm:text-2xl">Wypłaty i Bilans</h1>
+          <h1 className="dash-sans text-depths text-xl font-bold tracking-tight sm:text-2xl">Wynagrodzenia i Bilans</h1>
           <span className="mt-1.5 block h-1 w-10 rounded-full bg-lime" aria-hidden />
           <p className="dash-sans text-muted mt-1.5 max-w-2xl text-xs leading-relaxed sm:text-sm">
             Wyłącznie lekcje VERIFIED · model marżowy 70% tutor / 30% agencja.
@@ -192,13 +192,13 @@ export function WyplatyClient({
         <div className="flex flex-wrap items-end gap-2 sm:gap-3">
           <label className="grid gap-1">
             <span className="section-label !text-muted">
-              Miesiąc wypłaty
+              Miesiąc wynagrodzenia
             </span>
             <select
               className="dash-sans text-depths rounded-app border border-mist bg-snow px-3 py-2 text-sm font-medium"
               value={selectedMonthKey}
               onChange={(e) => setSelectedMonthKey(e.target.value)}
-              aria-label="Wybierz miesiąc wypłaty"
+              aria-label="Wybierz miesiąc wynagrodzenia"
             >
               {monthOptions.map((key) => (
                 <option key={key} value={key}>
@@ -214,7 +214,7 @@ export function WyplatyClient({
         <FinanceTile label="Przychód" tone="navy">
           {formatMoney(totals.przychod)}
         </FinanceTile>
-        <FinanceTile label="Do wypłaty / Wypłacone" tone="orange">
+        <FinanceTile label="Do wynagrodzenia / Wypłacone" tone="orange">
           {formatMoney(totals.doWyplaty)}
           <span className="opacity-40"> / </span>
           {formatMoney(totals.wyplacone)}
@@ -354,14 +354,14 @@ export function WyplatyClient({
             : undefined
         }
         confirmLabel="Zatwierdź przelew"
-        successMessage="Wypłata oznaczona jako wykonana."
+        successMessage="Wynagrodzenie oznaczone jako wykonane."
         onConfirm={handleConfirmPaid}
         onSuccess={() => router.refresh()}
         onCancel={() => setConfirmRow(null)}
       >
         <label className="block text-left">
           <span className="dash-sans text-muted text-[0.65rem] font-semibold uppercase tracking-wide">
-            Kwota do wypłaty (można skorygować)
+            Kwota do wynagrodzenia (można skorygować)
           </span>
           <div className="mt-1 flex items-center gap-2 rounded-app border border-panel-frame/40 bg-white px-3 py-2">
             <input
@@ -372,7 +372,7 @@ export function WyplatyClient({
               value={manualAmount}
               onChange={(e) => setManualAmount(e.target.value)}
               className="dash-mono text-depths w-full bg-transparent text-base font-bold outline-none"
-              aria-label="Kwota do wypłaty"
+              aria-label="Kwota do wynagrodzenia"
             />
             <span className="dash-sans text-muted text-sm font-semibold">zł</span>
           </div>
@@ -382,14 +382,14 @@ export function WyplatyClient({
       <ConfirmDialog
         open={unmarkRow !== null}
         tone="danger"
-        title={unmarkRow ? `Odznacz wypłatę: ${unmarkRow.tutorName}` : ""}
+        title={unmarkRow ? `Odznacz wynagrodzenie: ${unmarkRow.tutorName}` : ""}
         description={
           unmarkRow
-            ? `Za ${monthLabel}. Status wróci do „do wypłaty”. Używaj tylko gdy oznaczenie było pomyłką.`
+            ? `Za ${monthLabel}. Status wróci do „do wynagrodzenia”. Używaj tylko gdy oznaczenie było pomyłką.`
             : undefined
         }
         confirmLabel="Odznacz"
-        successMessage="Wypłata odznaczona."
+        successMessage="Wynagrodzenie odznaczone."
         onConfirm={handleUnmarkPaid}
         onSuccess={() => router.refresh()}
         onCancel={() => setUnmarkRow(null)}

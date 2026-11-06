@@ -9,7 +9,7 @@ import type { AppNotification, NotificationKind } from "@/lib/types/database";
 const KIND_LABEL: Record<NotificationKind, string> = {
   EWIDENCJA_REQUEST: "Ewidencja",
   CENNIK_UPDATE: "Cennik",
-  PAYOUT: "Wypłata",
+  PAYOUT: "Wynagrodzenie",
   INFO: "Info",
 };
 

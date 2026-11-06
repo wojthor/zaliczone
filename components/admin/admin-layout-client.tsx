@@ -72,7 +72,7 @@ const ADMIN_NAV = [
   },
   {
     href: "/admin/wyplaty",
-    label: "Wypłaty",
+    label: "Wynagrodzenia",
     Icon: IconWallet,
     keywords: [
       "przelew",
@@ -151,7 +151,7 @@ const ADMIN_NAV = [
   },
 ] as const;
 
-const ADMIN_SEARCH_HINTS = ["zatwierdź", "wypłaty", "cennik", "nauczyciel", "ewidencja"];
+const ADMIN_SEARCH_HINTS = ["zatwierdź", "wynagrodzenia", "cennik", "nauczyciel", "ewidencja"];
 
 const SIDEBAR_W = "4.75rem";
 const RAIL = "tutor-panel-surface flex flex-col items-center gap-1.5 rounded-[1.75rem] px-2 py-2.5";

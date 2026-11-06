@@ -67,7 +67,7 @@ export function BonusProgressBar({
       {p.maxed ? (
         showCelebration ? (
           <p className="mt-1.5 text-xs text-lime/90">
-            Łącznie {p.bonusPln} zł premii trafia do Twojej wypłaty.
+            Łącznie {p.bonusPln} zł premii trafia do Twojego wynagrodzenia.
           </p>
         ) : null
       ) : !p.achieved ? (

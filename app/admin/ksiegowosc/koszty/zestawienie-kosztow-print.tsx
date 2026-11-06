@@ -155,7 +155,7 @@ export function ZestawienieKosztowPrintView({
                 Miesiąc
               </th>
               <th className="border border-black bg-neutral-100 px-2 py-2 text-right font-bold">
-                Wypłaty
+                Wynagrodzenia
               </th>
               <th className="border border-black bg-neutral-100 px-2 py-2 text-right font-bold">
                 Premie
@@ -254,7 +254,7 @@ export function ZestawienieKosztowPrintView({
       <header className="border-b-2 border-black pb-3">
         <h1 className="text-xl font-bold uppercase tracking-wide">Zestawienie kosztów</h1>
         <p className="mt-1 text-sm capitalize">
-          {displayPeriod} - rachunki i faktury (poza wypłatami tutorów)
+          {displayPeriod} - rachunki i faktury (poza wynagrodzeniami tutorów)
         </p>
       </header>
 

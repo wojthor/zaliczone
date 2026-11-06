@@ -387,7 +387,7 @@ export function KsiegowoscClient({
               .filter((e) => e.month === monthKey)
               .reduce((s, e) => s + Number(e.amount_pln), 0) * 100,
           ) / 100;
-        // Wypłaty = pełna suma PAID (z premiami); premie tylko jako rozbicie
+        // Wynagrodzenia = pełna suma PAID (z premiami); premie tylko jako rozbicie
         const totalPln = Math.round((payoutsPln + extraCostsPln) * 100) / 100;
         return {
           monthKey,
@@ -1027,7 +1027,7 @@ export function KsiegowoscClient({
         <FinanceTile label="Przychód" tone="navy">
           <span className="mark-highlight-on-dark">{formatPln(totals.gross)}</span>
         </FinanceTile>
-        <FinanceTile label="Wypłaty" tone="orange">
+        <FinanceTile label="Wynagrodzenia" tone="orange">
           {formatPln(totals.tutorShare)}
         </FinanceTile>
         <FinanceTile label="Dochód" tone="green">
@@ -1148,7 +1148,7 @@ export function KsiegowoscClient({
         <div className="mb-4">
           <p className="text-muted text-xs capitalize">
             {viewMode === "year"
-              ? `${periodLabel} - wypłaty, premie i koszty dodatkowe z ewidencji miesięcznej`
+              ? `${periodLabel} - wynagrodzenia, premie i koszty dodatkowe z ewidencji miesięcznej`
               : `${periodLabel} - rachunki i faktury`}
           </p>
         </div>
@@ -1319,7 +1319,7 @@ export function KsiegowoscClient({
           </>
         ) : yearCostRows.length === 0 ? (
           <p className="text-muted py-3 text-xs">
-            Brak kosztów w tym roku - pojawią się po wypłatach i kosztach z widoku miesięcznego.
+            Brak kosztów w tym roku - pojawią się po wynagrodzeniach i kosztach z widoku miesięcznego.
           </p>
         ) : (
           <div className="max-h-[min(20rem,42vh)] overflow-auto rounded-app bg-snow scrollbar-panel">
@@ -1327,7 +1327,7 @@ export function KsiegowoscClient({
               <thead className="sticky top-0 z-1 bg-paper">
                 <tr>
                   <th className={th}>Miesiąc</th>
-                  <th className={`${th} text-right`}>Wypłaty</th>
+                  <th className={`${th} text-right`}>Wynagrodzenia</th>
                   <th className={`${th} text-right`}>Premie</th>
                   <th className={`${th} text-right`}>Koszty dodatkowe</th>
                   <th className={`${th} text-right`}>Suma</th>
@@ -1395,7 +1395,7 @@ export function KsiegowoscClient({
                   <th className={`${thNavy} text-right`}>Uczniowie</th>
                   <th className={`${thNavy} text-right`}>Lekcje</th>
                   <th className={`${thNavy} text-right`}>Godziny</th>
-                  <th className={`${thNavy} text-right`}>Wypłaty PAID</th>
+                  <th className={`${thNavy} text-right`}>Wynagrodzenia PAID</th>
                   <th className={thNavy}>Status</th>
                 </tr>
               </thead>
@@ -1659,7 +1659,7 @@ export function KsiegowoscClient({
 
             <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-dashed border-moss/25 pt-6 sm:grid-cols-4">
               <ClosedFigure label="Przychód" value={formatPln(totals.gross)} />
-              <ClosedFigure label="Wypłaty" value={formatPln(totals.tutorShare)} />
+              <ClosedFigure label="Wynagrodzenia" value={formatPln(totals.tutorShare)} />
               <ClosedFigure label="Podatek dochodowy" value={formatPln(summaryPit)} />
               <ClosedFigure label="Twój ZUS" value={formatPln(closedZusTotal)} />
               <ClosedFigure label="ZUS pracowników" value={formatPln(summaryZusPracownicy)} />
@@ -1701,7 +1701,7 @@ export function KsiegowoscClient({
                 Wszystkie lekcje mają status VERIFIED lub UNPAID (brak PLANNED / do weryfikacji).
               </ChecklistRow>
               <ChecklistRow ok={payoutsReady} title="Warunek 2">
-                Wszystkie wypłaty tutorów mają status PAID.
+                Wszystkie wynagrodzenia tutorów mają status PAID.
               </ChecklistRow>
               <li>
                 <label
@@ -1770,7 +1770,7 @@ export function KsiegowoscClient({
         open={confirmCloseOpen}
         tone="positive"
         title={`Zamknąć ${periodLabel}?`}
-        description="Miesiąc zostanie oznaczony jako zamknięty - dodawanie/usuwanie kosztów oraz edycja lekcji, wypłat i wydatków za ten miesiąc będzie zablokowana. Tej operacji nie można cofnąć z UI."
+        description="Miesiąc zostanie oznaczony jako zamknięty - dodawanie/usuwanie kosztów oraz edycja lekcji, wynagrodzeń i wydatków za ten miesiąc będzie zablokowana. Tej operacji nie można cofnąć z UI."
         confirmLabel="Zamknij miesiąc"
         successMessage="Miesiąc został zamknięty."
         onConfirm={handleCloseMonth}
@@ -1879,7 +1879,7 @@ function ProfitSummary({
           <span className="font-bold dash-mono text-snow">{formatPln(gross)}</span>
         </li>
         <li className={`${row} text-soft-lime/85`}>
-          <span className="font-semibold uppercase tracking-wide">− Wypłaty</span>
+          <span className="font-semibold uppercase tracking-wide">− Wynagrodzenia</span>
           <span className="font-bold dash-mono">{formatPln(payouts)}</span>
         </li>
         <li className={`${row} text-soft-lime/85`}>

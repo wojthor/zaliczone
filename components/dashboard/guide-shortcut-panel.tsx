@@ -54,7 +54,7 @@ export function GuideShortcutPanel() {
           />
           <CycleStep
             tone="navy"
-            eyebrow="Wypłata"
+            eyebrow="Wynagrodzenie"
             title={`do ${DATES.payout.deadlineDayOfNextMonth}. dnia miesiąca`}
             isLast
           />

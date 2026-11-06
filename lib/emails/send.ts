@@ -145,10 +145,10 @@ export async function sendPayoutConfirmationEmail(email: string, month: string, 
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `Wypłata zaksięgowana - ${label}${subjectSuffix}`,
+    subject: `Wynagrodzenie zaksięgowane - ${label}${subjectSuffix}`,
     html: `
       <p>Cześć!</p>
-      <p>Potwierdzamy wypłatę za <strong>${label}</strong> w kwocie <strong>${amount.toLocaleString("pl-PL")} zł</strong>.</p>
+      <p>Potwierdzamy wynagrodzenie za <strong>${label}</strong> w kwocie <strong>${amount.toLocaleString("pl-PL")} zł</strong>.</p>
       <p>Pozdrawiamy,<br/>ZALICZONE</p>
     `,
   });

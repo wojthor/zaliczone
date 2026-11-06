@@ -126,7 +126,7 @@ export function FinanseClient({
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-muted max-w-xl text-sm font-medium">
           Widzisz tu tylko zarobki z lekcji, które placówka już zatwierdziła. Od tej kwoty liczymy
-          Twoją wypłatę.
+          Twoje wynagrodzenie.
         </p>
         <div className="flex w-full flex-col gap-3 sm:w-auto">
           <label className="grid w-full shrink-0 gap-1 sm:w-auto">
@@ -218,7 +218,7 @@ export function FinanseClient({
         <div className="rounded-[1.75rem] bg-[#000C4A] p-4 text-luster sm:col-span-2 lg:col-span-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <p className="text-[0.65rem] font-extrabold uppercase tracking-[0.08em] text-lime/80">
-              {isCurrentMonth ? "Do wypłaty w tym miesiącu" : "Do wypłaty"}
+              {isCurrentMonth ? "Do wynagrodzenia w tym miesiącu" : "Do wynagrodzenia"}
             </p>
             {isPayoutMarkedPaid ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-depths">

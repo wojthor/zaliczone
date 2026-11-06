@@ -411,7 +411,7 @@ export function NauczycielProfilClient({
             <Metric label="Godziny" value={String(monthStats.hours)} />
             <Metric label="Przychód (klient)" value={formatPln(monthStats.revenue)} />
             <div>
-              <p className="section-label !text-muted">Jego wypłata</p>
+              <p className="section-label !text-muted">Jego wynagrodzenie</p>
               <p className="dash-mono text-depths mt-0.5 text-2xl font-black">
                 {formatPln(monthStats.payout)}
               </p>
@@ -482,7 +482,7 @@ export function NauczycielProfilClient({
         open={confirmArchiveOpen}
         tone="neutral"
         title={`Zakończyć współpracę z ${tutor.name}?`}
-        description="Ustawimy datę zakończenia umowy na dziś i zablokujemy logowanie. Profil, wypłaty i dane do PIT zostaną zachowane - będziesz mógł rozliczyć PIT na koniec roku."
+        description="Ustawimy datę zakończenia umowy na dziś i zablokujemy logowanie. Profil, wynagrodzenia i dane do PIT zostaną zachowane - będziesz mógł rozliczyć PIT na koniec roku."
         confirmLabel="Zakończ współpracę"
         successMessage="Współpraca zakończona."
         onConfirm={handleArchiveConfirmed}

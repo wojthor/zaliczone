@@ -81,7 +81,7 @@ const mainNav = [
     keywords: [
       "zarobki",
       "pieniądze",
-      "wypłata",
+      "wynagrodzenie",
       "rozliczenia",
       "ewidencja",
       "ewidencja godzin",
@@ -137,7 +137,7 @@ const profilNav = {
 
 const SEARCH_NAV_ITEMS = [...mainNav, guideNav, profilNav];
 
-const SEARCH_HINTS = ["ewidencja", "wypłata", "uczeń", "lekcja", "hasło"];
+const SEARCH_HINTS = ["ewidencja", "wynagrodzenie", "uczeń", "lekcja", "hasło"];
 
 const SIDEBAR_W = "4.75rem";
 const RAIL = "tutor-panel-surface flex flex-col items-center gap-1.5 rounded-[1.75rem] px-2 py-2.5";

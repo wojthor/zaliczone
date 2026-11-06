@@ -58,7 +58,7 @@ function identityFromTutor(tutor: AdminTutorSummary): IdentityDraft {
 
 /**
  * Panel PIT - domyślnie sztywne informacje; edycja + jeden zapis.
- * Przychody z wypłat PAID aktualizują się automatycznie z kolejnymi miesiącami.
+ * Przychody z wynagrodzeń PAID aktualizują się automatycznie z kolejnymi miesiącami.
  */
 export function TutorPitPanel({
   open,
@@ -158,7 +158,7 @@ export function TutorPitPanel({
           <div>
             <h2 className="dash-sans text-depths text-lg font-bold">Dane do PIT - {tutor.name}</h2>
             <p className="dash-sans text-muted mt-0.5 text-xs">
-              Informacje pod PIT-11. Przychody z wypłat aktualizują się wraz z kolejnymi miesiącami.
+              Informacje pod PIT-11. Przychody z wynagrodzeń aktualizują się wraz z kolejnymi miesiącami.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -197,7 +197,7 @@ export function TutorPitPanel({
 
           {isB2b ? (
             <p className="dash-sans rounded-app border border-butter/50 bg-butter/30 px-3 py-2 text-xs leading-relaxed text-depths">
-              Współpraca B2B - zwykle <strong>nie wystawiasz PIT-11</strong>. Poniższe wypłaty służą kontroli kosztów.
+              Współpraca B2B - zwykle <strong>nie wystawiasz PIT-11</strong>. Poniższe wynagrodzenia służą kontroli kosztów.
             </p>
           ) : (
             <p className="dash-sans text-muted text-xs leading-relaxed">
@@ -323,7 +323,7 @@ export function TutorPitPanel({
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Kpi label="Przychód (wypłaty PAID)" value={formatPln(income)} hint="z systemu" />
+              <Kpi label="Przychód (wynagrodzenia PAID)" value={formatPln(income)} hint="z systemu" />
               <Kpi label="Koszty uzyskania" value={formatPln(costs)} />
               <Kpi label="Dochód" value={formatPln(taxable)} />
               <Kpi label="Zaliczki PIT" value={formatPln(tax.taxAdvancesPln)} />
@@ -343,7 +343,7 @@ export function TutorPitPanel({
                       Premia
                     </th>
                     <th className="dash-sans px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wide text-muted">
-                      Wypłata
+                      Wynagrodzenie
                     </th>
                   </tr>
                 </thead>
@@ -351,7 +351,7 @@ export function TutorPitPanel({
                   {months.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="dash-sans text-muted px-3 py-3 text-xs">
-                        Brak wypłat PAID w {year} - pojawią się automatycznie po oznaczeniu wypłat.
+                        Brak wynagrodzeń PAID w {year} - pojawią się automatycznie po oznaczeniu wynagrodzeń.
                       </td>
                     </tr>
                   ) : (
