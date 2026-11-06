@@ -9,7 +9,7 @@ export const COMPANY = {
   address: "ul. Gliwicka 3, 45-132, Opole",
   email: "kontakt@zaliczone.edu.pl",
   /** Numer rachunku do przelewów od rodziców / uczniów. */
-  bankAccount: "39 1160 2202 0000 0007 3524 4970",
+  bankAccount: "63 1160 2202 0000 0007 3875 0021",
   /** Numer telefonu (kontakt / BLIK). */
   phone: "+48 780 890 905",
 } as const;
